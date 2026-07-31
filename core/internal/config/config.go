@@ -43,7 +43,13 @@ type Database struct {
 }
 
 type Auth struct {
-	Mode string
+	Mode            string
+	SessionIdle     time.Duration
+	SessionAbsolute time.Duration
+	FailureLimit    int
+	LockoutDuration time.Duration
+	LoginRateLimit  int
+	LoginRateWindow time.Duration
 }
 
 // Load applies defaults, an optional JSON file, then environment overrides.
@@ -80,7 +86,11 @@ func defaults() Config {
 			ConnectTimeout:     5 * time.Second,
 			MigrationTimeout:   2 * time.Minute,
 		},
-		Auth: Auth{Mode: "local"},
+		Auth: Auth{
+			Mode: "local", SessionIdle: 30 * time.Minute, SessionAbsolute: 12 * time.Hour,
+			FailureLimit: 5, LockoutDuration: 15 * time.Minute,
+			LoginRateLimit: 10, LoginRateWindow: time.Minute,
+		},
 	}
 }
 
@@ -99,7 +109,13 @@ type fileConfig struct {
 		MigrationTimeout   string `json:"migration_timeout"`
 	} `json:"database"`
 	Auth struct {
-		Mode string `json:"mode"`
+		Mode            string `json:"mode"`
+		SessionIdle     string `json:"session_idle"`
+		SessionAbsolute string `json:"session_absolute"`
+		FailureLimit    *int   `json:"failure_limit"`
+		LockoutDuration string `json:"lockout_duration"`
+		LoginRateLimit  *int   `json:"login_rate_limit"`
+		LoginRateWindow string `json:"login_rate_window"`
 	} `json:"auth"`
 }
 
@@ -170,6 +186,34 @@ func applyFile(cfg *Config, name string) error {
 	if values.Auth.Mode != "" {
 		cfg.Auth.Mode = values.Auth.Mode
 	}
+	for name, value := range map[string]string{
+		"auth.session_idle": values.Auth.SessionIdle, "auth.session_absolute": values.Auth.SessionAbsolute,
+		"auth.lockout_duration": values.Auth.LockoutDuration, "auth.login_rate_window": values.Auth.LoginRateWindow,
+	} {
+		if value == "" {
+			continue
+		}
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		switch name {
+		case "auth.session_idle":
+			cfg.Auth.SessionIdle = duration
+		case "auth.session_absolute":
+			cfg.Auth.SessionAbsolute = duration
+		case "auth.lockout_duration":
+			cfg.Auth.LockoutDuration = duration
+		case "auth.login_rate_window":
+			cfg.Auth.LoginRateWindow = duration
+		}
+	}
+	if values.Auth.FailureLimit != nil {
+		cfg.Auth.FailureLimit = *values.Auth.FailureLimit
+	}
+	if values.Auth.LoginRateLimit != nil {
+		cfg.Auth.LoginRateLimit = *values.Auth.LoginRateLimit
+	}
 	return nil
 }
 
@@ -180,6 +224,9 @@ func (cfg Config) SafeSummary() map[string]any {
 		"listen_address":                cfg.Server.ListenAddress,
 		"public_url":                    cfg.Server.PublicURL.String(),
 		"auth_mode":                     cfg.Auth.Mode,
+		"auth_session_idle":             cfg.Auth.SessionIdle,
+		"auth_session_absolute":         cfg.Auth.SessionAbsolute,
+		"auth_lockout_duration":         cfg.Auth.LockoutDuration,
 		"database_dsn_configured":       cfg.Database.DSNFile != "",
 		"database_max_open_connections": cfg.Database.MaxOpenConnections,
 		"database_connect_timeout":      cfg.Database.ConnectTimeout,
@@ -242,6 +289,32 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	if value := strings.TrimSpace(getenv("ESPIAL_AUTH_MODE")); value != "" {
 		cfg.Auth.Mode = value
 	}
+	for name, destination := range map[string]*time.Duration{
+		"ESPIAL_AUTH_SESSION_IDLE":      &cfg.Auth.SessionIdle,
+		"ESPIAL_AUTH_SESSION_ABSOLUTE":  &cfg.Auth.SessionAbsolute,
+		"ESPIAL_AUTH_LOCKOUT_DURATION":  &cfg.Auth.LockoutDuration,
+		"ESPIAL_AUTH_LOGIN_RATE_WINDOW": &cfg.Auth.LoginRateWindow,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			duration, err := time.ParseDuration(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = duration
+		}
+	}
+	for name, destination := range map[string]*int{
+		"ESPIAL_AUTH_FAILURE_LIMIT":    &cfg.Auth.FailureLimit,
+		"ESPIAL_AUTH_LOGIN_RATE_LIMIT": &cfg.Auth.LoginRateLimit,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = parsed
+		}
+	}
 	return nil
 }
 
@@ -274,10 +347,14 @@ func (cfg Config) Validate() error {
 	if cfg.Database.ConnectTimeout <= 0 || cfg.Database.MigrationTimeout <= 0 {
 		return errors.New("database timeouts must be positive")
 	}
-	switch cfg.Auth.Mode {
-	case "local", "sso_with_local_fallback", "sso":
-	default:
-		return errors.New("auth mode must be local, sso_with_local_fallback, or sso")
+	if cfg.Auth.Mode != "local" {
+		return errors.New("only local auth mode is available; SSO is planned but not implemented")
+	}
+	if cfg.Auth.SessionIdle <= 0 || cfg.Auth.SessionAbsolute <= cfg.Auth.SessionIdle {
+		return errors.New("auth session durations must be positive and absolute must exceed idle")
+	}
+	if cfg.Auth.FailureLimit < 1 || cfg.Auth.LoginRateLimit < 1 || cfg.Auth.LockoutDuration <= 0 || cfg.Auth.LoginRateWindow <= 0 {
+		return errors.New("auth limits and durations must be positive")
 	}
 	return nil
 }

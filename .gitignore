@@ -5,6 +5,8 @@
 node_modules/
 coverage/
 dist/
+build/
+.svelte-kit/
 tmp/
 
 # Local runtime data

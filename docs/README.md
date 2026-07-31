@@ -33,6 +33,7 @@ intentions into implementable contracts.
 ## Operations and discovery
 
 - [Initial environment and integration inventory](operations/ENVIRONMENT_INVENTORY.md)
+- [Temporary local authentication runbook](operations/LOCAL_AUTH.md)
 
 ## Decisions
 

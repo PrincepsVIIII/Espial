@@ -2,14 +2,16 @@
 
 This directory is the Go module for the standalone Espial backend. Phase 1 currently
 provides the process lifecycle, typed configuration, structured logs, PostgreSQL
-connection pool and migrations, graceful shutdown, and liveness/readiness API.
+connection pool and migrations, graceful shutdown, health API, and temporary local
+authentication with server-side sessions and role enforcement.
 
 Current layout:
 
 ```text
-cmd/espial/       serve, migrate, and version commands
-internal/api/     HTTP routing and health handlers
+cmd/espial/       serve, migrate, bootstrap, and version commands
+internal/api/     HTTP routing, security boundary, and health/auth handlers
 internal/app/     dependency wiring and graceful lifecycle
+internal/auth/    credentials, sessions, CSRF, roles, limits, and provider boundary
 internal/config/  defaults, JSON file, environment overrides, validation
 internal/storage/ PostgreSQL pool and migration runner
 migrations/       embedded, forward-only SQL migrations
@@ -24,6 +26,7 @@ this process.
 ```text
 espial serve
 espial migrate
+espial admin bootstrap --username NAME
 espial version
 ```
 
@@ -49,6 +52,12 @@ then by environment variables. Unknown JSON keys are rejected.
 | `ESPIAL_DATABASE_CONNECT_TIMEOUT` | `5s` | PostgreSQL connection timeout |
 | `ESPIAL_DATABASE_MIGRATION_TIMEOUT` | `2m` | Startup and CLI migration deadline |
 | `ESPIAL_AUTH_MODE` | `local` | Auth transition mode; only local behavior is implemented yet |
+| `ESPIAL_AUTH_SESSION_IDLE` | `30m` | Sliding authenticated-session idle timeout |
+| `ESPIAL_AUTH_SESSION_ABSOLUTE` | `12h` | Maximum authenticated-session lifetime |
+| `ESPIAL_AUTH_FAILURE_LIMIT` | `5` | Failed passwords before timed account lock |
+| `ESPIAL_AUTH_LOCKOUT_DURATION` | `15m` | Timed account lock duration |
+| `ESPIAL_AUTH_LOGIN_RATE_LIMIT` | `10` | Login attempts allowed per source/window |
+| `ESPIAL_AUTH_LOGIN_RATE_WINDOW` | `1m` | Source-address login rate window |
 
 The DSN value is read from a file and is never included in configuration summaries
 or logs.
@@ -60,6 +69,18 @@ or logs.
 
 Database loss leaves liveness healthy and changes readiness to HTTP 503. Both
 responses include a request ID and baseline security headers.
+
+## Authentication API
+
+- `GET /api/v1/auth/capabilities` reports local availability and keeps unfinished
+  SSO controls disabled.
+- `POST /api/v1/auth/local/login` creates an audited server-side session.
+- `GET /api/v1/auth/session` returns the authoritative user, roles, and permissions.
+- `POST /api/v1/auth/logout` validates trusted origin and CSRF, then revokes the
+  session.
+
+See the [local authentication runbook](../docs/operations/LOCAL_AUTH.md) for
+bootstrap and recovery procedures.
 
 ## Checks
 

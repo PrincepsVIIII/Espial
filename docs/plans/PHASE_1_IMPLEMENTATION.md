@@ -12,8 +12,8 @@ Updated 2026-07-30:
 | Slice | Status | Evidence |
 |---|---|---|
 | 1.0 Toolchain and contracts | Implemented | Root npm commands with optional Make aliases, pinned toolchains, 10 schema fixtures, generated TypeScript, documentation link checks, CI, `.env.example` |
-| 1.1 Core lifecycle and PostgreSQL | Foundation implemented | `serve`/`migrate`/`version`, typed configuration, JSON logs, health API, graceful shutdown, PostgreSQL pool, three embedded migrations, unit/race/integration tests; `admin bootstrap` lands with Slice 1.2 |
-| 1.2 Local authentication | Next | Database tables and roles exist; credential/session services and routes are not implemented |
+| 1.1 Core lifecycle and PostgreSQL | Implemented | `serve`/`migrate`/`version`, typed configuration, JSON logs, health API, graceful shutdown, PostgreSQL pool, three embedded migrations, unit/race/integration tests |
+| 1.2 Local authentication | Implemented | One-time administrator bootstrap, Argon2id local credentials, lockout/rate limiting, hashed sessions, CSRF/origin checks, RBAC boundary, audit events, SvelteKit login/protected shell, and race/integration tests |
 | 1.3–1.8 Monitoring vertical slice | Planned | Contracts and database foundation are ready for implementation |
 
 The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
@@ -203,10 +203,10 @@ useful after SSO arrives.
   `local` is usable until a real SSO provider is implemented. Reject unsupported
   configured modes at startup rather than silently falling back.
 - Add `espial admin bootstrap --username NAME`. Read the password interactively or
-  from stdin, enforce a minimum policy, hash with calibrated Argon2id parameters,
+  from stdin, enforce a minimum policy, hash with a documented Argon2id baseline,
   create the first administrator transactionally, and refuse a second bootstrap.
-- Implement credential verification with generic failure responses, per-address and
-  per-identity rate limits, optional timed lockout, and safe audit data.
+- Implement credential verification with generic failure responses, per-address
+  rate limiting, timed per-identity lockout, and safe audit data.
 - Implement provider-neutral sessions: random token, hashed storage, secure cookie,
   idle/absolute expiry, rotation, revocation, and cleanup.
 - Add session-bound CSRF tokens and trusted-origin validation for mutations.
@@ -243,6 +243,32 @@ useful after SSO arrives.
 
 **Done when:** a newly bootstrapped administrator can sign in and reach a protected
 placeholder page, and a Viewer cannot cross an administrator boundary.
+
+**Implemented evidence (2026-07-30):**
+
+- `espial admin bootstrap --username NAME` accepts a no-echo terminal password or
+  two matching stdin lines and serializes first-administrator creation with a
+  PostgreSQL transaction/advisory lock.
+- Passwords use Argon2id at the accepted OWASP baseline (19 MiB, two iterations,
+  parallelism one), a 15–128 Unicode-character policy, unique salts, bounded PHC
+  parsing, and a common-value deny list. Re-benchmark before production rollout.
+- Login uses a 10-attempt/minute source-address limiter and a 15-minute account
+  lock after five failures. Unknown, wrong, disabled, and locked identities share
+  one public error.
+- Session and CSRF secrets contain 256 random bits and only SHA-256 digests are
+  stored. Idle/absolute defaults are 30 minutes/12 hours; rotation, logout,
+  administrative revocation, disabled-user rejection, and periodic cleanup exist.
+- Core exposes capabilities, local login, current session, logout, and a minimal
+  administrator permission probe under `/api/v1`; mutations enforce exact trusted
+  origin and session-bound CSRF validation.
+- Web provides a SvelteKit local-login page, safe local return targets, authoritative
+  session lookup, protected placeholder overview, and logout without local storage.
+- Unit, PostgreSQL integration, and race tests cover credential policy, bootstrap
+  concurrency, failure/lockout/success, idle and absolute expiry, rotation, role
+  refresh, revocation, disabled accounts, cookie flags, CSRF/origin rejection, and
+  direct Viewer denial.
+
+Operational use is documented in the [local authentication runbook](../operations/LOCAL_AUTH.md).
 
 ### Slice 1.3 — Normalized storage and health evaluation
 

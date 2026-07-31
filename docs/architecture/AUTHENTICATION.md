@@ -24,7 +24,7 @@ never makes an authorization decision on behalf of Core.
   password and no password in arguments, logs, or environment variables.
 - Response: a generic authentication error for unknown users, wrong passwords, and
   disabled users.
-- Controls: per-address and per-account rate limits, constant-time hash comparison,
+- Controls: a per-address rate limit, timed per-account lockout, constant-time hash comparison,
   request-size limits, and structured audit outcomes without submitted usernames
   beyond the normalized attempted identity.
 - UI: the login page clearly labels local access. Once SSO exists, local fallback is
@@ -33,10 +33,11 @@ never makes an authorization decision on behalf of Core.
 ## Sessions
 
 - Generate at least 256 bits of randomness; store only a SHA-256 digest server-side.
-- Cookie name: `espial_session`; `HttpOnly`, `Secure` in non-development modes,
+- Cookie name: `espial_session`; `HttpOnly`, `Secure` outside loopback development,
   `SameSite=Lax`, `Path=/`, and no JavaScript access.
 - Idle timeout: 30 minutes by default; absolute lifetime: 12 hours by default.
-- Rotate the token at login and after any privilege change.
+- Rotate the token through the session service; role-management work must rotate or
+  revoke affected sessions when it changes privileges.
 - Revoke on logout, account disable, role change, expiration, and administrator
   action.
 - Protect state-changing requests with allowed-origin checks and a session-bound
@@ -85,7 +86,7 @@ the implementation must follow the actual confirmed protocol.
 
 ## Required audit events
 
-`auth.login.succeeded`, `auth.login.failed`, `auth.logout`, `auth.session.revoked`,
+`auth.login.succeeded`, `auth.login.failed`, `auth.logout`, `auth.session.rotated`, `auth.session.revoked`,
 `auth.local.bootstrap`, `auth.local.used`, `auth.user.disabled`, and
 `auth.roles.changed` include actor/session when known, source address, result,
 correlation ID, and target identity. They never include passwords, cookies, tokens,

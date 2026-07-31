@@ -101,6 +101,14 @@ func TestValidateRejectsInsecureProductionURL(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsUnavailableSSOMode(t *testing.T) {
+	cfg := defaults()
+	cfg.Auth.Mode = "sso"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "not implemented") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestDatabaseDSNReadsFile(t *testing.T) {
 	name := filepath.Join(t.TempDir(), "dsn")
 	if err := os.WriteFile(name, []byte("postgres://espial:secret@db/espial\n"), 0o600); err != nil {

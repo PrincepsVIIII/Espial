@@ -66,9 +66,11 @@ concealed with `404` where disclosure itself is sensitive.
 ```text
 GET  /api/v1/health/live
 GET  /api/v1/health/ready
+GET  /api/v1/auth/capabilities
 POST /api/v1/auth/local/login
 POST /api/v1/auth/logout
 GET  /api/v1/auth/session
+GET  /api/v1/admin/ping              temporary Slice 1.2 RBAC acceptance probe
 GET  /api/v1/overview
 GET  /api/v1/resources
 GET  /api/v1/resources/{id}

@@ -1,4 +1,14 @@
 services:
+  web:
+    build:
+      context: ../../web
+    environment:
+      ESPIAL_CORE_URL: http://core:8080
+    depends_on:
+      - core
+    ports:
+      - "127.0.0.1:${ESPIAL_WEB_PORT:-5173}:5173"
+
   core:
     build:
       context: ../../core

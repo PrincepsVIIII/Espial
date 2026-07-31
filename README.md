@@ -82,11 +82,11 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 Phase 0's architecture and design baseline is complete, and Phase 1 implementation
 is in progress. The repository now includes contract checks, generated TypeScript
 models, CI, the initial Go service lifecycle, PostgreSQL migrations, health probes,
-and a local Core/PostgreSQL stack. Environment-specific values
+temporary local authentication, and a protected SvelteKit shell in the local stack. Environment-specific values
 that require UBNetDef operator input are recorded in the
 [environment inventory](docs/operations/ENVIRONMENT_INVENTORY.md), rather than
 being guessed. SSO is an explicit external dependency; Phase 1 will begin with
-audited local authentication and retain a provider boundary for SSO when its
+audited local authentication now and retains a provider boundary for SSO when its
 protocol is ready.
 
 Implementation is organized in the
@@ -101,11 +101,13 @@ the repository commands use the pinned Go 1.26 container when Go is unavailable.
 ```sh
 cp .env.example .env
 npm install
+npm --prefix web ci
 npm run check
 npm run dev
 ```
 
-Core is then available on `http://127.0.0.1:18080` by default:
+Web is available on `http://localhost:5173`; Core is available on
+`http://127.0.0.1:18080` by default:
 
 ```sh
 curl http://127.0.0.1:18080/api/v1/health/live

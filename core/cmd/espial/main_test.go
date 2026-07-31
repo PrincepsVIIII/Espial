@@ -35,3 +35,13 @@ func TestUnknownCommandPrintsUsage(t *testing.T) {
 		t.Fatalf("stderr = %q", stderr.String())
 	}
 }
+
+func TestReadPasswordRequiresMatchingConfirmation(t *testing.T) {
+	password, err := readPassword(strings.NewReader("correct horse battery\ncorrect horse battery\n"), &bytes.Buffer{})
+	if err != nil || password != "correct horse battery" {
+		t.Fatalf("password = %q, error = %v", password, err)
+	}
+	if _, err := readPassword(strings.NewReader("first\nsecond\n"), &bytes.Buffer{}); err == nil {
+		t.Fatal("mismatched confirmation was accepted")
+	}
+}

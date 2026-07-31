@@ -1,6 +1,6 @@
 # Local development stack
 
-The local stack runs PostgreSQL 17 and Espial Core as separate containers. It is for
+The local stack runs PostgreSQL 17, Espial Core, and Espial Web as separate containers. It is for
 development and tests only; its example password is intentionally public and must
 never be reused.
 
@@ -11,11 +11,23 @@ From the repository root:
 ```sh
 cp .env.example .env
 npm install
+npm --prefix web ci
 npm run dev
 ```
 
-The default host ports are Core `18080` and PostgreSQL `55432`, both bound to
-loopback. Change `ESPIAL_CORE_PORT` or `POSTGRES_PORT` in `.env` if needed.
+The default host ports are Web `5173`, Core `18080`, and PostgreSQL `55432`, all
+bound to loopback. Change `ESPIAL_WEB_PORT`, `ESPIAL_CORE_PORT`, or `POSTGRES_PORT`
+in `.env` if needed.
+
+Create the first local administrator in a second terminal:
+
+```sh
+docker compose --env-file .env -f deployments/local/compose.yml run --rm core admin bootstrap --username admin
+```
+
+Then open `http://localhost:5173/login`. See the
+[local authentication runbook](../../docs/operations/LOCAL_AUTH.md) for security
+controls and transition cautions.
 
 Check the service:
 

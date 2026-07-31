@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/api"
+	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -31,13 +32,21 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("migrate database: %w", err)
 	}
+	authService, err := auth.NewService(pool, authOptions(cfg))
+	if err != nil {
+		return fmt.Errorf("initialize authentication: %w", err)
+	}
+	go cleanSessions(ctx, logger, authService)
 
 	listener, err := net.Listen("tcp", cfg.Server.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Server.ListenAddress, err)
 	}
 
-	handler := api.New(logger, pool.Ping)
+	handler := api.New(api.Dependencies{
+		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
+		SecureCookies: secureCookies(cfg),
+	})
 	server := &http.Server{
 		Handler:           handler,
 		ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout,
@@ -49,6 +58,28 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	logger.Info("Espial Core ready", "address", listener.Addr().String())
 	return runHTTPServer(ctx, server, listener, cfg.Server.ShutdownTimeout)
+}
+
+// BootstrapAdmin creates the one-time local administrator account.
+func BootstrapAdmin(ctx context.Context, cfg config.Config, username, password string) (auth.User, error) {
+	pool, err := openDatabase(ctx, cfg)
+	if err != nil {
+		return auth.User{}, err
+	}
+	defer pool.Close()
+
+	migrationContext, cancelMigration := context.WithTimeout(ctx, cfg.Database.MigrationTimeout)
+	err = storage.Migrate(migrationContext, pool)
+	cancelMigration()
+	if err != nil {
+		return auth.User{}, fmt.Errorf("migrate database: %w", err)
+	}
+
+	service, err := auth.NewService(pool, authOptions(cfg))
+	if err != nil {
+		return auth.User{}, fmt.Errorf("initialize authentication: %w", err)
+	}
+	return service.BootstrapAdmin(ctx, username, password, "bootstrap-cli", "")
 }
 
 // Migrate applies pending database migrations and exits.
@@ -78,6 +109,39 @@ func openDatabase(ctx context.Context, cfg config.Config) (*pgxpool.Pool, error)
 		return nil, err
 	}
 	return pool, nil
+}
+
+func authOptions(cfg config.Config) auth.Options {
+	options := auth.DefaultOptions()
+	options.SessionIdle = cfg.Auth.SessionIdle
+	options.SessionAbsolute = cfg.Auth.SessionAbsolute
+	options.FailureLimit = cfg.Auth.FailureLimit
+	options.LockoutDuration = cfg.Auth.LockoutDuration
+	options.LoginLimiter = auth.NewLoginLimiter(cfg.Auth.LoginRateLimit, cfg.Auth.LoginRateWindow)
+	return options
+}
+
+func secureCookies(cfg config.Config) bool {
+	if cfg.Environment != config.Development {
+		return true
+	}
+	host := cfg.Server.PublicURL.Hostname()
+	return host != "localhost" && !net.ParseIP(host).IsLoopback()
+}
+
+func cleanSessions(ctx context.Context, logger *slog.Logger, service *auth.Service) {
+	ticker := time.NewTicker(15 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case now := <-ticker.C:
+			if err := service.DeleteExpiredSessions(ctx, now.UTC()); err != nil {
+				logger.ErrorContext(ctx, "session cleanup failed", "error", err)
+			}
+		}
+	}
 }
 
 func runHTTPServer(ctx context.Context, server *http.Server, listener net.Listener, shutdownTimeout time.Duration) error {
