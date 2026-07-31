@@ -1,0 +1,12 @@
+{
+  "schema": "resource",
+  "data": {
+    "external_id": "sample-node-01",
+    "kind": "host",
+    "display_name": "Sample node 01",
+    "observed_at": "2026-07-30T15:00:00Z",
+    "attributes": {
+      "environment": "sample"
+    }
+  }
+}

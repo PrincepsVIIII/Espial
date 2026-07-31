@@ -1,0 +1,32 @@
+{
+  "name": "espial-workspace",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "22.17.x"
+  },
+  "scripts": {
+    "check": "npm run check:repo && npm run core:check",
+    "check:repo": "npm run format:check && npm run contracts && npm run docs && npm run generate:check",
+    "contracts": "node scripts/validate-contracts.mjs",
+    "core:check": "npm run core:lint && npm run core:test",
+    "core:format": "node scripts/run-go.mjs fmt ./...",
+    "core:lint": "node scripts/run-go.mjs vet ./...",
+    "core:test": "node scripts/run-go.mjs test ./...",
+    "dev": "node scripts/compose.mjs up --build",
+    "docs": "node scripts/check-doc-links.mjs",
+    "down": "node scripts/compose.mjs down",
+    "format": "prettier --write package.json api/**/*.json scripts/**/*.mjs .github/**/*.yml deployments/**/*.yml && npm run core:format",
+    "format:check": "prettier --check package.json api/**/*.json scripts/**/*.mjs .github/**/*.yml deployments/**/*.yml",
+    "generate": "node scripts/generate-types.mjs",
+    "generate:check": "npm run generate && git diff --exit-code -- web/src/lib/api/generated.ts",
+    "lint": "npm run format:check && npm run core:lint",
+    "test": "npm run contracts && npm run docs && npm run generate:check && npm run core:test"
+  },
+  "devDependencies": {
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "json-schema-to-typescript": "15.0.4",
+    "prettier": "3.9.6"
+  }
+}

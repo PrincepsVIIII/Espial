@@ -1,0 +1,17 @@
+{
+  "schema": "adapter-manifest",
+  "data": {
+    "adapter_id": "org.ubnetdef.espial.sample",
+    "display_name": "Espial sample adapter",
+    "adapter_version": "0.1.0",
+    "protocol_versions": ["1.0"],
+    "integration_category": "sample",
+    "resource_types": ["host"],
+    "check_types": ["sample.availability"],
+    "capabilities": ["collect"],
+    "read_only": true,
+    "config_schema": {
+      "type": "object"
+    }
+  }
+}

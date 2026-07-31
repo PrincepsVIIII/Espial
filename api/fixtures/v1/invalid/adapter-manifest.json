@@ -1,0 +1,12 @@
+{
+  "schema": "adapter-manifest",
+  "data": {
+    "adapter_id": "Sample Adapter",
+    "display_name": "Espial sample adapter",
+    "adapter_version": "0.1.0",
+    "protocol_versions": [],
+    "integration_category": "sample",
+    "capabilities": ["shell"],
+    "config_schema": {}
+  }
+}

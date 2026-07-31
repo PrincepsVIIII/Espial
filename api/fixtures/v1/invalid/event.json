@@ -1,0 +1,11 @@
+{
+  "schema": "event",
+  "data": {
+    "schema_version": "2.0",
+    "event_id": "not-a-uuid",
+    "event_type": "Resource Changed",
+    "source": "espial-core",
+    "occurred_at": "yesterday",
+    "payload": {}
+  }
+}

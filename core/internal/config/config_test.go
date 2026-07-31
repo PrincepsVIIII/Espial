@@ -1,0 +1,141 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
+	cfg := defaults()
+	values := map[string]string{
+		"ESPIAL_ENV":                           Test,
+		"ESPIAL_LISTEN_ADDRESS":                "127.0.0.1:9090",
+		"ESPIAL_PUBLIC_URL":                    "https://espial.test",
+		"ESPIAL_READ_HEADER_TIMEOUT":           "3s",
+		"ESPIAL_SHUTDOWN_TIMEOUT":              "7s",
+		"ESPIAL_DATABASE_DSN_FILE":             "/run/secrets/test_dsn",
+		"ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS": "8",
+		"ESPIAL_DATABASE_CONNECT_TIMEOUT":      "4s",
+		"ESPIAL_DATABASE_MIGRATION_TIMEOUT":    "1m",
+		"ESPIAL_AUTH_MODE":                     "local",
+	}
+
+	err := applyEnvironment(&cfg, func(key string) string { return values[key] })
+	if err != nil {
+		t.Fatalf("apply environment: %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if cfg.Server.ListenAddress != "127.0.0.1:9090" {
+		t.Fatalf("listen address = %q", cfg.Server.ListenAddress)
+	}
+	if cfg.Server.ShutdownTimeout != 7*time.Second {
+		t.Fatalf("shutdown timeout = %s", cfg.Server.ShutdownTimeout)
+	}
+	if cfg.Database.MaxOpenConnections != 8 {
+		t.Fatalf("max open connections = %d", cfg.Database.MaxOpenConnections)
+	}
+	if cfg.Database.ConnectTimeout != 4*time.Second {
+		t.Fatalf("connect timeout = %s", cfg.Database.ConnectTimeout)
+	}
+}
+
+func TestApplyFileRejectsUnknownKeys(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(name, []byte(`{"unknown": true}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := defaults()
+	err := applyFile(&cfg, name)
+	if err == nil || !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadEnvironmentOverridesFile(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "config.json")
+	contents := `{
+		"environment": "test",
+		"server": {"listen_address": "127.0.0.1:7000"},
+		"database": {"max_open_connections": 6}
+	}`
+	if err := os.WriteFile(name, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ESPIAL_CONFIG_FILE", name)
+	t.Setenv("ESPIAL_LISTEN_ADDRESS", "127.0.0.1:8000")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if cfg.Server.ListenAddress != "127.0.0.1:8000" {
+		t.Fatalf("listen address = %q", cfg.Server.ListenAddress)
+	}
+	if cfg.Database.MaxOpenConnections != 6 {
+		t.Fatalf("max open connections = %d", cfg.Database.MaxOpenConnections)
+	}
+}
+
+func TestLoadRejectsInvalidDuration(t *testing.T) {
+	t.Setenv("ESPIAL_SHUTDOWN_TIMEOUT", "eventually")
+
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "ESPIAL_SHUTDOWN_TIMEOUT") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInsecureProductionURL(t *testing.T) {
+	cfg := defaults()
+	cfg.Environment = Production
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "must use https") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestDatabaseDSNReadsFile(t *testing.T) {
+	name := filepath.Join(t.TempDir(), "dsn")
+	if err := os.WriteFile(name, []byte("postgres://espial:secret@db/espial\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := defaults()
+	cfg.Database.DSNFile = name
+	dsn, err := cfg.DatabaseDSN()
+	if err != nil {
+		t.Fatalf("read DSN: %v", err)
+	}
+	if dsn != "postgres://espial:secret@db/espial" {
+		t.Fatalf("DSN was not trimmed")
+	}
+}
+
+func TestDatabaseDSNRequiresFile(t *testing.T) {
+	cfg := defaults()
+
+	_, err := cfg.DatabaseDSN()
+	if err == nil || !strings.Contains(err.Error(), "required") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestSafeSummaryDoesNotContainDSNPath(t *testing.T) {
+	cfg := defaults()
+	cfg.Database.DSNFile = "/private/secrets/database_dsn"
+
+	summary := cfg.SafeSummary()
+	for key, value := range summary {
+		text, _ := value.(string)
+		if strings.Contains(key, "dsn_file") || strings.Contains(text, "/private/secrets") {
+			t.Fatalf("unsafe summary field %q = %v", key, value)
+		}
+	}
+}

@@ -1,0 +1,11 @@
+{
+  "schema": "observation",
+  "data": {
+    "external_resource_id": "sample-node-01",
+    "check_type": "sample.availability",
+    "state": "stale",
+    "summary": "Adapters cannot assign Core's derived stale state.",
+    "observed_at": "2026-07-30T15:00:00Z",
+    "expected_refresh_seconds": 0
+  }
+}

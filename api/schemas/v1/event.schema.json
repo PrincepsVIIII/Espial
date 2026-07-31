@@ -4,17 +4,24 @@
   "title": "Espial event",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "event_id", "event_type", "source", "occurred_at", "payload"],
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "source",
+    "occurred_at",
+    "payload"
+  ],
   "properties": {
-    "schema_version": {"const": "1.0"},
-    "event_id": {"type": "string", "format": "uuid"},
-    "event_type": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$"},
-    "source": {"type": "string", "minLength": 1, "maxLength": 128},
-    "occurred_at": {"type": "string", "format": "date-time"},
-    "emitted_at": {"type": "string", "format": "date-time"},
-    "correlation_id": {"type": "string", "minLength": 1, "maxLength": 128},
-    "resource_id": {"type": "string", "format": "uuid"},
-    "integration_id": {"type": "string", "format": "uuid"},
-    "payload": {"type": "object", "additionalProperties": true}
+    "schema_version": { "const": "1.0" },
+    "event_id": { "type": "string", "format": "uuid" },
+    "event_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "source": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "emitted_at": { "type": "string", "format": "date-time" },
+    "correlation_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "payload": { "type": "object", "additionalProperties": true }
   }
 }

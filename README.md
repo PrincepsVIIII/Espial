@@ -79,7 +79,10 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 
 ## Project status
 
-Phase 0's architecture and design baseline is complete. Environment-specific values
+Phase 0's architecture and design baseline is complete, and Phase 1 implementation
+is in progress. The repository now includes contract checks, generated TypeScript
+models, CI, the initial Go service lifecycle, PostgreSQL migrations, health probes,
+and a local Core/PostgreSQL stack. Environment-specific values
 that require UBNetDef operator input are recorded in the
 [environment inventory](docs/operations/ENVIRONMENT_INVENTORY.md), rather than
 being guessed. SSO is an explicit external dependency; Phase 1 will begin with
@@ -87,8 +90,32 @@ audited local authentication and retain a provider boundary for SSO when its
 protocol is ready.
 
 Implementation is organized in the
-[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md). The repository currently
-contains contracts and design decisions, not a production-ready service.
+[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md). Espial is not yet a
+production-ready service.
+
+## Development quick start
+
+Requirements: Docker, Node.js 22.17, and npm. A host Go installation is optional;
+the repository commands use the pinned Go 1.26 container when Go is unavailable.
+
+```sh
+cp .env.example .env
+npm install
+npm run check
+npm run dev
+```
+
+Core is then available on `http://127.0.0.1:18080` by default:
+
+```sh
+curl http://127.0.0.1:18080/api/v1/health/live
+curl http://127.0.0.1:18080/api/v1/health/ready
+```
+
+Run `npm run down` to stop the local stack. The Makefile provides optional aliases
+for environments that already have `make`. See the
+[local deployment guide](deployments/local/README.md) for configuration and data
+retention details.
 
 ## Guiding principles
 

@@ -6,16 +6,16 @@
   "additionalProperties": false,
   "required": ["external_id", "kind", "display_name", "observed_at"],
   "properties": {
-    "id": {"type": "string", "format": "uuid"},
-    "external_id": {"type": "string", "minLength": 1, "maxLength": 512},
-    "kind": {"type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$"},
-    "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
-    "observed_at": {"type": "string", "format": "date-time"},
+    "id": { "type": "string", "format": "uuid" },
+    "external_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "kind": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "observed_at": { "type": "string", "format": "date-time" },
     "attributes": {
       "type": "object",
       "maxProperties": 128,
       "additionalProperties": true
     },
-    "source_url": {"type": "string", "format": "uri", "maxLength": 2048}
+    "source_url": { "type": "string", "format": "uri", "maxLength": 2048 }
   }
 }

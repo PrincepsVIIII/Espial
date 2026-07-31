@@ -1,0 +1,14 @@
+{
+  "schema": "event",
+  "data": {
+    "schema_version": "1.0",
+    "event_id": "66b9dc5f-3bc9-4b08-913a-520ee2f765bc",
+    "event_type": "resource.health_changed",
+    "source": "espial-core",
+    "occurred_at": "2026-07-30T15:00:00Z",
+    "resource_id": "82e8d0d2-376d-4f0e-a6ca-920c01c35f21",
+    "payload": {
+      "state": "warning"
+    }
+  }
+}

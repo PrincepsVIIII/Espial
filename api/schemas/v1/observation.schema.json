@@ -13,20 +13,37 @@
     "expected_refresh_seconds"
   ],
   "properties": {
-    "id": {"type": "string", "format": "uuid"},
-    "external_resource_id": {"type": "string", "minLength": 1, "maxLength": 512},
-    "check_type": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$"},
+    "id": { "type": "string", "format": "uuid" },
+    "external_resource_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "check_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
     "state": {
       "type": "string",
-      "enum": ["healthy", "warning", "critical", "unknown", "maintenance", "disabled"]
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "maintenance",
+        "disabled"
+      ]
     },
-    "summary": {"type": "string", "minLength": 1, "maxLength": 1024},
-    "observed_at": {"type": "string", "format": "date-time"},
-    "expected_refresh_seconds": {"type": "integer", "minimum": 1, "maximum": 86400},
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "expected_refresh_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 86400
+    },
     "measurements": {
       "type": "object",
       "maxProperties": 64,
-      "additionalProperties": {"type": ["number", "integer", "string", "boolean"]}
+      "additionalProperties": {
+        "type": ["number", "integer", "string", "boolean"]
+      }
     },
     "metadata": {
       "type": "object",

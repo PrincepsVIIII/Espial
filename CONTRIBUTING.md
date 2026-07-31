@@ -18,8 +18,8 @@ health evaluation in Web.
 
 ## Formatting and checks
 
-Phase 1 will expose a root `make check` that runs the same non-networked checks as
-CI. Until then, every change follows these minimum conventions:
+The root `npm run check` runs the same non-networked checks as CI. A small Makefile
+provides optional aliases. Every change follows these minimum conventions:
 
 - Go: `gofmt`, `go vet ./...`, `go test ./...`, and focused race tests for concurrent
   packages; errors include operational context and contexts cross I/O boundaries.
@@ -44,6 +44,9 @@ Critical Phase 1 cases include authentication/role denial, session revocation,
 malformed adapter output, output size limits, collection timeout, adapter crash and
 restart, stale/unknown transitions, transaction rollback, SSE reconnect/resync, and
 graceful shutdown. Run `go test -race` on concurrency-bearing packages in CI.
+
+PostgreSQL integration tests run when `ESPIAL_TEST_DATABASE_URL` is set. They create
+and remove a uniquely named schema; they never drop the configured database.
 
 ## CI convention
 

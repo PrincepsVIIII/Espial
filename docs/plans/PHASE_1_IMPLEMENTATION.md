@@ -1,9 +1,24 @@
 # Phase 1 implementation plan: monitoring foundation
 
-**Status:** Ready to implement  
+**Status:** In progress
 **Inputs:** [Roadmap](../ROADMAP.md), [backend plan](../BACKEND_PLAN.md),
 [frontend/UI plan](../FRONTEND_UI_PLAN.md), and the accepted
 [Phase 0 baseline](../phase-0/README.md)
+
+## Implementation progress
+
+Updated 2026-07-30:
+
+| Slice | Status | Evidence |
+|---|---|---|
+| 1.0 Toolchain and contracts | Implemented | Root npm commands with optional Make aliases, pinned toolchains, 10 schema fixtures, generated TypeScript, documentation link checks, CI, `.env.example` |
+| 1.1 Core lifecycle and PostgreSQL | Foundation implemented | `serve`/`migrate`/`version`, typed configuration, JSON logs, health API, graceful shutdown, PostgreSQL pool, three embedded migrations, unit/race/integration tests; `admin bootstrap` lands with Slice 1.2 |
+| 1.2 Local authentication | Next | Database tables and roles exist; credential/session services and routes are not implemented |
+| 1.3–1.8 Monitoring vertical slice | Planned | Contracts and database foundation are ready for implementation |
+
+The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
+200 during database loss while readiness returns HTTP 503 and recovers after the
+database restarts.
 
 ## 1. Outcome
 

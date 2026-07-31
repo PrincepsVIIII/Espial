@@ -1,0 +1,15 @@
+{
+  "schema": "adapter-envelope",
+  "data": {
+    "protocol_version": "1.0",
+    "kind": "response",
+    "operation": "collect",
+    "sent_at": "2026-07-30T15:00:00Z",
+    "payload": {},
+    "error": {
+      "code": "collect_failed",
+      "message": "A response cannot contain both payload and error.",
+      "retryable": true
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "adapter-envelope",
+  "data": {
+    "protocol_version": "1.0",
+    "kind": "request",
+    "operation": "collect",
+    "request_id": "b8ab8b5b-4466-45af-b285-05f0643dc024",
+    "sent_at": "2026-07-30T15:00:00Z",
+    "deadline": "2026-07-30T15:00:30Z",
+    "payload": {}
+  }
+}

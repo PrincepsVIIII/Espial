@@ -1,0 +1,8 @@
+{
+  "schema": "resource",
+  "data": {
+    "external_id": "sample-node-01",
+    "kind": "Host",
+    "display_name": "Sample node 01"
+  }
+}

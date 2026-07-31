@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run check:repo
+
+  core:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: espial_test
+          POSTGRES_USER: espial
+          POSTGRES_PASSWORD: espial_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U espial -d espial_test"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 15
+    env:
+      ESPIAL_TEST_DATABASE_URL: postgres://espial:espial_test@127.0.0.1:5432/espial_test?sslmode=disable
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - run: go vet ./...
+        working-directory: core
+      - run: go test -race ./...
+        working-directory: core
