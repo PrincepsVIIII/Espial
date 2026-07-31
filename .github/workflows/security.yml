@@ -53,15 +53,19 @@ jobs:
         run: |
           docker build --tag espial-core:security core
           docker build --tag espial-web:security web
+          docker save --output "$RUNNER_TEMP/espial-core.tar" espial-core:security
+          docker save --output "$RUNNER_TEMP/espial-web.tar" espial-web:security
       - name: Scan Core image
         run: >-
           docker run --rm
+          -v "$RUNNER_TEMP:/scan:ro"
           aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
-          image --scanners vuln --exit-code 1 --severity HIGH,CRITICAL --skip-version-check
-          espial-core:security
+          image --input /scan/espial-core.tar --scanners vuln --exit-code 1
+          --severity HIGH,CRITICAL --skip-version-check
       - name: Scan Web image
         run: >-
           docker run --rm
+          -v "$RUNNER_TEMP:/scan:ro"
           aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
-          image --scanners vuln --exit-code 1 --severity HIGH,CRITICAL --skip-version-check
-          espial-web:security
+          image --input /scan/espial-web.tar --scanners vuln --exit-code 1
+          --severity HIGH,CRITICAL --skip-version-check
