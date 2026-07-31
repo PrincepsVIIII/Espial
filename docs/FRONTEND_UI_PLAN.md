@@ -1,5 +1,9 @@
 # Espial Frontend and UI Plan
 
+All UI work must first follow the authoritative
+[general UI guidance](design/UI_GUIDANCE.md). This plan expands that contract for
+individual product areas.
+
 ## 1. Purpose
 
 The frontend will be a standalone SvelteKit application designed for a technical UBNetDef audience. It should help infrastructure administrators, instructors, and TAs quickly identify failures, understand affected systems, and reach useful diagnostic details.
@@ -15,7 +19,8 @@ The interface should feel like a modern network operations center rather than a 
 - Make warning, critical, unknown, and stale states immediately distinguishable.
 - Reuse a stable component system across integrations.
 - Allow custom Svelte pages for advanced integrations without changing central frontend logic.
-- Support dark mode as the primary operational theme.
+- Use a deliberately designed dark theme throughout Phase 1; do not mix in isolated
+  light cards or defer the theme until polish.
 - Establish a reusable UBNetDef visual language for future internal tools.
 
 ## 2.1 Frontend/backend boundary
@@ -32,7 +37,8 @@ The product name is **Espial**. UBNetDef should remain clearly visible as the or
 
 The visual identity should combine:
 
-- University at Buffalo blue as the primary accent
+- a deep navy/dark-blue application frame, with official UB Blue used sparingly for
+  brand reference, selected state, and primary actions
 - dark neutral surfaces
 - clear operational status colors
 - compact information density
@@ -40,9 +46,18 @@ The visual identity should combine:
 - restrained motion
 - clear diagrams and physical layouts
 
+UBNetDef attribution is part of the product chrome, not footer-only decoration.
+Login and persistent navigation use `Espial / UBNetDef Infrastructure Operations`
+or the compact equivalent. The top navigation is visually darker than UB Blue:
+Harriman Blue (`#002f56`) or a nearby deep navy anchors the frame, while UB Blue
+(`#005bbb`) is a restrained selection/action accent. A subtle dark-blue-only linear
+gradient may distinguish structural navigation from content if it improves depth;
+flat dark blue remains the fallback. Green is operational status, never branding.
+
 ### 3.2 Avoid
 
-- decorative gradients
+- bright, multicolor, pastel, radial, or ambient gradients; a restrained linear
+  gradient between adjacent dark-blue navigation tokens is the only exception
 - excessive glow or neon effects
 - oversized rounded cards
 - fake terminal decorations
@@ -51,6 +66,13 @@ The visual identity should combine:
 - large empty marketing layouts in authenticated views
 - red and green as the only status distinction
 - vague summaries that hide source data
+- glassmorphism, pastel ambient backgrounds, floating islands, and soft shadows
+- default SaaS card grids, excessive pills, and large corner radii on every object
+- generic product copy, fake metrics, fake activity feeds, and placeholder charts
+- sparkle motifs, chatbot composition, or decorative icons without state/action meaning
+
+These are acceptance constraints, not taste suggestions. A screen that falls into
+these patterns is incomplete even when its routes and data loading work.
 
 ### 3.3 Status system
 
@@ -67,22 +89,26 @@ Each status should use more than color alone.
 
 ## 4. Information architecture
 
-Recommended primary navigation:
+Desktop/laptop navigation uses a top bar rather than a permanent primary sidebar.
+The bar keeps the Espial/UBNetDef lockup on the left and session state, user menu,
+and sign-out access on the right. The primary items and order are fixed:
 
 ```text
-Overview
-Incidents
-Services
-Infrastructure
-Certificates
-History
-Integrations
-Administration
+Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  |  Live  User ▾
 ```
 
-### 4.1 Overview
+These target `/dashboard`, `/alerts`, `/datacenter`, `/hypervisor`, and `/webpages`.
+Dashboard is the default destination after login; Datacenter remains one primary
+navigation action away. Child-route dropdowns may be added only when a section has
+real children. Dropdowns support click and keyboard activation, arrow-key movement,
+`Escape` to close, visible focus, and route-aware selected state; they do not open
+on hover alone. Unimplemented areas show an honest unavailable or not-configured
+state rather than fake content. On narrow screens the same items collapse behind
+one menu button without changing their order.
 
-The overview should answer:
+### 4.1 Dashboard
+
+The dashboard should answer:
 
 - What is wrong now?
 - What changed recently?
@@ -230,6 +256,10 @@ Requirements:
 
 The component should be data-driven. Rack placement must come from backend inventory, not hardcoded coordinates.
 
+The rack is normally reached by selecting it in the room overview. Selection uses
+the shared spatial transition and route model in the
+[physical drill-down specification](design/PHYSICAL_DRILLDOWN.md).
+
 ## 7. Room layout component
 
 The room layout is a later visual layer above rack views.
@@ -244,6 +274,11 @@ Requirements:
 - link directly into the selected rack
 
 The first version can use a simple grid-based room editor instead of a full freeform drawing tool.
+
+The operator-facing room view precedes the editor. It renders the room and
+unselected equipment primarily in grays, then uses outlines, labels, and restrained
+status color to highlight affected or focused racks. Hover/focus slightly enlarges
+the target without changing layout; selection moves into a straight-on rack view.
 
 ## 8. Device detail drawer
 
@@ -300,17 +335,17 @@ A failed or degraded drive should be visually obvious without relying only on co
 
 ### 9.3 Motion and opening animations
 
-Animations are roadmap polish, not MVP requirements.
+The spatial sequence is a product requirement, delivered progressively after the
+non-animated inspection routes work:
 
-Potential interactions:
+- room selection zooms toward a rack and gently corrects its angle to a front view
+- server selection retains rack context, then moves to a model-aware chassis front
+- drive selection runs the bay motion defined by that server's chassis template
+- the drive details panel becomes available immediately and does not wait on motion
 
-- expand chassis from rack view
-- slide or rotate between front and rear
-- open a detailed bay overlay
-- highlight a selected failed drive
-- animate dependency tracing from drive to pool, VM, and service
-
-Motion should remain brief and functional. It should help users understand spatial relationships, not delay access to data.
+Motion remains brief, functional, interruptible, and reduced-motion safe. Exact
+routes, indicator separation, drive fields, animation bounds, and fallbacks are in
+the [physical drill-down specification](design/PHYSICAL_DRILLDOWN.md).
 
 ## 10. Incident highlighting
 
@@ -453,32 +488,48 @@ Physical diagrams should have an accessible list or table equivalent.
 
 Mobile support can be secondary, but incident acknowledgement and basic inspection should remain usable.
 
-## 17. Public view
+## 17. Public entry page
 
-A future public page should expose only explicitly approved content.
+The root route is a public informational page before login. Its first version is an
+explicitly temporary explanation of what Espial does and will be replaced by a more
+complete public presentation later.
 
-Recommended separation:
+Required first-version structure:
 
-- authenticated operational application for internal details
-- separately configured public-facing route or static site
-- no internal hostnames, addresses, versions, serials, incidents, or topology data
-- marketing content and selected photos managed independently from operational views
+- the same dark top bar and Espial/UBNetDef attribution as the authenticated app;
+- a visible `Sign in` action at the top right, linking to `/login` with a safe local
+  return target when applicable;
+- concise factual sections explaining infrastructure monitoring, freshness/stale
+  state, incident direction, physical drill-down direction, and audited access;
+- no authenticated session requirement and no automatic redirect to login; and
+- an honest temporary-page label so it is not mistaken for final marketing copy.
+
+The page is informational, not a public status page. It exposes no live health,
+internal hostnames, addresses, versions, serials, incidents, topology, user data, or
+API-derived operational payload. The later replacement may add approved copy and
+media, but operational data remains in the authenticated application unless a
+separate public-status product is explicitly approved.
 
 ## 18. Frontend implementation order
 
-1. Establish design tokens and status semantics.
-2. Build the application shell and navigation.
-3. Implement authentication states and role-aware controls.
-4. Build the overview page.
+1. Establish design tokens, status semantics, UBNetDef attribution, and automated
+   contrast checks.
+2. Build the public informational entry, exact five-section top navigation, and
+   authenticated shell, then complete the visual review gate before feature pages.
+3. Implement authentication states and role-aware controls without introducing a
+   separate generic login-page aesthetic.
+4. Build Dashboard as the post-login summary. Establish Alerts and Datacenter as
+   adjacent primary routes with honest unavailable/not-configured states until their
+   domain data is available.
 5. Build incident list, detail, acknowledgement, and timeline.
 6. Build service and dependency views.
 7. Build inventory lists and device detail drawer.
 8. Build certificate monitoring views.
 9. Build integration administration screens.
-10. Build rack grid and incident highlighting.
-11. Build room layout and affected-services toggle.
-12. Build chassis templates and drive-slot visualization.
-13. Add controlled motion and opening animations.
+10. Build the neutral-gray room view, rack grid, and room-to-rack selection.
+11. Add incident highlighting and affected-services context in physical views.
+12. Build chassis templates, device indicators, drive bays, and drive details.
+13. Add the controlled rack/server/bay transitions defined by the physical drill-down.
 14. Add custom integration pages as real needs appear.
 
 ## 19. Frontend success criteria
@@ -493,3 +544,12 @@ The frontend is successful when:
 - a failed drive can be located by server, chassis, slot, and serial number
 - the design remains consistent across student-built extensions
 - the interface looks intentionally UBNetDef, technical, and operational
+- dark-blue branding remains coherent across login, shell, loading, empty, error,
+  and feature states rather than only on the happy-path overview
+- visual review finds no generic AI-dashboard patterns listed in Section 3.2
+- the public root explains Espial without disclosing operations and keeps sign-in
+  available in the top-right navigation
+- every authenticated page uses Dashboard, Alerts, Datacenter, Hypervisor, and
+  Webpages in that order, with Dashboard as the post-login destination
+- room, rack, server, and drive selection form one deep-linkable and accessible
+  drill-down with motion-independent fallbacks

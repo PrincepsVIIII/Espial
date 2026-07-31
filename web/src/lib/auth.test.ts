@@ -3,10 +3,12 @@ import { readCookie, safeReturnTo } from './auth';
 
 describe('safeReturnTo', () => {
   it('keeps local paths', () =>
-    expect(safeReturnTo('/overview?tab=health')).toBe('/overview?tab=health'));
+    expect(safeReturnTo('/datacenter?view=room')).toBe(
+      '/datacenter?view=room',
+    ));
   it.each(['https://evil.test', '//evil.test', null])(
     'rejects external or absent values',
-    (value) => expect(safeReturnTo(value)).toBe('/overview'),
+    (value) => expect(safeReturnTo(value)).toBe('/dashboard'),
   );
 });
 

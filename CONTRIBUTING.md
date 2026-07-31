@@ -23,8 +23,11 @@ provides optional aliases. Every change follows these minimum conventions:
 
 - Go: `gofmt`, `go vet ./...`, `go test ./...`, and focused race tests for concurrent
   packages; errors include operational context and contexts cross I/O boundaries.
-- Web: Prettier, ESLint, Svelte checks, TypeScript strict mode, component/unit tests,
-  and accessibility checks.
+- Web: Prettier, Svelte checks, TypeScript strict mode, Vitest unit checks, production
+  build validation, and accessibility diagnostics.
+- Web visuals: preserve the dark UBNetDef token system, reject generic AI/SaaS
+  composition, and complete the large/laptop/narrow review gate in the
+  [design system](docs/design/DESIGN_SYSTEM.md) for every material UI change.
 - Schemas: parse every JSON file, validate schemas against draft 2020-12, and run
   positive and negative fixtures against every changed contract.
 - Docs: preserve relative links, wrap readable prose where practical, and update

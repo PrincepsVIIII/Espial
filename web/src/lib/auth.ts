@@ -14,14 +14,14 @@ export type SessionResponse = {
 
 export function safeReturnTo(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//'))
-    return '/overview';
+    return '/dashboard';
   try {
     const parsed = new URL(value, 'http://espial.local');
     return parsed.origin === 'http://espial.local'
       ? parsed.pathname + parsed.search + parsed.hash
-      : '/overview';
+      : '/dashboard';
   } catch {
-    return '/overview';
+    return '/dashboard';
   }
 }
 

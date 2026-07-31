@@ -17,6 +17,7 @@ services:
       ESPIAL_LISTEN_ADDRESS: 0.0.0.0:8080
       ESPIAL_PUBLIC_URL: http://localhost:5173
       ESPIAL_AUTH_MODE: local
+      ESPIAL_SAMPLE_ADAPTER_EXECUTABLE: /espial-sample-adapter
       ESPIAL_DATABASE_DSN_FILE: /run/secrets/database_dsn
     depends_on:
       postgres:

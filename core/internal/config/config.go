@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -26,6 +27,7 @@ type Config struct {
 	Server      Server
 	Database    Database
 	Auth        Auth
+	Adapters    Adapters
 }
 
 type Server struct {
@@ -50,6 +52,10 @@ type Auth struct {
 	LockoutDuration time.Duration
 	LoginRateLimit  int
 	LoginRateWindow time.Duration
+}
+
+type Adapters struct {
+	SampleExecutable string
 }
 
 // Load applies defaults, an optional JSON file, then environment overrides.
@@ -117,6 +123,9 @@ type fileConfig struct {
 		LoginRateLimit  *int   `json:"login_rate_limit"`
 		LoginRateWindow string `json:"login_rate_window"`
 	} `json:"auth"`
+	Adapters struct {
+		SampleExecutable string `json:"sample_executable"`
+	} `json:"adapters"`
 }
 
 func applyFile(cfg *Config, name string) error {
@@ -214,6 +223,9 @@ func applyFile(cfg *Config, name string) error {
 	if values.Auth.LoginRateLimit != nil {
 		cfg.Auth.LoginRateLimit = *values.Auth.LoginRateLimit
 	}
+	if values.Adapters.SampleExecutable != "" {
+		cfg.Adapters.SampleExecutable = values.Adapters.SampleExecutable
+	}
 	return nil
 }
 
@@ -231,6 +243,7 @@ func (cfg Config) SafeSummary() map[string]any {
 		"database_max_open_connections": cfg.Database.MaxOpenConnections,
 		"database_connect_timeout":      cfg.Database.ConnectTimeout,
 		"database_migration_timeout":    cfg.Database.MigrationTimeout,
+		"sample_adapter_configured":     cfg.Adapters.SampleExecutable != "",
 	}
 }
 
@@ -288,6 +301,9 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_AUTH_MODE")); value != "" {
 		cfg.Auth.Mode = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_SAMPLE_ADAPTER_EXECUTABLE")); value != "" {
+		cfg.Adapters.SampleExecutable = value
 	}
 	for name, destination := range map[string]*time.Duration{
 		"ESPIAL_AUTH_SESSION_IDLE":      &cfg.Auth.SessionIdle,
@@ -355,6 +371,9 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Auth.FailureLimit < 1 || cfg.Auth.LoginRateLimit < 1 || cfg.Auth.LockoutDuration <= 0 || cfg.Auth.LoginRateWindow <= 0 {
 		return errors.New("auth limits and durations must be positive")
+	}
+	if cfg.Adapters.SampleExecutable != "" && !filepath.IsAbs(cfg.Adapters.SampleExecutable) {
+		return errors.New("sample adapter executable must be an absolute path")
 	}
 	return nil
 }

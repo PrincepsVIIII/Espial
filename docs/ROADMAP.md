@@ -64,11 +64,15 @@ do not block the local-authenticated Phase 1 vertical slice.
 
 ### Frontend
 
+- temporary public informational entry page with sign-in at the top right
 - SvelteKit application shell
 - UBNetDef dark NOC theme
-- navigation
+- dark top navigation: Dashboard, Alerts, Datacenter, Hypervisor, and Webpages
+- Dashboard as the default authenticated destination; Alerts and Datacenter remain
+  one primary navigation action away and show honest unavailable/not-configured
+  states until their domain phases are implemented
 - authenticated session states
-- overview page
+- dashboard summary page
 - integration health display
 - basic resource and status tables
 - live update connection status
@@ -178,8 +182,10 @@ Candidate order:
 
 ### Frontend
 
-- rack grid component
-- room selector
+- neutral-gray room overview generated from inventory data
+- hover/focus highlighting and selection from room to rack
+- rack grid component with a straight-on rack focus view
+- room selector, breadcrumbs, and direct URLs
 - device detail drawer
 - filter chips
 - hover and focus tooltips
@@ -191,6 +197,7 @@ Candidate order:
 - administrators can locate an affected device physically
 - rack views are generated from inventory data
 - room and rack health are visible without manually maintained drawings
+- selection remains usable when animation is disabled
 
 ## Phase 6: Chassis and drive-slot visualization
 
@@ -209,25 +216,28 @@ Candidate order:
 - generic templates for additional hardware
 - front and rear chassis views
 - per-slot drive occupancy
+- separate power, device-health, drive-state, and activity indicators
+- chassis-specific drive-bay inspection motion with a no-motion fallback
 - failed or degraded drive highlighting
-- drive detail tooltips and drawer content
+- drive details covering identity, health, pool association, and data freshness
 
 ### Exit criteria
 
 - an operator can identify the exact server, slot, and serial number for a failed drive
 - templates are reusable rather than tied to hostnames
 - new chassis types can be added without redesigning the entire page
+- server and drive views are directly addressable and usable with motion disabled
 
-## Phase 7: Room layout and visual polish
+## Phase 7: Spatial editing and visual refinement
 
 ### Features
 
-- room layout component
 - rack positioning editor
 - rack-level incident highlighting
 - simple overlays for service, network, power, or cooling zones
-- chassis expand/open animations
-- smooth front/rear transitions
+- refined room-to-rack-to-chassis transitions
+- refined chassis expand/open animations
+- smooth front/rear transitions and guided camera motion
 - guided focus on affected hardware
 - dependency path highlighting
 

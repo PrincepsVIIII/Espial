@@ -8,7 +8,8 @@ models.
 
 1. Core starts the configured executable with a minimal environment and dedicated
    working directory.
-2. Adapter writes exactly one `ready` notification after initialization.
+2. Adapter writes exactly one `ready` notification after initialization, using the
+   v1 bootstrap envelope version `1.0`.
 3. Core sends request envelopes on stdin; the adapter returns one terminal response
    with the same `request_id` on stdout.
 4. Either side may send supported notifications. Stderr is captured as bounded,
@@ -20,6 +21,11 @@ Each stdout line is one JSON object no larger than 1 MiB. Invalid JSON, unknown
 protocol major versions, duplicate terminal responses, output floods, and missed
 deadlines are protocol failures. Core records them and applies bounded restart
 backoff.
+
+Core requests the manifest after `ready` and selects the highest exact version
+advertised by both sides. Slice 1.4 Core supports `1.0`. An adapter may advertise
+later additive v1 minors alongside `1.0`; Core does not invent support for a minor
+that the adapter did not advertise.
 
 ## Envelope
 
@@ -53,7 +59,9 @@ either `payload` or a safe structured `error`. Notifications use
 | `log` | adapter → Core notification | Structured, bounded diagnostic record |
 
 The first sample adapter must implement `manifest`, `validate_config`, `collect`,
-`health`, and `shutdown`. Event subscription is optional in the first slice.
+`health`, and `shutdown`. Slice 1.4 consumes `ready` and bounded `log`
+notifications. Event input remains disabled until Slice 1.5 can validate and ingest
+it without dropping data.
 
 ## Collection payload
 
@@ -72,8 +80,8 @@ through APIs, audit diffs, protocol errors, or logs.
   higher limit.
 - Default collection timeout is 30 seconds and is operator-configurable within
   bounds.
-- Restart delays use exponential backoff with jitter and a cap; a healthy interval
-  resets the failure counter.
+- Restart delays start at one second, double to a 60-second cap, and apply ±20%
+  injected jitter; five continuous healthy minutes reset the failure counter.
 - Core marks current data `stale` after its expected refresh window plus grace. It
   becomes `unknown` after a configurable multiple or when no valid observation has
   ever arrived.

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
 	"github.com/PrincepsVIIII/Espial/core/internal/api"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
@@ -36,6 +37,11 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
+	adapterSupervisor, err := adapterRuntime(pool, cfg)
+	if err != nil {
+		return fmt.Errorf("initialize adapter runtime: %w", err)
+	}
+	_ = adapterSupervisor // Slice 1.5 owns enabled-integration scheduling.
 	go cleanSessions(ctx, logger, authService)
 
 	listener, err := net.Listen("tcp", cfg.Server.ListenAddress)
@@ -58,6 +64,21 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	logger.Info("Espial Core ready", "address", listener.Addr().String())
 	return runHTTPServer(ctx, server, listener, cfg.Server.ShutdownTimeout)
+}
+
+func adapterRuntime(pool *pgxpool.Pool, cfg config.Config) (*adapters.Supervisor, error) {
+	descriptors := make([]adapters.Descriptor, 0, 1)
+	if cfg.Adapters.SampleExecutable != "" {
+		descriptors = append(descriptors, adapters.Descriptor{
+			AdapterID:  "org.ubnetdef.espial.sample",
+			Executable: cfg.Adapters.SampleExecutable,
+		})
+	}
+	registry, err := adapters.NewRegistry(descriptors...)
+	if err != nil {
+		return nil, err
+	}
+	return adapters.NewSupervisor(adapters.NewPostgreSQLStore(pool), registry, adapters.SupervisorOptions{}), nil
 }
 
 // BootstrapAdmin creates the one-time local administrator account.

@@ -21,6 +21,7 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_DATABASE_CONNECT_TIMEOUT":      "4s",
 		"ESPIAL_DATABASE_MIGRATION_TIMEOUT":    "1m",
 		"ESPIAL_AUTH_MODE":                     "local",
+		"ESPIAL_SAMPLE_ADAPTER_EXECUTABLE":     "/opt/espial/sample-adapter",
 	}
 
 	err := applyEnvironment(&cfg, func(key string) string { return values[key] })
@@ -41,6 +42,9 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 	}
 	if cfg.Database.ConnectTimeout != 4*time.Second {
 		t.Fatalf("connect timeout = %s", cfg.Database.ConnectTimeout)
+	}
+	if cfg.Adapters.SampleExecutable != "/opt/espial/sample-adapter" {
+		t.Fatalf("sample executable = %q", cfg.Adapters.SampleExecutable)
 	}
 }
 
@@ -109,6 +113,14 @@ func TestValidateRejectsUnavailableSSOMode(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsRelativeSampleExecutable(t *testing.T) {
+	cfg := defaults()
+	cfg.Adapters.SampleExecutable = "./sample-adapter"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "absolute") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestDatabaseDSNReadsFile(t *testing.T) {
 	name := filepath.Join(t.TempDir(), "dsn")
 	if err := os.WriteFile(name, []byte("postgres://espial:secret@db/espial\n"), 0o600); err != nil {
@@ -138,11 +150,12 @@ func TestDatabaseDSNRequiresFile(t *testing.T) {
 func TestSafeSummaryDoesNotContainDSNPath(t *testing.T) {
 	cfg := defaults()
 	cfg.Database.DSNFile = "/private/secrets/database_dsn"
+	cfg.Adapters.SampleExecutable = "/private/bin/sample-adapter"
 
 	summary := cfg.SafeSummary()
 	for key, value := range summary {
 		text, _ := value.(string)
-		if strings.Contains(key, "dsn_file") || strings.Contains(text, "/private/secrets") {
+		if strings.Contains(key, "dsn_file") || strings.Contains(key, "executable") || strings.Contains(text, "/private/") {
 			t.Fatalf("unsafe summary field %q = %v", key, value)
 		}
 	}

@@ -7,14 +7,18 @@
 
 ## Implementation progress
 
-Updated 2026-07-30:
+Updated 2026-07-31:
 
 | Slice | Status | Evidence |
 |---|---|---|
 | 1.0 Toolchain and contracts | Implemented | Root npm commands with optional Make aliases, pinned toolchains, 10 schema fixtures, generated TypeScript, documentation link checks, CI, `.env.example` |
 | 1.1 Core lifecycle and PostgreSQL | Implemented | `serve`/`migrate`/`version`, typed configuration, JSON logs, health API, graceful shutdown, PostgreSQL pool, three embedded migrations, unit/race/integration tests |
 | 1.2 Local authentication | Implemented | One-time administrator bootstrap, Argon2id local credentials, lockout/rate limiting, hashed sessions, CSRF/origin checks, RBAC boundary, audit events, SvelteKit login/protected shell, and race/integration tests |
-| 1.3–1.8 Monitoring vertical slice | Planned | Contracts and database foundation are ready for implementation |
+| Pre-1.3 UI review | Implemented | Corrected the light/green generic shell to a dark UB-blue operational foundation; added visible UBNetDef attribution, contrast checks, anti-template constraints, and a recurring visual review gate |
+| Pre-1.3 webpage skeleton | Implemented | Public informational root, Dashboard-first auth return, responsive five-item top navigation, canonical route skeletons, honest domain-unavailable states, Core-unavailable handling, UI contract tests, and viewport review |
+| 1.3 Normalized storage and health | Implemented | Domain validation, injectable freshness evaluation, migration 000004, transactional resource/observation ingestion, delivery idempotency, stable row locking, post-commit changes, and PostgreSQL race/integration tests |
+| 1.4 Adapter runtime and sample | Implemented | Strict v1 protocol/manifest validation, bounded NDJSON process runtime, trusted registry and secret boundary, durable health/backoff state, graceful escalation/reaping, deterministic fault-capable sample binary, and black-box conformance/race/PostgreSQL tests |
+| 1.5–1.8 Monitoring vertical slice | Planned | Scheduling/ingestion, APIs/events, operational data UI, and deployment acceptance remain |
 
 The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
 200 during database loss while readiness returns HTTP 503 and recovers after the
@@ -51,7 +55,10 @@ integrations.
 - NDJSON stdio adapter protocol, registry, supervisor, scheduler, and sample adapter
 - Freshness evaluation with explicit stale/unknown behavior
 - Versioned REST API and authenticated SSE invalidation stream
-- SvelteKit shell, tokens, authentication states, overview, integration health,
+- Temporary informational public root with no operational data and a top-right
+  sign-in action
+- SvelteKit shell, tokens, exact five-section top navigation, authentication states,
+  Dashboard post-login route, Alerts and Datacenter route states, integration health,
   resource/status table, and live-connection state
 - Local deployment stack, test fixtures, CI checks, and contributor commands
 
@@ -61,10 +68,15 @@ integrations.
 - Incident state machine, acknowledgement, notifications, certificates, dependency
   resolution, physical inventory, rack/chassis views, or controlled actions
 - Production vendor adapters beyond the deterministic sample adapter
-- High availability, Kubernetes, a public status page, or arbitrary plugin install UI
+- High availability, Kubernetes, a public operational status page, or arbitrary
+  plugin install UI
 
 The UI may show disabled navigation labels for later areas only if they are clearly
 marked; it must not ship fake counts or imply unimplemented monitoring.
+
+The room-to-rack-to-server-to-drive experience is specified now in the
+[physical drill-down contract](../design/PHYSICAL_DRILLDOWN.md), but its inventory,
+visualization, and refinement work remains assigned to Phases 5–7.
 
 ## 3. Decisions Phase 1 will implement
 
@@ -77,6 +89,19 @@ marked; it must not ship fake counts or imply unimplemented monitoring.
   added later without replacing authorization or session storage.
 - SvelteKit renders initial authenticated state; Core remains authoritative for
   health rules and authorization.
+- Web uses the accepted dark UBNetDef design language: Harriman/deep navy anchors
+  the top bar and spatial chrome, UB Blue is reserved for selection and action, and
+  `UBNetDef Operations` remains visible in product chrome. Green is reserved for
+  healthy/success state.
+- The unauthenticated root is a temporary factual explanation of Espial with a
+  top-right sign-in action. It exposes no monitoring state, resource identity, or
+  environment metadata.
+- The authenticated shell uses the persistent top-level order `Dashboard`, `Alerts`,
+  `Datacenter`, `Hypervisor`, and `Webpages`; the current permanent side rail is
+  transitional, not the Slice 1.7 target. Dashboard is the post-login destination.
+- A frontend slice is not complete merely because it functions. It must pass the
+  anti-template and viewport review in the [design system](../design/DESIGN_SYSTEM.md)
+  and record material findings in the [UI review notes](../design/UI_REVIEW.md).
 
 Details live in the [ADR index](../adr/README.md).
 
@@ -102,9 +127,14 @@ web/
 ├── src/lib/components/         Phase 1 operational components
 ├── src/lib/server/             Core-facing server helpers only
 ├── src/lib/stores/             live connection and safe UI state
+├── src/routes/(public)/        temporary informational root
 ├── src/routes/(public)/login/
 ├── src/routes/(app)/           protected application shell
-├── src/routes/(app)/overview/
+├── src/routes/(app)/dashboard/
+├── src/routes/(app)/alerts/
+├── src/routes/(app)/datacenter/
+├── src/routes/(app)/hypervisor/
+├── src/routes/(app)/webpages/
 ├── src/routes/(app)/resources/
 └── src/routes/(app)/integrations/
 
@@ -122,6 +152,15 @@ do not decide Core health, and Web does not copy domain rules.
 
 Each slice ends in a testable state and merges without relying on an unreviewable
 big-bang branch.
+
+For any slice that changes Web, “testable” includes visual evidence at large,
+laptop, and narrow viewports. Reviewers reject generic AI/SaaS composition—gradients,
+glass, oversized rounded card grids, excessive pills, vague copy, and invented
+metrics—even when automated functional checks pass. A restrained dark-blue linear
+gradient is permitted only in structural navigation chrome and must have a flat
+fallback; ambient, multicolor, pastel, and content-surface gradients remain out of
+scope. New UI extends the shared dark-blue tokens and UBNetDef lockup; it does not
+establish a separate aesthetic.
 
 ### Slice 1.0 — Toolchain, contracts, and developer commands
 
@@ -270,7 +309,16 @@ placeholder page, and a Viewer cannot cross an administrator boundary.
 
 Operational use is documented in the [local authentication runbook](../operations/LOCAL_AUTH.md).
 
+The pre-Slice 1.3 [UI review](../design/UI_REVIEW.md) found that the initial visual
+implementation had diverged from the accepted dark UBNetDef direction. The login,
+shell, and placeholder overview were corrected before monitoring-domain work began.
+
 ### Slice 1.3 — Normalized storage and health evaluation
+
+**Detailed execution plan:** [Slice 1.3 normalized storage and health](SLICE_1_3_NORMALIZED_HEALTH.md)
+
+**Status:** Implemented 2026-07-31. The detailed plan records the accepted
+semantics, package boundaries, implementation evidence, and verification gates.
 
 **Build**
 
@@ -312,6 +360,12 @@ adapter process or HTTP handler.
 
 ### Slice 1.4 — Adapter registry, supervisor, and sample adapter
 
+**Detailed execution plan:** [Slice 1.4 adapter runtime and sample adapter](SLICE_1_4_ADAPTER_RUNTIME.md)
+
+**Status:** Implemented 2026-07-31. Core constructs the trusted sample registry at
+startup when its absolute executable path is configured; Slice 1.5 remains the
+owner of enabled-integration scheduling and collection ingestion.
+
 **Build**
 
 - Implement manifest parsing and protocol version negotiation from the v1 schemas.
@@ -336,8 +390,9 @@ adapter process or HTTP handler.
   response, and shutdown refusal.
 - Child processes are reaped and no goroutine/pipe leaks remain after cancellation.
 - Secret values are absent from process listing, logs, audit, and API responses.
-- Adapter crash changes integration health and eventually drives resource freshness
-  to stale/unknown; it never crashes Core or freezes health as healthy.
+- Adapter crash changes integration process health, enters bounded restart, and
+  never crashes Core. Slice 1.5 verifies the end-to-end freshness worker advances
+  dependent resource data to stale/unknown instead of freezing it as healthy.
 
 **Done when:** the sample adapter can be started, collected, stopped, deliberately
 broken, and recovered under automated tests.
@@ -401,7 +456,7 @@ health → internal event, with failures isolated and auditable.
 **Done when:** a non-browser client can complete the authenticated monitoring flow
 using the documented v1 API alone.
 
-### Slice 1.7 — SvelteKit operational shell and overview
+### Slice 1.7 — SvelteKit operational shell and primary pages
 
 **Build**
 
@@ -409,13 +464,24 @@ using the documented v1 API alone.
   component tests, and accessibility checks.
 - Implement the Phase 0 tokens as CSS custom properties and test status semantics
   with icon plus label, never color alone.
-- Build the application shell, skip link, navigation, user/role display, sign-out,
-  responsive behavior, error boundary, and Core-unavailable state.
+- Build the temporary public root: a concise factual explanation of Espial, no live
+  or identifying operational data, and an obvious sign-in action at the top right.
+- Preserve the reviewed dark UBNetDef foundation: visible organization attribution,
+  deep navy/Harriman structural chrome, restrained UB Blue actions and selection,
+  compact divided layouts, and no ambient gradient, glass, glow, oversized card
+  grid, or fake operational content.
+- Build the application shell, skip link, dark top navigation with `Dashboard`,
+  `Alerts`, `Datacenter`, `Hypervisor`, and `Webpages` in that order, user/role
+  dropdown, sign-out, responsive behavior, error boundary, and Core-unavailable
+  state.
+- Route successful login to Dashboard. Until Phases 2 and 5 provide their domain
+  data, render honest unavailable/not-configured states at Alerts and Datacenter;
+  do not fabricate alerts, a room, or devices.
 - Use a typed API client with request IDs, same-origin credentials, safe error
   mapping, and no browser calls to infrastructure sources.
 - Load authoritative initial data through SvelteKit. Avoid persisting sessions,
   credentials, operational payloads, or resource data in browser local storage.
-- Build overview counts, integration-health list, resource status table, timestamp,
+- Build Dashboard counts, integration-health list, resource status table, timestamp,
   loading/empty/error states, filters reflected in the URL, and accessible narrow
   layout.
 - Add the SSE client after initial load. Show `Live`, `Reconnecting`, `Disconnected`,
@@ -425,7 +491,13 @@ using the documented v1 API alone.
 
 **Verify**
 
+- The public root explains the product without disclosing live status, hostnames,
+  locations, integrations, counts, or other operational metadata.
 - Keyboard-only login, navigation, filtering, table inspection, and logout.
+- The post-login route is Dashboard; all five primary items remain present and in
+  order across routes and narrow screens.
+- Real navigation/user dropdowns work by click, keyboard, and touch; focus returns
+  predictably and Escape closes an open menu.
 - Automated contrast/accessibility checks plus manual screen-reader landmarks and
   status-label review.
 - Unknown and stale are distinguishable from healthy in text, icon, and styling.
@@ -434,9 +506,12 @@ using the documented v1 API alone.
 - SSE disconnect/reconnect and reduced-motion behavior are covered by browser tests.
 - Large display, laptop, and narrow viewport snapshots contain the same critical
   information.
+- The visual review checklist passes and finds no anti-template pattern; screenshots
+  visibly belong to the same UBNetDef product as the login and protected shell.
 
-**Done when:** an operator can identify unhealthy/stale resources and monitoring
-coverage within seconds using only the Web UI.
+**Done when:** a visitor can understand Espial and reach sign-in from the public
+root, and an operator can identify unhealthy/stale resources and monitoring coverage
+within seconds using only the Web UI.
 
 ### Slice 1.8 — Deployment, hardening, and phase acceptance
 
@@ -609,6 +684,14 @@ Phase 1 is complete only when all are true:
 - [ ] PostgreSQL migrations, transactional ingestion, and current health are tested.
 - [ ] Operators can see current counts, integration health, resources, timestamps,
   and live connection state in an accessible Svelte UI.
+- [ ] The public root explains Espial without operational disclosure and keeps
+  sign-in available at the top right.
+- [ ] Authenticated primary navigation uses an accessible top bar and presents
+  Dashboard, Alerts, Datacenter, Hypervisor, and Webpages in that order on narrow
+  screens as well as desktop.
+- [ ] Login, shell, Dashboard, Alerts, Datacenter, loading, empty, error, and
+  monitoring states share the reviewed dark UBNetDef visual language and pass the
+  design-system review gate.
 - [ ] SSE improves freshness but loss/reconnect never corrupts authoritative state.
 - [ ] Administrative and authentication activity has redacted audit evidence.
 - [ ] Graceful shutdown, race-sensitive code, bounded queues, and leak-prone adapter

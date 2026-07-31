@@ -70,10 +70,16 @@ erDiagram
       uuid id PK
       uuid integration_id FK
       text adapter_version
+      text protocol_version
       text state
       timestamptz last_started_at
       timestamptz last_healthy_at
+      timestamptz last_stopped_at
+      timestamptz last_error_at
       text last_error_code
+      integer consecutive_failures
+      timestamptz next_restart_at
+      timestamptz updated_at
     }
     RESOURCES {
       uuid id PK
@@ -93,6 +99,8 @@ erDiagram
       text observed_state
       text summary
       timestamptz observed_at
+      timestamptz received_at
+      integer expected_refresh_seconds
       timestamptz expires_at
       jsonb measurements
       jsonb metadata
@@ -105,6 +113,7 @@ erDiagram
       timestamptz observed_at
       timestamptz last_success_at
       timestamptz stale_at
+      timestamptz unknown_at
       timestamptz updated_at
     }
     AUDIT_EVENTS {
@@ -130,11 +139,16 @@ erDiagram
 - Observation ingestion and current-state replacement happen in one transaction.
 - `observed_at` is source time; ingestion time is separately recorded in migrations
   even when omitted from the conceptual diagram.
+- `(integration_id, resource_id, check_type, observed_at)` is the normalized
+  observation delivery key when a source UUID is absent. Retrying the same payload
+  is a no-op; conflicting content for the same key is rejected.
 - Staleness is derived from expected refresh and persisted as a state transition so
   clients receive a live event and history remains explainable.
 - Audit records are append-only to application roles. Corrections create a new
   event; they do not update old events.
 - Secrets are references, never values, in `integrations` and audit summaries.
+- Adapter-instance restart counters and deadlines are persisted so restarting Core
+  cannot erase a failing adapter's backoff. Host-local process IDs are not stored.
 
 ## Migration rules
 

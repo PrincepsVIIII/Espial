@@ -12,6 +12,8 @@ intentions into implementable contracts.
 | [Roadmap](ROADMAP.md) | Phase boundaries, ordering, and product scope |
 | [Phase 0 record](phase-0/README.md) | Completed design deliverables, decisions, and known external inputs |
 | [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
+| [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
+| [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |
 | [Backend plan](BACKEND_PLAN.md) | Long-term backend responsibilities and domain direction |
 | [Frontend/UI plan](FRONTEND_UI_PLAN.md) | Long-term information architecture and interaction direction |
 
@@ -27,8 +29,11 @@ intentions into implementable contracts.
 
 ## Design
 
+- [Authoritative general UI guidance](design/UI_GUIDANCE.md)
 - [Design tokens and status semantics](design/DESIGN_SYSTEM.md)
-- [Phase 0 wireframes](design/WIREFRAMES.md)
+- [Product wireframes](design/WIREFRAMES.md)
+- [Physical infrastructure drill-down](design/PHYSICAL_DRILLDOWN.md)
+- [UI review notes](design/UI_REVIEW.md)
 
 ## Operations and discovery
 

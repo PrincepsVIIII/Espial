@@ -29,8 +29,49 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 3 {
+	if migrationCount != 5 {
 		t.Fatalf("migration count = %d", migrationCount)
+	}
+
+	var expectedRefreshNullable string
+	if err := pool.QueryRow(ctx, `
+		SELECT is_nullable
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'observations'
+		  AND column_name = 'expected_refresh_seconds'
+	`).Scan(&expectedRefreshNullable); err != nil {
+		t.Fatalf("inspect expected refresh column: %v", err)
+	}
+	if expectedRefreshNullable != "NO" {
+		t.Fatalf("expected_refresh_seconds nullable = %q", expectedRefreshNullable)
+	}
+
+	var deliveryIndexExists bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.observations_delivery_key_idx') IS NOT NULL
+	`).Scan(&deliveryIndexExists); err != nil {
+		t.Fatalf("inspect delivery key index: %v", err)
+	}
+	if !deliveryIndexExists {
+		t.Fatal("observations delivery key index is missing")
+	}
+
+	var runtimeColumns int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM information_schema.columns
+		WHERE table_schema = current_schema()
+		  AND table_name = 'adapter_instances'
+		  AND column_name IN (
+			'protocol_version', 'last_stopped_at', 'last_error_at',
+			'consecutive_failures', 'next_restart_at', 'updated_at'
+		  )
+	`).Scan(&runtimeColumns); err != nil {
+		t.Fatalf("inspect adapter runtime columns: %v", err)
+	}
+	if runtimeColumns != 6 {
+		t.Fatalf("adapter runtime column count = %d", runtimeColumns)
 	}
 
 	var roleCount int
@@ -74,7 +115,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (4, '000004_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (6, '000006_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

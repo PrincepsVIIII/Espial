@@ -2,17 +2,24 @@
 
 This directory is the Go module for the standalone Espial backend. Phase 1 currently
 provides the process lifecycle, typed configuration, structured logs, PostgreSQL
-connection pool and migrations, graceful shutdown, health API, and temporary local
-authentication with server-side sessions and role enforcement.
+connection pool and migrations, graceful shutdown, health API, temporary local
+authentication with server-side sessions and role enforcement, and normalized
+resource/observation persistence with deterministic current-health evaluation. It
+also includes the trusted, supervised adapter runtime and standalone deterministic
+sample adapter used by the next scheduled-ingestion slice.
 
 Current layout:
 
 ```text
 cmd/espial/       serve, migrate, bootstrap, and version commands
+cmd/espial-sample-adapter/ standalone deterministic adapter executable
+internal/adapters/ protocol, registry, process supervision, persistence, conformance
 internal/api/     HTTP routing, security boundary, and health/auth handlers
 internal/app/     dependency wiring and graceful lifecycle
 internal/auth/    credentials, sessions, CSRF, roles, limits, and provider boundary
 internal/config/  defaults, JSON file, environment overrides, validation
+internal/health/  pure normalized state and freshness evaluation
+internal/observations/ domain validation and transactional ingestion
 internal/storage/ PostgreSQL pool and migration runner
 migrations/       embedded, forward-only SQL migrations
 ```
@@ -58,9 +65,11 @@ then by environment variables. Unknown JSON keys are rejected.
 | `ESPIAL_AUTH_LOCKOUT_DURATION` | `15m` | Timed account lock duration |
 | `ESPIAL_AUTH_LOGIN_RATE_LIMIT` | `10` | Login attempts allowed per source/window |
 | `ESPIAL_AUTH_LOGIN_RATE_WINDOW` | `1m` | Source-address login rate window |
+| `ESPIAL_SAMPLE_ADAPTER_EXECUTABLE` | none | Absolute trusted path to the bundled sample adapter; never supplied by an integration/API |
 
 The DSN value is read from a file and is never included in configuration summaries
-or logs.
+or logs. The adapter executable path is likewise represented only as a configured/
+not-configured boolean in safe summaries.
 
 ## Health API
 
@@ -69,6 +78,31 @@ or logs.
 
 Database loss leaves liveness healthy and changes readiness to HTTP 503. Both
 responses include a request ID and baseline security headers.
+
+## Normalized observations and health
+
+`internal/observations` accepts transport-independent batches, validates them
+before persistence, then commits resource upserts, append-only observations, and
+current health in one PostgreSQL transaction. Identical retries are no-ops;
+conflicting reuse of a UUID or normalized delivery key rejects the entire batch.
+
+`internal/health` derives state from the newest observation using injected time.
+It persists the stale and unknown deadlines needed by the Slice 1.5 freshness
+worker. See the [Slice 1.3 record](../docs/plans/SLICE_1_3_NORMALIZED_HEALTH.md) for
+freshness semantics and the verification matrix.
+
+## Adapter runtime
+
+The runtime starts only executables supplied through Core's immutable registry. An
+integration row selects a registered adapter ID; it cannot provide paths, arguments,
+shell text, working directories, or environment values. Runtime configuration and
+resolved secrets travel through bounded stdin envelopes and known secrets are
+redacted from retained diagnostics.
+
+The bundled `espial-sample-adapter` supports deterministic healthy, warning, and
+critical collections plus test-only failure modes. Core wires its descriptor when
+`ESPIAL_SAMPLE_ADAPTER_EXECUTABLE` is configured, but Slice 1.5 owns scheduling and
+does not start it yet. See the [Slice 1.4 record](../docs/plans/SLICE_1_4_ADAPTER_RUNTIME.md).
 
 ## Authentication API
 

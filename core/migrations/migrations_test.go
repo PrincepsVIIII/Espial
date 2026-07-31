@@ -7,7 +7,7 @@ func TestAllReturnsOrderedMigrations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load migrations: %v", err)
 	}
-	if len(items) != 3 {
+	if len(items) != 5 {
 		t.Fatalf("migration count = %d", len(items))
 	}
 	for index, item := range items {
