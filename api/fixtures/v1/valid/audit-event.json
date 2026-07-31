@@ -1,0 +1,15 @@
+{
+  "schema": "audit-event",
+  "data": {
+    "id": "30000000-0000-4000-8000-000000000001",
+    "actor_user_id": "40000000-0000-4000-8000-000000000001",
+    "actor_username": "admin",
+    "action": "audit.read",
+    "target_type": "audit",
+    "result": "succeeded",
+    "source_address": "127.0.0.1",
+    "correlation_id": "request-1",
+    "after_summary": { "limit": 50 },
+    "occurred_at": "2026-07-31T12:00:00Z"
+  }
+}

@@ -8,6 +8,8 @@ resource/observation persistence with deterministic current-health evaluation. I
 also includes the trusted, supervised adapter runtime, scheduled normalized
 collection pipeline, database-safe freshness worker, bounded event hub, and the
 standalone deterministic sample adapter used to prove the pipeline.
+The authenticated v1 monitoring API now exposes stable read models and bounded
+SSE invalidations for non-browser clients and the upcoming operational UI.
 
 Current layout:
 
@@ -76,6 +78,8 @@ then by environment variables. Unknown JSON keys are rejected.
 | `ESPIAL_FRESHNESS_INTERVAL` | `1s` | Persisted freshness deadline polling interval |
 | `ESPIAL_FRESHNESS_BATCH_SIZE` | `100` | Maximum claimed freshness rows per transaction |
 | `ESPIAL_EVENT_REPLAY_SIZE` | `1024` | Bounded in-process invalidation replay capacity |
+| `ESPIAL_SSE_HEARTBEAT` | `15s` | Stream heartbeat and session revalidation interval, from 1s through 1m |
+| `ESPIAL_SSE_MAX_CLIENTS` | `100` | Maximum concurrent authenticated event streams, from 1 through 10,000 |
 
 The DSN value is read from a file and is never included in configuration summaries
 or logs. The adapter executable path is likewise represented only as a configured/
@@ -127,6 +131,20 @@ published only afterward. See the [Slice 1.5 record](../docs/plans/SLICE_1_5_SCH
 
 See the [local authentication runbook](../docs/operations/LOCAL_AUTH.md) for
 bootstrap and recovery procedures.
+
+## Monitoring API
+
+Authenticated clients can read `/api/v1/overview`, paginated resources and
+integrations, and their detail routes. Administrators can read bounded audit
+windows at `/api/v1/audit`. Operators and administrators can create a registered
+integration and replace its configuration through an `If-Match` guarded update.
+`/api/v1/events/stream` carries invalidations only; clients always refetch REST
+state after an event or `resync_required`.
+
+The default collection page is 50 items and the maximum is 200. Mutation bodies
+are capped at 128 KiB. See the [Slice 1.6 record](../docs/plans/SLICE_1_6_REST_SSE_API.md)
+and checked [OpenAPI document](../api/openapi/v1.json) for filters, permissions,
+schemas, and example client flow.
 
 ## Checks
 

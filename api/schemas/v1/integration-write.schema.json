@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/integration-write.schema.json",
+  "title": "Integration write request",
+  "$defs": {
+    "CreateIntegrationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_id",
+        "display_name",
+        "enabled",
+        "interval_seconds",
+        "config_nonsecret",
+        "secret_references"
+      ],
+      "properties": {
+        "adapter_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]{0,126}$"
+        },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "enabled": { "type": "boolean" },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "config_nonsecret": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": true
+        },
+        "secret_references": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      }
+    },
+    "ReplaceIntegrationConfigurationRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "interval_seconds",
+        "config_nonsecret",
+        "secret_references"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "config_nonsecret": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": true
+        },
+        "secret_references": {
+          "type": "object",
+          "maxProperties": 128,
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/CreateIntegrationRequest" },
+    { "$ref": "#/$defs/ReplaceIntegrationConfigurationRequest" }
+  ]
+}

@@ -4,7 +4,7 @@ This directory contains the standalone SvelteKit/TypeScript browser application.
 It presents Core state and sessions; authorization and domain decisions remain in
 Core.
 
-The implemented authentication and webpage skeleton includes:
+The implemented Phase 1 Web application includes:
 
 - a local login page with password-manager-compatible fields and generic errors;
 - a public informational root with no operational data and a top-right login action;
@@ -13,8 +13,16 @@ The implemented authentication and webpage skeleton includes:
 - an authoritative `/api/v1/auth/session` check around the application route group;
 - a Dashboard-first protected shell with Dashboard, Alerts, Datacenter, Hypervisor,
   and Webpages in a responsive top navigation bar;
-- honest unavailable/not-configured states for monitoring domains that Core does not
-  expose yet, plus an explicit Core-unavailable shell state;
+- an authoritative Dashboard with resource-state counts, integration coverage,
+  resource health, URL-backed filters, empty/permission/error states, and stable
+  cursor continuation;
+- SvelteKit server-side session and monitoring loaders using generated API models,
+  safe request-ID-aware error mapping, and no direct browser infrastructure calls;
+- a bounded SSE client with `Last-Event-ID`, jittered reconnect, explicit
+  Live/Reconnecting/Disconnected state, coalesced REST refresh, and full resync;
+- honest unavailable/not-configured states for domains Core does not expose yet,
+  plus explicit permission and Core-unavailable states that never present old data
+  as fresh;
 - an `/overview` compatibility redirect to `/dashboard` and session-bound CSRF
   logout; and
 - a same-origin server proxy to Core, configured by `ESPIAL_CORE_URL`.
@@ -52,8 +60,16 @@ npm install
 npm run dev
 npm run check
 npm run test
+npm run test:browser
 npm run build
 ```
+
+`npm run test:browser` starts a deterministic test-only mock Core and a local
+SvelteKit server. Its Chromium suite covers keyboard navigation, URL filtering,
+logout access, SSE reconnect/resync, permission and outage handling, reduced
+motion, axe accessibility checks, and 1440px/1280px/500px viewport captures. The
+mock data exists only in `tests/`; no operational fixture is compiled into the
+application.
 
 The local Compose stack sets `ESPIAL_CORE_URL=http://core:8080`. A host development
 server defaults to `http://127.0.0.1:8080` unless that environment variable is set.

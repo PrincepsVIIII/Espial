@@ -142,3 +142,59 @@ metrics.
 - Full repository verification passed: formatting, 10 contract fixtures, links in
   38 Markdown files, generated-type diff, Core vet/tests, Svelte diagnostics,
   frontend tests, and the production build.
+
+## 2026-07-31 — Slice 1.7 operational Dashboard review
+
+### Scope
+
+Reviewed the implemented Dashboard, status semantics, resource filters/table,
+integration rows, live-connection states, error/permission/empty states, desktop
+user menu, and collapsed navigation against the [general UI guidance](UI_GUIDANCE.md)
+and [design system](DESIGN_SYSTEM.md).
+
+The review used deterministic test-only Core responses. Those fixtures validate
+layout and behavior but are never compiled into or displayed by the production UI.
+
+### Material decisions
+
+- Kept initial session and monitoring reads in SvelteKit loaders so authenticated
+  SSR uses the same-origin Core proxy and generated contracts. The browser does not
+  contact infrastructure sources or persist operational payloads.
+- Used one divided state-count strip, one compact resource table, and divided
+  integration rows. This avoids an oversized rounded-card dashboard while keeping
+  current health, freshness, coverage, reason, and observation time scannable.
+- Every state uses a visible icon and label. Healthy, warning, critical, unknown,
+  stale, maintenance, and disabled remain visually and textually distinct.
+- Converted the resource table to labeled stacked rows at 500px rather than hiding
+  columns or requiring horizontal scrolling. The same resource, state,
+  integration, kind, observation time, and reason remain available.
+- Kept Alerts and Datacenter honest and unavailable. Slice 1.7 does not pull the
+  physical room/rack interaction forward from Phases 5–7.
+- Exposed Live, Reconnecting, and Disconnected in shared top chrome. Live events
+  only invalidate; successful REST reloads remain the displayed authority.
+
+### Viewport findings
+
+- At 1440px, the full resource table and integration coverage row fit without
+  clipped text or ornamental whitespace. The attention state is visible beside the
+  Dashboard heading and does not rely on color.
+- At 1280px, the same columns and state strip remain readable with the established
+  top navigation intact.
+- At 500px, the top navigation becomes the required labeled menu, preserves all
+  five items in order, exposes Live and sign out, and the monitoring content uses
+  full-width divided rows. No primary sidebar is introduced.
+- Public and Dashboard axe scans reported no violations on the public page and no
+  serious/critical violations on Dashboard. Keyboard Escape returns focus to the
+  user-menu trigger; filters and narrow navigation remain keyboard operable.
+- Reduced-motion emulation confirms the global motion cap, while SSE reconnect and
+  resync remain functional without animation.
+
+### Verification evidence
+
+- Svelte diagnostics: zero errors and zero warnings.
+- Unit/contract suite: 36 tests covering API errors, filter normalization, status
+  semantics, timestamps, SSE parsing/replay headers, and existing UI contracts.
+- Chromium suite: 11 tests covering public disclosure, axe, filters, keyboard
+  menus, 401/403/outage behavior, live reconnect, full resync, reduced motion, and
+  large/laptop/narrow captures.
+- Production SvelteKit SSR build completed successfully.

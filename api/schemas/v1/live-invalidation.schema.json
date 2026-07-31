@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/live-invalidation.schema.json",
+  "title": "Live invalidation data",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "changed_at"],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "result": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "changed_at": { "type": "string", "format": "date-time" }
+  }
+}

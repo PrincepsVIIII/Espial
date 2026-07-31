@@ -1,0 +1,12 @@
+{
+  "schema": "integration-write",
+  "data": {
+    "adapter_id": "bad adapter",
+    "display_name": "",
+    "enabled": true,
+    "interval_seconds": 0,
+    "config_nonsecret": {},
+    "secret_references": {},
+    "executable": "/tmp/untrusted"
+  }
+}

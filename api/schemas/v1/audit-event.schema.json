@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/audit-event.schema.json",
+  "title": "Redacted audit event view",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "action",
+    "target_type",
+    "result",
+    "correlation_id",
+    "occurred_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": "string", "format": "uuid" },
+    "actor_username": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "action": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "target_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,62}$" },
+    "target_id": { "type": "string", "maxLength": 512 },
+    "result": { "enum": ["succeeded", "failed", "denied"] },
+    "source_address": {
+      "type": "string",
+      "oneOf": [{ "format": "ipv4" }, { "format": "ipv6" }]
+    },
+    "correlation_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "before_summary": { "type": "object", "additionalProperties": true },
+    "after_summary": { "type": "object", "additionalProperties": true },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

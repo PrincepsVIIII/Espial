@@ -7,6 +7,8 @@ coverage/
 dist/
 build/
 .svelte-kit/
+test-results/
+playwright-report/
 tmp/
 
 # Local runtime data

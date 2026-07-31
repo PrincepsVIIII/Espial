@@ -1,0 +1,10 @@
+{
+  "schema": "api-error",
+  "data": {
+    "error": {
+      "code": "Validation Failed",
+      "message": "raw SQL SELECT secret FROM users",
+      "request_id": ""
+    }
+  }
+}

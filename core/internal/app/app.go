@@ -40,7 +40,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
-	monitoringRuntime, err := adapterRuntime(pool, cfg, logger)
+	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("initialize adapter runtime: %w", err)
 	}
@@ -51,7 +51,10 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 
 	handler := api.New(api.Dependencies{
 		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
-		SecureCookies: secureCookies(cfg),
+		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
+		Integrations: monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
+		Events:       monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
+		SSEMaxClients: cfg.Server.SSEMaxClients,
 	})
 	server := &http.Server{
 		Handler:           handler,
@@ -83,7 +86,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 }
 
-func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*monitoring.Runtime, error) {
+func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*monitoring.Runtime, *adapters.Registry, error) {
 	descriptors := make([]adapters.Descriptor, 0, 1)
 	if cfg.Adapters.SampleExecutable != "" {
 		descriptors = append(descriptors, adapters.Descriptor{
@@ -93,7 +96,7 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) 
 	}
 	registry, err := adapters.NewRegistry(descriptors...)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	return monitoring.NewRuntime(pool, registry, monitoring.RuntimeOptions{
 		GlobalConcurrency:  cfg.Adapters.GlobalConcurrency,
@@ -104,7 +107,7 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) 
 		OnError: func(integrationID string, err error) {
 			logger.Error("integration supervisor exited", "integration_id", integrationID, "error", err)
 		},
-	}), nil
+	}), registry, nil
 }
 
 // BootstrapAdmin creates the one-time local administrator account.

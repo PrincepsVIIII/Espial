@@ -1,0 +1,15 @@
+{
+  "schema": "resource-view",
+  "data": {
+    "id": "not-a-uuid",
+    "integration_id": "20000000-0000-4000-8000-000000000001",
+    "integration_name": "Sample",
+    "external_id": "node",
+    "kind": "Host",
+    "display_name": "Node",
+    "attributes": {},
+    "first_seen_at": "2026-07-31T12:00:00Z",
+    "last_seen_at": "2026-07-31T12:00:00Z",
+    "health": { "state": "stale", "reason": "Stale", "updated_at": "bad" }
+  }
+}

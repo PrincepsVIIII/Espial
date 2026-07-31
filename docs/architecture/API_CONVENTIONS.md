@@ -76,13 +76,25 @@ GET  /api/v1/resources
 GET  /api/v1/resources/{id}
 GET  /api/v1/integrations
 GET  /api/v1/integrations/{id}
+POST /api/v1/integrations
+PUT  /api/v1/integrations/{id}/configuration
 GET  /api/v1/events/stream
-GET  /api/v1/audit                 administrator only
+GET  /api/v1/audit                   administrator only
 ```
 
-Administration endpoints needed to register the sample adapter may begin behind a
-CLI and repository interface; before a UI mutation endpoint is exposed it must have
-validation, authorization, optimistic concurrency, and audit coverage.
+Resource filters are repeated `state`, `kind`, and `integration` values plus a
+single `stale` boolean. Integration filters are repeated `adapter_id` and
+`runtime_state` values plus a single `enabled` boolean. Audit filters are repeated
+`action`, `result`, and `target_type` values, with one `actor_user_id`, `from`, and
+`to`. `stale=true` matches the stale state only; unknown remains an explicit state
+filter. Audit windows default to the previous 24 hours and cannot exceed 31 days.
+
+Integration creation accepts only adapter IDs in Core's immutable trusted registry.
+Configuration replacement requires the current response `ETag` in `If-Match`;
+missing, stale, and unknown-adapter preconditions return `428`, `412`, and `409`
+respectively. Both mutations require `integrations:manage`, trusted origin, CSRF,
+bounded JSON, and an audit record. Configuration values and secret-reference values
+never appear in read models or audit summaries; only their key names do.
 
 ## Live events
 
@@ -90,6 +102,9 @@ SSE messages have `id`, `event`, and a JSON `data` object with `schema_version`,
 `resource_id` or `integration_id`, and `changed_at`. They are invalidations, not a
 second source of truth. Send a heartbeat comment every 15 seconds. Honor
 `Last-Event-ID` within a bounded replay window; otherwise emit `resync_required`.
+The heartbeat also revalidates the session and `overview:read` permission. A lost or
+revoked session closes the stream within that interval. Concurrent streams are
+bounded and excess clients receive `503` with `Retry-After`.
 
 ## Compatibility
 

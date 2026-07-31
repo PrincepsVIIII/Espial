@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/overview.schema.json",
+  "title": "Monitoring overview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "generated_at",
+    "resource_counts",
+    "integration_counts",
+    "stale_count",
+    "unknown_count",
+    "recent_state_changes"
+  ],
+  "properties": {
+    "generated_at": { "type": "string", "format": "date-time" },
+    "resource_counts": {
+      "type": "array",
+      "maxItems": 7,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "count"],
+        "properties": {
+          "state": {
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "unknown",
+              "stale",
+              "maintenance",
+              "disabled"
+            ]
+          },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "integration_counts": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "count"],
+        "properties": {
+          "state": {
+            "enum": [
+              "starting",
+              "healthy",
+              "unhealthy",
+              "stopped",
+              "disabled",
+              "not_started"
+            ]
+          },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "stale_count": { "type": "integer", "minimum": 0 },
+    "unknown_count": { "type": "integer", "minimum": 0 },
+    "recent_state_changes": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resource_id",
+          "integration_id",
+          "display_name",
+          "state",
+          "reason",
+          "changed_at"
+        ],
+        "properties": {
+          "resource_id": { "type": "string", "format": "uuid" },
+          "integration_id": { "type": "string", "format": "uuid" },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "state": {
+            "enum": [
+              "healthy",
+              "warning",
+              "critical",
+              "unknown",
+              "stale",
+              "maintenance",
+              "disabled"
+            ]
+          },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+          "changed_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

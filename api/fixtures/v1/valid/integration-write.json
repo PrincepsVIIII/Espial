@@ -1,0 +1,11 @@
+{
+  "schema": "integration-write",
+  "data": {
+    "adapter_id": "org.ubnetdef.espial.sample",
+    "display_name": "Sample integration",
+    "enabled": true,
+    "interval_seconds": 300,
+    "config_nonsecret": { "scenario": "healthy" },
+    "secret_references": {}
+  }
+}

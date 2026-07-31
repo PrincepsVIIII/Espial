@@ -26,22 +26,55 @@ export interface AdapterManifest {
   /**
    * @minItems 1
    */
-  protocol_versions: [string, ...string[]];
+  protocol_versions: string[];
   integration_category: string;
   resource_types?: string[];
   check_types?: string[];
   /**
    * @minItems 1
    */
-  capabilities: [
-    "collect" | "events" | "notifications" | "actions",
-    ...("collect" | "events" | "notifications" | "actions")[]
-  ];
+  capabilities: ("collect" | "events" | "notifications" | "actions")[];
   read_only?: boolean;
   config_schema: {
     [k: string]: unknown;
   };
   secret_fields?: string[];
+}
+
+export interface APIErrorResponse {
+  error: {
+    code: string;
+    message: string;
+    request_id: string;
+    /**
+     * @maxItems 64
+     */
+    fields?: {
+      field: string;
+      code: string;
+    }[];
+  };
+}
+
+export interface RedactedAuditEventView {
+  id: string;
+  actor_user_id?: string;
+  actor_username?: string;
+  action: string;
+  target_type: string;
+  target_id?: string;
+  result: "succeeded" | "failed" | "denied";
+  source_address?: {
+    [k: string]: unknown;
+  } & string;
+  correlation_id: string;
+  before_summary?: {
+    [k: string]: unknown;
+  };
+  after_summary?: {
+    [k: string]: unknown;
+  };
+  occurred_at: string;
 }
 
 export interface EspialEvent {
@@ -59,6 +92,86 @@ export interface EspialEvent {
   };
 }
 
+export interface IntegrationAPIView {
+  id: string;
+  adapter_id: string;
+  display_name: string;
+  enabled: boolean;
+  interval_seconds: number;
+  /**
+   * @maxItems 128
+   */
+  config_keys: string[];
+  /**
+   * @maxItems 128
+   */
+  secret_reference_keys: string[];
+  runtime_state: "starting" | "healthy" | "unhealthy" | "stopped" | "disabled" | "not_started";
+  resource_count: number;
+  stale_count: number;
+  unknown_count: number;
+  instance?: {
+    adapter_version: string;
+    protocol_version?: string;
+    state: "starting" | "healthy" | "unhealthy" | "stopped";
+    last_started_at?: string;
+    last_healthy_at?: string;
+    last_stopped_at?: string;
+    last_error_at?: string;
+    last_error_code?: string;
+    consecutive_failures: number;
+    next_restart_at?: string;
+    updated_at: string;
+  };
+  last_collection?: {
+    started_at: string;
+    completed_at: string;
+    duration_ms: number;
+    result: "succeeded" | "rejected" | "failed" | "skipped";
+    error_code?: string;
+    resource_count: number;
+    observation_count: number;
+    observations_inserted: number;
+    duplicate_observations: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export type IntegrationWriteRequest = CreateIntegrationRequest | ReplaceIntegrationConfigurationRequest;
+
+export interface CreateIntegrationRequest {
+  adapter_id: string;
+  display_name: string;
+  enabled: boolean;
+  interval_seconds: number;
+  config_nonsecret: {
+    [k: string]: unknown;
+  };
+  secret_references: {
+    [k: string]: string;
+  };
+}
+export interface ReplaceIntegrationConfigurationRequest {
+  enabled: boolean;
+  interval_seconds: number;
+  config_nonsecret: {
+    [k: string]: unknown;
+  };
+  secret_references: {
+    [k: string]: string;
+  };
+}
+
+export interface LiveInvalidationData {
+  schema_version: 1;
+  resource_id?: string;
+  integration_id?: string;
+  state?: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  result?: string;
+  changed_at: string;
+}
+
 export interface NormalizedObservation {
   id?: string;
   external_resource_id: string;
@@ -72,6 +185,77 @@ export interface NormalizedObservation {
   };
   metadata?: {
     [k: string]: unknown;
+  };
+}
+
+export interface MonitoringOverview {
+  generated_at: string;
+  /**
+   * @maxItems 7
+   */
+  resource_counts: {
+    state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+    count: number;
+  }[];
+  /**
+   * @maxItems 6
+   */
+  integration_counts: {
+    state: "starting" | "healthy" | "unhealthy" | "stopped" | "disabled" | "not_started";
+    count: number;
+  }[];
+  stale_count: number;
+  unknown_count: number;
+  /**
+   * @maxItems 10
+   */
+  recent_state_changes: {
+    resource_id: string;
+    integration_id: string;
+    display_name: string;
+    state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+    reason: string;
+    changed_at: string;
+  }[];
+}
+
+export interface ResourceAPIView {
+  id: string;
+  integration_id: string;
+  integration_name: string;
+  external_id: string;
+  kind: string;
+  display_name: string;
+  attributes: {
+    [k: string]: unknown;
+  };
+  source_url?: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  health: {
+    state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+    reason: string;
+    observation_id?: string;
+    observed_at?: string;
+    last_success_at?: string;
+    stale_at?: string;
+    unknown_at?: string;
+    updated_at: string;
+  };
+  latest_observation?: {
+    id: string;
+    check_type: string;
+    state: "healthy" | "warning" | "critical" | "unknown" | "maintenance" | "disabled";
+    summary: string;
+    observed_at: string;
+    received_at: string;
+    expected_refresh_seconds: number;
+    measurements: {
+      [k: string]: unknown;
+    };
+    metadata: {
+      [k: string]: unknown;
+    };
   };
 }
 

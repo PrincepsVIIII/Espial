@@ -1,0 +1,712 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Espial Core API",
+    "version": "1.0.0",
+    "description": "Authenticated Phase 1 monitoring reads, integration configuration, and live invalidations."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "paths": {
+    "/health/live": {
+      "get": {
+        "operationId": "getLiveness",
+        "responses": { "200": { "$ref": "#/components/responses/Status" } }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "operationId": "getReadiness",
+        "responses": {
+          "200": { "$ref": "#/components/responses/Status" },
+          "503": { "$ref": "#/components/responses/Status" }
+        }
+      }
+    },
+    "/auth/capabilities": {
+      "get": {
+        "operationId": "getAuthCapabilities",
+        "responses": {
+          "200": {
+            "description": "Available authentication mechanisms.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["local", "sso"],
+                  "properties": {
+                    "local": { "type": "boolean" },
+                    "sso": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/local/login": {
+      "post": {
+        "operationId": "loginLocal",
+        "parameters": [
+          { "$ref": "#/components/parameters/RequestID" },
+          { "$ref": "#/components/parameters/Origin" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["username", "password"],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated session; tokens are cookies, not response fields."
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/auth/session": {
+      "get": {
+        "operationId": "getSession",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Authoritative current user, roles, permissions, and expiry."
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "operationId": "logout",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" }
+        ],
+        "responses": {
+          "204": { "description": "Session revoked." },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/admin/ping": {
+      "get": {
+        "operationId": "adminPing",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": { "$ref": "#/components/responses/Status" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/overview": {
+      "get": {
+        "operationId": "getOverview",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Small authoritative monitoring overview without incident data.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/v1/overview.schema.json" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/resources": {
+      "get": {
+        "operationId": "listResources",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "enum": [
+                  "healthy",
+                  "warning",
+                  "critical",
+                  "unknown",
+                  "stale",
+                  "maintenance",
+                  "disabled"
+                ]
+              }
+            },
+            "explode": true
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+              }
+            },
+            "explode": true
+          },
+          {
+            "name": "integration",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string", "format": "uuid" }
+            },
+            "explode": true
+          },
+          { "name": "stale", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable snapshot page ordered by state-change time and ID.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ResourceList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/resources/{id}": {
+      "get": {
+        "operationId": "getResource",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Resource, current health, and latest observation.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/v1/resource-view.schema.json" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/integrations": {
+      "get": {
+        "operationId": "listIntegrations",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "adapter_id",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string" }
+            },
+            "explode": true
+          },
+          {
+            "name": "runtime_state",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "enum": [
+                  "starting",
+                  "healthy",
+                  "unhealthy",
+                  "stopped",
+                  "disabled",
+                  "not_started"
+                ]
+              }
+            },
+            "explode": true
+          },
+          { "name": "enabled", "in": "query", "schema": { "type": "boolean" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable snapshot page of redacted integration views.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IntegrationList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "operationId": "createIntegration",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/integration-write.schema.json#/$defs/CreateIntegrationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created integration identifier and version.",
+            "headers": {
+              "Location": { "schema": { "type": "string" } },
+              "ETag": { "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IntegrationCreated" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/integrations/{id}": {
+      "get": {
+        "operationId": "getIntegration",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Redacted integration, runtime state, and last collection.",
+            "headers": { "ETag": { "schema": { "type": "string" } } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/v1/integration-view.schema.json"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/integrations/{id}/configuration": {
+      "put": {
+        "operationId": "replaceIntegrationConfiguration",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/integration-write.schema.json#/$defs/ReplaceIntegrationConfigurationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Configuration replaced.",
+            "headers": { "ETag": { "schema": { "type": "string" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/audit": {
+      "get": {
+        "operationId": "listAuditEvents",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string" }
+            },
+            "explode": true
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "enum": ["succeeded", "failed", "denied"] }
+            },
+            "explode": true
+          },
+          {
+            "name": "target_type",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string" }
+            },
+            "explode": true
+          },
+          {
+            "name": "actor_user_id",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Administrator-only bounded audit page; the read is itself audited.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuditList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/events/stream": {
+      "get": {
+        "operationId": "streamEvents",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/LastEventID" }],
+        "responses": {
+          "200": {
+            "description": "SSE invalidations. Data conforms to live-invalidation.schema.json. Heartbeats are comments.",
+            "content": {
+              "text/event-stream": { "schema": { "type": "string" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "espial_session"
+      }
+    },
+    "parameters": {
+      "RequestID": {
+        "name": "X-Request-ID",
+        "in": "header",
+        "schema": { "type": "string", "maxLength": 128 }
+      },
+      "CSRFToken": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "Origin": {
+        "name": "Origin",
+        "in": "header",
+        "required": true,
+        "description": "Must exactly match Espial's configured public origin for authentication and mutation requests.",
+        "schema": { "type": "string", "format": "uri" }
+      },
+      "IfMatch": {
+        "name": "If-Match",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string" }
+      },
+      "LastEventID": {
+        "name": "Last-Event-ID",
+        "in": "header",
+        "schema": { "type": "string", "pattern": "^[0-9]{1,20}$" }
+      },
+      "ID": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      },
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": { "type": "string", "maxLength": 2048 }
+      }
+    },
+    "schemas": {
+      "APIError": { "$ref": "../schemas/v1/api-error.schema.json" },
+      "Resource": { "$ref": "../schemas/v1/resource-view.schema.json" },
+      "Integration": { "$ref": "../schemas/v1/integration-view.schema.json" },
+      "AuditEvent": { "$ref": "../schemas/v1/audit-event.schema.json" },
+      "LiveInvalidation": {
+        "$ref": "../schemas/v1/live-invalidation.schema.json"
+      },
+      "ResourceList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/resource-view.schema.json" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "IntegrationList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/integration-view.schema.json" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "AuditList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items", "from", "to"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/audit-event.schema.json" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 },
+          "from": { "type": "string", "format": "date-time" },
+          "to": { "type": "string", "format": "date-time" }
+        }
+      },
+      "IntegrationCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "updated_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "responses": {
+      "Status": {
+        "description": "Service status.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "type": "object",
+              "required": ["status"],
+              "properties": { "status": { "type": "string" } }
+            }
+          }
+        }
+      },
+      "BadRequest": { "$ref": "#/components/responses/Error400" },
+      "Unauthorized": { "$ref": "#/components/responses/Error401" },
+      "Forbidden": { "$ref": "#/components/responses/Error403" },
+      "NotFound": { "$ref": "#/components/responses/Error404" },
+      "Conflict": { "$ref": "#/components/responses/Error409" },
+      "PreconditionFailed": { "$ref": "#/components/responses/Error412" },
+      "TooLarge": { "$ref": "#/components/responses/Error413" },
+      "PreconditionRequired": { "$ref": "#/components/responses/Error428" },
+      "RateLimited": { "$ref": "#/components/responses/Error429" },
+      "InternalError": { "$ref": "#/components/responses/Error500" },
+      "Unavailable": { "$ref": "#/components/responses/Error503" },
+      "Error400": {
+        "description": "Invalid request.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Authentication required.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Permission denied.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Record not found.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Registered runtime conflict.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error412": {
+        "description": "Stale ETag.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error413": {
+        "description": "Request body too large.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error428": {
+        "description": "If-Match is required.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Rate limit exceeded.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error500": {
+        "description": "Safe internal failure.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Temporarily unavailable.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "../schemas/v1/api-error.schema.json" }
+          }
+        }
+      }
+    }
+  }
+}

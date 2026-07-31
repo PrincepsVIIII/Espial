@@ -16,6 +16,8 @@ import (
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
+	"github.com/PrincepsVIIII/Espial/core/internal/events"
+	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 )
 
 const (
@@ -33,17 +35,54 @@ type AuthService interface {
 	RecordDenied(context.Context, auth.User, string, string, string) error
 }
 
+type MonitoringReader interface {
+	Overview(context.Context) (monitoring.Overview, error)
+	Resources(context.Context, monitoring.ResourceFilter) (monitoring.ResourceList, error)
+	Resource(context.Context, string) (monitoring.ResourceView, error)
+	Integrations(context.Context, monitoring.IntegrationFilter) (monitoring.IntegrationList, error)
+	Integration(context.Context, string) (monitoring.IntegrationView, error)
+	Audit(context.Context, monitoring.AuditFilter) (monitoring.AuditList, error)
+	RecordAuditRead(context.Context, string, string, string, monitoring.AuditFilter) error
+}
+
+type IntegrationManager interface {
+	Create(context.Context, monitoring.CreateIntegration) (string, time.Time, error)
+	Update(context.Context, monitoring.IntegrationConfigUpdate) (time.Time, error)
+}
+
+type EventSource interface {
+	Subscribe(*uint64, int) *events.Subscription
+}
+
 type Dependencies struct {
 	Logger        *slog.Logger
 	Ready         Readiness
 	Auth          AuthService
 	PublicURL     *url.URL
 	SecureCookies bool
+	Monitoring    MonitoringReader
+	Integrations  IntegrationManager
+	Events        EventSource
+	SSEHeartbeat  time.Duration
+	SSEMaxClients int
+	Now           func() time.Time
 }
 
 // New creates the Phase 1 HTTP handler.
 func New(dependencies Dependencies) http.Handler {
-	server := &server{dependencies: dependencies}
+	if dependencies.Logger == nil {
+		dependencies.Logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+	if dependencies.SSEHeartbeat <= 0 {
+		dependencies.SSEHeartbeat = 15 * time.Second
+	}
+	if dependencies.SSEMaxClients <= 0 {
+		dependencies.SSEMaxClients = 100
+	}
+	if dependencies.Now == nil {
+		dependencies.Now = func() time.Time { return time.Now().UTC() }
+	}
+	server := &server{dependencies: dependencies, sseSlots: make(chan struct{}, dependencies.SSEMaxClients)}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health/live", healthLive)
 	mux.HandleFunc("GET /api/v1/health/ready", healthReady(dependencies.Ready))
@@ -52,10 +91,22 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/auth/session", server.currentSession)
 	mux.HandleFunc("POST /api/v1/auth/logout", server.logout)
 	mux.HandleFunc("GET /api/v1/admin/ping", server.adminPing)
+	mux.HandleFunc("GET /api/v1/overview", server.overview)
+	mux.HandleFunc("GET /api/v1/resources", server.resources)
+	mux.HandleFunc("GET /api/v1/resources/{id}", server.resource)
+	mux.HandleFunc("GET /api/v1/integrations", server.integrations)
+	mux.HandleFunc("POST /api/v1/integrations", server.createIntegration)
+	mux.HandleFunc("GET /api/v1/integrations/{id}", server.integration)
+	mux.HandleFunc("PUT /api/v1/integrations/{id}/configuration", server.updateIntegration)
+	mux.HandleFunc("GET /api/v1/audit", server.auditEvents)
+	mux.HandleFunc("GET /api/v1/events/stream", server.eventStream)
 	return middleware(dependencies.Logger, mux)
 }
 
-type server struct{ dependencies Dependencies }
+type server struct {
+	dependencies Dependencies
+	sseSlots     chan struct{}
+}
 
 func healthLive(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
@@ -199,7 +250,28 @@ func sessionResponse(session auth.Session) any {
 }
 
 func (server *server) error(w http.ResponseWriter, r *http.Request, status int, code, message string) {
-	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": message, "request_id": requestID(r)}})
+	server.errorFields(w, r, status, code, message, nil)
+}
+
+type APIFieldError struct {
+	Field string `json:"field"`
+	Code  string `json:"code"`
+}
+
+type apiErrorBody struct {
+	Error struct {
+		Code      string          `json:"code"`
+		Message   string          `json:"message"`
+		RequestID string          `json:"request_id"`
+		Fields    []APIFieldError `json:"fields,omitempty"`
+	} `json:"error"`
+}
+
+func (server *server) errorFields(w http.ResponseWriter, r *http.Request, status int, code, message string, fields []APIFieldError) {
+	var body apiErrorBody
+	body.Error.Code, body.Error.Message, body.Error.RequestID = code, message, requestID(r)
+	body.Error.Fields = fields
+	writeJSON(w, status, body)
 }
 
 type contextKey string
@@ -243,7 +315,11 @@ func sourceAddress(r *http.Request) string {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 4096)
+	return decodeJSONLimit(w, r, destination, 4096)
+}
+
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, destination any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(destination); err != nil {

@@ -1,0 +1,10 @@
+{
+  "schema": "live-invalidation",
+  "data": {
+    "schema_version": 2,
+    "resource_id": "not-a-uuid",
+    "state": "invented",
+    "changed_at": "now",
+    "payload": { "secret": true }
+  }
+}

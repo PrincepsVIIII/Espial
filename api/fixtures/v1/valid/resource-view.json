@@ -1,0 +1,19 @@
+{
+  "schema": "resource-view",
+  "data": {
+    "id": "10000000-0000-4000-8000-000000000001",
+    "integration_id": "20000000-0000-4000-8000-000000000001",
+    "integration_name": "Sample integration",
+    "external_id": "node-01",
+    "kind": "host",
+    "display_name": "Node 01",
+    "attributes": { "sample": true },
+    "first_seen_at": "2026-07-31T12:00:00Z",
+    "last_seen_at": "2026-07-31T12:00:00Z",
+    "health": {
+      "state": "healthy",
+      "reason": "Node is healthy.",
+      "updated_at": "2026-07-31T12:00:00Z"
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/integration-view.schema.json",
+  "title": "Integration API view",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "adapter_id",
+    "display_name",
+    "enabled",
+    "interval_seconds",
+    "config_keys",
+    "secret_reference_keys",
+    "runtime_state",
+    "resource_count",
+    "stale_count",
+    "unknown_count",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "adapter_id": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{0,126}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "enabled": { "type": "boolean" },
+    "interval_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "config_keys": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "type": "string", "maxLength": 128 }
+    },
+    "secret_reference_keys": {
+      "type": "array",
+      "maxItems": 128,
+      "items": { "type": "string", "maxLength": 128 }
+    },
+    "runtime_state": {
+      "enum": [
+        "starting",
+        "healthy",
+        "unhealthy",
+        "stopped",
+        "disabled",
+        "not_started"
+      ]
+    },
+    "resource_count": { "type": "integer", "minimum": 0 },
+    "stale_count": { "type": "integer", "minimum": 0 },
+    "unknown_count": { "type": "integer", "minimum": 0 },
+    "instance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adapter_version",
+        "state",
+        "consecutive_failures",
+        "updated_at"
+      ],
+      "properties": {
+        "adapter_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "protocol_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        },
+        "state": { "enum": ["starting", "healthy", "unhealthy", "stopped"] },
+        "last_started_at": { "type": "string", "format": "date-time" },
+        "last_healthy_at": { "type": "string", "format": "date-time" },
+        "last_stopped_at": { "type": "string", "format": "date-time" },
+        "last_error_at": { "type": "string", "format": "date-time" },
+        "last_error_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+        },
+        "consecutive_failures": { "type": "integer", "minimum": 0 },
+        "next_restart_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "last_collection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "completed_at",
+        "duration_ms",
+        "result",
+        "resource_count",
+        "observation_count",
+        "observations_inserted",
+        "duplicate_observations"
+      ],
+      "properties": {
+        "started_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "result": { "enum": ["succeeded", "rejected", "failed", "skipped"] },
+        "error_code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+        },
+        "resource_count": { "type": "integer", "minimum": 0 },
+        "observation_count": { "type": "integer", "minimum": 0 },
+        "observations_inserted": { "type": "integer", "minimum": 0 },
+        "duplicate_observations": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

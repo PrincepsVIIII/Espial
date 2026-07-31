@@ -1,0 +1,11 @@
+{
+  "schema": "api-error",
+  "data": {
+    "error": {
+      "code": "validation_failed",
+      "message": "Request validation failed.",
+      "request_id": "request-1",
+      "fields": [{ "field": "limit", "code": "out_of_range" }]
+    }
+  }
+}

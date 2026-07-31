@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/api-error.schema.json",
+  "title": "API error response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["error"],
+  "properties": {
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "request_id"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "fields": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["field", "code"],
+            "properties": {
+              "field": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "code": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

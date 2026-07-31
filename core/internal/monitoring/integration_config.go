@@ -7,8 +7,11 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 	"time"
+	"unicode/utf8"
 
+	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
 	"github.com/PrincepsVIIII/Espial/core/internal/audit"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
@@ -33,16 +36,94 @@ type IntegrationConfigUpdate struct {
 }
 
 type IntegrationConfigService struct {
-	pool  *pgxpool.Pool
-	hub   *events.Hub
-	clock health.Clock
+	pool     *pgxpool.Pool
+	hub      *events.Hub
+	clock    health.Clock
+	registry AdapterRegistry
 }
 
-func NewIntegrationConfigService(pool *pgxpool.Pool, hub *events.Hub, clock health.Clock) *IntegrationConfigService {
+type AdapterRegistry interface {
+	Lookup(string) (adapters.Descriptor, error)
+}
+
+func NewIntegrationConfigService(pool *pgxpool.Pool, hub *events.Hub, clock health.Clock, registries ...AdapterRegistry) *IntegrationConfigService {
 	if clock == nil {
 		clock = health.SystemClock{}
 	}
-	return &IntegrationConfigService{pool: pool, hub: hub, clock: clock}
+	service := &IntegrationConfigService{pool: pool, hub: hub, clock: clock}
+	if len(registries) > 0 {
+		service.registry = registries[0]
+	}
+	return service
+}
+
+func (service *IntegrationConfigService) Create(ctx context.Context, create CreateIntegration) (string, time.Time, error) {
+	create.DisplayName = strings.TrimSpace(create.DisplayName)
+	if service.registry == nil || create.CorrelationID == "" ||
+		create.DisplayName == "" || utf8.RuneCountInString(create.DisplayName) > 128 ||
+		create.Interval < time.Second || create.Interval > 24*time.Hour || create.Interval%time.Second != 0 {
+		return "", time.Time{}, &Error{Code: "invalid_integration_config"}
+	}
+	if _, err := service.registry.Lookup(create.AdapterID); err != nil {
+		return "", time.Time{}, &Error{Code: "adapter_not_registered"}
+	}
+	if create.ConfigNonsecret == nil {
+		create.ConfigNonsecret = map[string]any{}
+	}
+	if create.SecretReferences == nil {
+		create.SecretReferences = map[string]string{}
+	}
+	nonsecret, err := encodeConfig(create.ConfigNonsecret)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	references, err := encodeConfig(create.SecretReferences)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	id, err := newCorrelationID()
+	if err != nil {
+		return "", time.Time{}, &Error{Code: "correlation_id_failed"}
+	}
+	createdAt := service.clock.Now().UTC().Truncate(time.Microsecond)
+	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("begin integration creation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO integrations (
+			id, adapter_id, display_name, enabled, config_nonsecret,
+			secret_references, interval_seconds, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7, $8, $8)
+	`, id, create.AdapterID, create.DisplayName, create.Enabled, string(nonsecret),
+		string(references), int(create.Interval/time.Second), createdAt); err != nil {
+		return "", time.Time{}, fmt.Errorf("create integration: %w", err)
+	}
+	if err := audit.Append(ctx, tx, audit.Event{
+		ActorUserID: create.ActorUserID, Action: "integration.created",
+		TargetType: "integration", TargetID: id, Result: "succeeded",
+		SourceAddress: create.SourceAddress, CorrelationID: create.CorrelationID,
+		AfterSummary: map[string]any{
+			"adapter_id": create.AdapterID, "display_name": create.DisplayName,
+			"enabled": create.Enabled, "interval_seconds": int(create.Interval / time.Second),
+			"config_keys":           sortedKeys(create.ConfigNonsecret),
+			"secret_reference_keys": sortedKeys(create.SecretReferences),
+		},
+		OccurredAt: createdAt,
+	}); err != nil {
+		return "", time.Time{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return "", time.Time{}, fmt.Errorf("commit integration creation: %w", err)
+	}
+	if service.hub != nil {
+		service.hub.Publish(events.Event{
+			Kind: events.IntegrationChanged, IntegrationID: id,
+			Result: "created", ChangedAt: createdAt,
+		})
+	}
+	return id, createdAt, nil
 }
 
 // Update applies configuration and its redacted audit record atomically. Only key

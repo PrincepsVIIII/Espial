@@ -1,0 +1,12 @@
+{
+  "schema": "overview",
+  "data": {
+    "generated_at": "not-a-time",
+    "resource_counts": [{ "state": "invented", "count": -1 }],
+    "integration_counts": [],
+    "stale_count": -1,
+    "unknown_count": 0,
+    "recent_state_changes": [],
+    "incident_count": 4
+  }
+}

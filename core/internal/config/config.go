@@ -35,6 +35,8 @@ type Server struct {
 	PublicURL         *url.URL
 	ReadHeaderTimeout time.Duration
 	ShutdownTimeout   time.Duration
+	SSEHeartbeat      time.Duration
+	SSEMaxClients     int
 }
 
 type Database struct {
@@ -91,6 +93,8 @@ func defaults() Config {
 			PublicURL:         publicURL,
 			ReadHeaderTimeout: 5 * time.Second,
 			ShutdownTimeout:   10 * time.Second,
+			SSEHeartbeat:      15 * time.Second,
+			SSEMaxClients:     100,
 		},
 		Database: Database{
 			MaxOpenConnections: 20,
@@ -117,6 +121,8 @@ type fileConfig struct {
 		PublicURL         string `json:"public_url"`
 		ReadHeaderTimeout string `json:"read_header_timeout"`
 		ShutdownTimeout   string `json:"shutdown_timeout"`
+		SSEHeartbeat      string `json:"sse_heartbeat"`
+		SSEMaxClients     *int   `json:"sse_max_clients"`
 	} `json:"server"`
 	Database struct {
 		DSNFile            string `json:"dsn_file"`
@@ -186,6 +192,16 @@ func applyFile(cfg *Config, name string) error {
 			return fmt.Errorf("parse server.shutdown_timeout: %w", err)
 		}
 		cfg.Server.ShutdownTimeout = duration
+	}
+	if values.Server.SSEHeartbeat != "" {
+		duration, err := time.ParseDuration(values.Server.SSEHeartbeat)
+		if err != nil {
+			return fmt.Errorf("parse server.sse_heartbeat: %w", err)
+		}
+		cfg.Server.SSEHeartbeat = duration
+	}
+	if values.Server.SSEMaxClients != nil {
+		cfg.Server.SSEMaxClients = *values.Server.SSEMaxClients
 	}
 	if values.Database.DSNFile != "" {
 		cfg.Database.DSNFile = values.Database.DSNFile
@@ -285,6 +301,8 @@ func (cfg Config) SafeSummary() map[string]any {
 		"database_connect_timeout":      cfg.Database.ConnectTimeout,
 		"database_migration_timeout":    cfg.Database.MigrationTimeout,
 		"sample_adapter_configured":     cfg.Adapters.SampleExecutable != "",
+		"sse_heartbeat":                 cfg.Server.SSEHeartbeat,
+		"sse_max_clients":               cfg.Server.SSEMaxClients,
 		"adapter_global_concurrency":    cfg.Adapters.GlobalConcurrency,
 		"adapter_reconcile_interval":    cfg.Adapters.ReconcileInterval,
 		"freshness_interval":            cfg.Adapters.FreshnessInterval,
@@ -320,6 +338,20 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 			return fmt.Errorf("parse ESPIAL_SHUTDOWN_TIMEOUT: %w", err)
 		}
 		cfg.Server.ShutdownTimeout = duration
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_SSE_HEARTBEAT")); value != "" {
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_SSE_HEARTBEAT: %w", err)
+		}
+		cfg.Server.SSEHeartbeat = duration
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_SSE_MAX_CLIENTS")); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_SSE_MAX_CLIENTS: %w", err)
+		}
+		cfg.Server.SSEMaxClients = parsed
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_DATABASE_DSN_FILE")); value != "" {
 		cfg.Database.DSNFile = value
@@ -427,6 +459,10 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Server.ReadHeaderTimeout <= 0 || cfg.Server.ShutdownTimeout <= 0 {
 		return errors.New("server timeouts must be positive")
+	}
+	if cfg.Server.SSEHeartbeat < time.Second || cfg.Server.SSEHeartbeat > time.Minute ||
+		cfg.Server.SSEMaxClients < 1 || cfg.Server.SSEMaxClients > 10000 {
+		return errors.New("SSE settings are outside safe bounds")
 	}
 	if cfg.Database.MaxOpenConnections < 1 || cfg.Database.MaxOpenConnections > 200 {
 		return errors.New("database max open connections must be between 1 and 200")

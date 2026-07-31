@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/resource-view.schema.json",
+  "title": "Resource API view",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "integration_id",
+    "integration_name",
+    "external_id",
+    "kind",
+    "display_name",
+    "attributes",
+    "first_seen_at",
+    "last_seen_at",
+    "health"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "integration_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "external_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "kind": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,62}$" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "attributes": {
+      "type": "object",
+      "maxProperties": 128,
+      "additionalProperties": true
+    },
+    "source_url": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "first_seen_at": { "type": "string", "format": "date-time" },
+    "last_seen_at": { "type": "string", "format": "date-time" },
+    "health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason", "updated_at"],
+      "properties": {
+        "state": {
+          "enum": [
+            "healthy",
+            "warning",
+            "critical",
+            "unknown",
+            "stale",
+            "maintenance",
+            "disabled"
+          ]
+        },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "observation_id": { "type": "string", "format": "uuid" },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "last_success_at": { "type": "string", "format": "date-time" },
+        "stale_at": { "type": "string", "format": "date-time" },
+        "unknown_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "latest_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "check_type",
+        "state",
+        "summary",
+        "observed_at",
+        "received_at",
+        "expected_refresh_seconds",
+        "measurements",
+        "metadata"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "check_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+        },
+        "state": {
+          "enum": [
+            "healthy",
+            "warning",
+            "critical",
+            "unknown",
+            "maintenance",
+            "disabled"
+          ]
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "observed_at": { "type": "string", "format": "date-time" },
+        "received_at": { "type": "string", "format": "date-time" },
+        "expected_refresh_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 86400
+        },
+        "measurements": { "type": "object", "additionalProperties": true },
+        "metadata": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

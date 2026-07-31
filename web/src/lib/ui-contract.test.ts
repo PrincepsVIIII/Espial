@@ -7,6 +7,7 @@ function source(path: string): string {
 
 const publicPage = source('../routes/+page.svelte');
 const appShell = source('../routes/(app)/+layout.svelte');
+const appLoader = source('../routes/(app)/+layout.ts');
 const dashboardPage = source('../routes/(app)/dashboard/+page.svelte');
 const alertsPage = source('../routes/(app)/alerts/+page.svelte');
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
@@ -53,16 +54,28 @@ describe('authenticated shell contract', () => {
     expect(stylesheet).not.toContain('.sidebar');
   });
 
-  it('has explicit session-loading and Core-unavailable states', () => {
-    expect(appShell).toContain('Verifying session');
+  it('loads the session through SvelteKit and has a Core-unavailable state', () => {
+    expect(appLoader).toContain("'/api/v1/auth/session'");
+    expect(appLoader).toContain('redirect(303');
     expect(appShell).toContain('Core unavailable');
     expect(appShell).toContain('Retry connection');
+  });
+
+  it('shows all required live-connection states and uses invalidation refresh', () => {
+    expect(appShell).toContain("live: 'Live'");
+    expect(appShell).toContain("reconnecting: 'Reconnecting'");
+    expect(appShell).toContain("disconnected: 'Disconnected'");
+    expect(appShell).toContain("invalidate('espial:monitoring')");
   });
 });
 
 describe('primary route skeletons', () => {
   it('makes Dashboard the canonical replacement for Overview', () => {
     expect(dashboardPage).toContain('<h1>Dashboard</h1>');
+    expect(dashboardPage).toContain('Monitoring coverage');
+    expect(dashboardPage).toContain('Authoritative resource health');
+    expect(dashboardPage).toContain('Collection coverage');
+    expect(dashboardPage).not.toMatch(/incident count|active incidents/i);
     expect(overviewRedirect).toContain("redirect(308, '/dashboard')");
   });
 

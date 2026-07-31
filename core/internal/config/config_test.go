@@ -16,6 +16,8 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_PUBLIC_URL":                    "https://espial.test",
 		"ESPIAL_READ_HEADER_TIMEOUT":           "3s",
 		"ESPIAL_SHUTDOWN_TIMEOUT":              "7s",
+		"ESPIAL_SSE_HEARTBEAT":                 "12s",
+		"ESPIAL_SSE_MAX_CLIENTS":               "75",
 		"ESPIAL_DATABASE_DSN_FILE":             "/run/secrets/test_dsn",
 		"ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS": "8",
 		"ESPIAL_DATABASE_CONNECT_TIMEOUT":      "4s",
@@ -41,6 +43,9 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 	}
 	if cfg.Server.ShutdownTimeout != 7*time.Second {
 		t.Fatalf("shutdown timeout = %s", cfg.Server.ShutdownTimeout)
+	}
+	if cfg.Server.SSEHeartbeat != 12*time.Second || cfg.Server.SSEMaxClients != 75 {
+		t.Fatalf("SSE settings = %s %d", cfg.Server.SSEHeartbeat, cfg.Server.SSEMaxClients)
 	}
 	if cfg.Database.MaxOpenConnections != 8 {
 		t.Fatalf("max open connections = %d", cfg.Database.MaxOpenConnections)
@@ -133,11 +138,13 @@ func TestValidateRejectsRelativeSampleExecutable(t *testing.T) {
 
 func TestValidateRejectsUnsafeMonitoringBounds(t *testing.T) {
 	for name, mutate := range map[string]func(*Config){
-		"concurrency": func(cfg *Config) { cfg.Adapters.GlobalConcurrency = 0 },
-		"reconcile":   func(cfg *Config) { cfg.Adapters.ReconcileInterval = time.Millisecond },
-		"freshness":   func(cfg *Config) { cfg.Adapters.FreshnessInterval = 2 * time.Minute },
-		"batch":       func(cfg *Config) { cfg.Adapters.FreshnessBatchSize = 1001 },
-		"replay":      func(cfg *Config) { cfg.Adapters.EventReplaySize = 10001 },
+		"concurrency":   func(cfg *Config) { cfg.Adapters.GlobalConcurrency = 0 },
+		"reconcile":     func(cfg *Config) { cfg.Adapters.ReconcileInterval = time.Millisecond },
+		"freshness":     func(cfg *Config) { cfg.Adapters.FreshnessInterval = 2 * time.Minute },
+		"batch":         func(cfg *Config) { cfg.Adapters.FreshnessBatchSize = 1001 },
+		"replay":        func(cfg *Config) { cfg.Adapters.EventReplaySize = 10001 },
+		"sse heartbeat": func(cfg *Config) { cfg.Server.SSEHeartbeat = time.Millisecond },
+		"sse clients":   func(cfg *Config) { cfg.Server.SSEMaxClients = 0 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := defaults()

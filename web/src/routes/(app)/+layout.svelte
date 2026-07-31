@@ -1,17 +1,20 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
+  import { goto, invalidate } from '$app/navigation';
   import { page } from '$app/state';
-  import { onMount } from 'svelte';
-  import { readCookie, type SessionResponse } from '$lib/auth';
+  import { onDestroy, onMount } from 'svelte';
+  import { readCookie } from '$lib/auth';
+  import {
+    liveConnection,
+    startLiveInvalidations,
+    type LiveStatus,
+  } from '$lib/live';
 
-  let { children } = $props();
-  let session = $state<SessionResponse | null>(null);
-  let loading = $state(true);
-  let loadError = $state('');
+  let { data, children } = $props();
   let navOpen = $state(false);
   let accountOpen = $state(false);
   let navButton = $state<HTMLButtonElement>();
   let accountButton = $state<HTMLButtonElement>();
+  let stopLive: (() => void) | null = null;
 
   const navItems = [
     { label: 'Dashboard', href: '/dashboard' },
@@ -21,28 +24,24 @@
     { label: 'Webpages', href: '/webpages' },
   ];
 
-  onMount(async () => {
-    try {
-      const response = await fetch('/api/v1/auth/session');
-      if (response.status === 401 || response.status === 403) {
-        await goto(
+  const liveLabels: Record<LiveStatus, string> = {
+    live: 'Live',
+    reconnecting: 'Reconnecting',
+    disconnected: 'Disconnected',
+  };
+
+  onMount(() => {
+    if (!data.session) return;
+    stopLive = startLiveInvalidations({
+      onInvalidate: () => invalidate('espial:monitoring'),
+      onUnauthorized: () =>
+        goto(
           `/login?returnTo=${encodeURIComponent(page.url.pathname + page.url.search)}`,
-        );
-        return;
-      }
-      if (!response.ok) {
-        loadError =
-          'Espial Core is unavailable. Session state could not be verified.';
-        return;
-      }
-      session = await response.json();
-    } catch {
-      loadError =
-        'Espial Core is unavailable. Session state could not be verified.';
-    } finally {
-      loading = false;
-    }
+        ),
+    });
   });
+
+  onDestroy(() => stopLive?.());
 
   function isActive(href: string): boolean {
     return (
@@ -68,33 +67,32 @@
   }
 
   async function logout() {
-    await fetch('/api/v1/auth/logout', {
-      method: 'POST',
-      headers: { 'X-CSRF-Token': readCookie('espial_csrf') },
-    });
-    await goto('/');
+    stopLive?.();
+    try {
+      await fetch('/api/v1/auth/logout', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'X-CSRF-Token': readCookie('espial_csrf') },
+      });
+    } finally {
+      await goto('/');
+    }
   }
 </script>
 
 <svelte:window onkeydown={handleWindowKeydown} />
 
-{#if loading}
-  <main class="system-state" aria-live="polite">
-    <p class="eyebrow">Espial / UBNetDef Operations</p>
-    <h1>Verifying session</h1>
-    <p>Connecting to Espial Core…</p>
-  </main>
-{:else if loadError}
+{#if data.loadError}
   <main class="system-state" aria-live="assertive">
     <p class="eyebrow">Core unavailable</p>
     <h1>Espial cannot verify this session.</h1>
-    <p>{loadError}</p>
+    <p>{data.loadError}</p>
     <div class="system-actions">
       <button onclick={() => window.location.reload()}>Retry connection</button>
       <a class="text-link" href="/">Return to public page</a>
     </div>
   </main>
-{:else if session}
+{:else if data.session}
   <div class="shell">
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="app-header">
@@ -133,8 +131,11 @@
         {/each}
         <div class="mobile-account">
           <span>
-            <strong>{session.user.display_name}</strong>
-            <small>{session.user.roles.join(', ')}</small>
+            <strong>{data.session.user.display_name}</strong>
+            <small>{data.session.user.roles.join(', ')}</small>
+            <small class={`live-text live-${$liveConnection.status}`}>
+              {liveLabels[$liveConnection.status]}
+            </small>
           </span>
           <button class="link-button" type="button" onclick={logout}
             >Sign out</button
@@ -143,27 +144,33 @@
       </nav>
 
       <div class="app-meta">
-        <span class="connection-status">
+        <span
+          class={`connection-status live-${$liveConnection.status}`}
+          aria-live="polite"
+          title={$liveConnection.last_refresh
+            ? `Last successful refresh: ${$liveConnection.last_refresh}`
+            : 'Waiting for the first monitoring refresh'}
+        >
           <i aria-hidden="true"></i>
-          Core connected
+          {liveLabels[$liveConnection.status]}
         </span>
         <div class="user-menu">
           <button
             class="user-menu-trigger"
             type="button"
             bind:this={accountButton}
-            aria-label={`User menu for ${session.user.display_name}`}
+            aria-label={`User menu for ${data.session.user.display_name}`}
             aria-controls="user-menu-panel"
             aria-expanded={accountOpen}
             onclick={() => (accountOpen = !accountOpen)}
           >
-            <span>{session.user.display_name}</span>
+            <span>{data.session.user.display_name}</span>
             <span aria-hidden="true">▾</span>
           </button>
           {#if accountOpen}
             <div id="user-menu-panel" class="user-menu-panel">
-              <strong>{session.user.display_name}</strong>
-              <span>{session.user.roles.join(', ')}</span>
+              <strong>{data.session.user.display_name}</strong>
+              <span>{data.session.user.roles.join(', ')}</span>
               <button class="link-button" type="button" onclick={logout}
                 >Sign out</button
               >

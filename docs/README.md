@@ -15,6 +15,8 @@ intentions into implementable contracts.
 | [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
 | [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |
 | [Slice 1.5 record](plans/SLICE_1_5_SCHEDULING_PIPELINE.md) | Bounded scheduling, atomic collection/audit, freshness ownership, and internal events |
+| [Slice 1.6 record](plans/SLICE_1_6_REST_SSE_API.md) | Authenticated REST read models, stable cursors, administrator audit reads, SSE replay, and OpenAPI |
+| [Slice 1.7 record](plans/SLICE_1_7_OPERATIONAL_UI.md) | Authoritative Dashboard, typed SvelteKit loaders, live invalidation refresh, accessibility, and viewport verification |
 | [Backend plan](BACKEND_PLAN.md) | Long-term backend responsibilities and domain direction |
 | [Frontend/UI plan](FRONTEND_UI_PLAN.md) | Long-term information architecture and interaction direction |
 

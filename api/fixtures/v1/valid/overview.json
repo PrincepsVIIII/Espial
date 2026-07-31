@@ -1,0 +1,11 @@
+{
+  "schema": "overview",
+  "data": {
+    "generated_at": "2026-07-31T12:00:00Z",
+    "resource_counts": [{ "state": "healthy", "count": 2 }],
+    "integration_counts": [{ "state": "healthy", "count": 1 }],
+    "stale_count": 0,
+    "unknown_count": 0,
+    "recent_state_changes": []
+  }
+}

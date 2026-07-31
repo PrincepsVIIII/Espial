@@ -19,7 +19,9 @@ Updated 2026-07-31:
 | 1.3 Normalized storage and health | Implemented | Domain validation, injectable freshness evaluation, migration 000004, transactional resource/observation ingestion, delivery idempotency, stable row locking, post-commit changes, and PostgreSQL race/integration tests |
 | 1.4 Adapter runtime and sample | Implemented | Strict v1 protocol/manifest validation, bounded NDJSON process runtime, trusted registry and secret boundary, durable health/backoff state, graceful escalation/reaping, deterministic fault-capable sample binary, and black-box conformance/race/PostgreSQL tests |
 | 1.5 Scheduler, ingestion, audit, events | Implemented | Deterministic bounded scheduling, runtime ownership, atomic collection/audit records, DB-safe freshness, bounded replay/resync hub, and PostgreSQL race/end-to-end tests |
-| 1.6–1.8 Monitoring delivery | Planned | Versioned REST/authenticated SSE, operational data UI, and deployment acceptance remain |
+| 1.6 Versioned REST and SSE API | Implemented | Authenticated overview/resource/integration/audit APIs, stable bounded cursors, optimistic integration writes, bounded SSE replay/revalidation, shared schemas, checked OpenAPI, fuzz/race/PostgreSQL tests |
+| 1.7 SvelteKit operational UI | Implemented | SSR session/monitoring loaders, typed API client, authoritative Dashboard counts/integrations/resources, URL filters, SSE reconnect/resync, responsive status UI, accessibility and three-viewport browser tests |
+| 1.8 Deployment acceptance | Planned | Deployment hardening and the clean-stack vertical acceptance scenario remain |
 
 The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
 200 during database loss while readiness returns HTTP 503 and recovers after the
