@@ -75,7 +75,10 @@ function createStack(name) {
       writeFileSync(
         dsnPath,
         `postgres://espial:${encodeURIComponent(password)}@postgres:5432/espial?sslmode=disable\n`,
-        { mode: 0o600 },
+        // Compose file secrets are bind mounts on Linux, so the non-root Core
+        // process must be able to read this file. The containing mkdtemp
+        // directory remains private to the runner.
+        { mode: 0o644 },
       );
       const stack = {
         directory,
