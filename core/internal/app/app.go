@@ -14,20 +14,23 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/api"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
+	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Serve migrates the database and runs the HTTP API until ctx is canceled.
 func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
+	processContext, cancelProcess := context.WithCancel(ctx)
+	defer cancelProcess()
 	logger.Info("configuration loaded", "config", cfg.SafeSummary())
-	pool, err := openDatabase(ctx, cfg)
+	pool, err := openDatabase(processContext, cfg)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
 
-	migrationContext, cancelMigration := context.WithTimeout(ctx, cfg.Database.MigrationTimeout)
+	migrationContext, cancelMigration := context.WithTimeout(processContext, cfg.Database.MigrationTimeout)
 	err = storage.Migrate(migrationContext, pool)
 	cancelMigration()
 	if err != nil {
@@ -37,13 +40,10 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
-	adapterSupervisor, err := adapterRuntime(pool, cfg)
+	monitoringRuntime, err := adapterRuntime(pool, cfg, logger)
 	if err != nil {
 		return fmt.Errorf("initialize adapter runtime: %w", err)
 	}
-	_ = adapterSupervisor // Slice 1.5 owns enabled-integration scheduling.
-	go cleanSessions(ctx, logger, authService)
-
 	listener, err := net.Listen("tcp", cfg.Server.ListenAddress)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Server.ListenAddress, err)
@@ -58,15 +58,32 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		ReadHeaderTimeout: cfg.Server.ReadHeaderTimeout,
 		IdleTimeout:       60 * time.Second,
 		BaseContext: func(net.Listener) context.Context {
-			return ctx
+			return processContext
 		},
 	}
 
 	logger.Info("Espial Core ready", "address", listener.Addr().String())
-	return runHTTPServer(ctx, server, listener, cfg.Server.ShutdownTimeout)
+	runtimeErrors := make(chan error, 1)
+	go func() { runtimeErrors <- monitoringRuntime.Run(processContext) }()
+	go cleanSessions(processContext, logger, authService)
+	serverErrors := make(chan error, 1)
+	go func() { serverErrors <- runHTTPServer(processContext, server, listener, cfg.Server.ShutdownTimeout) }()
+	select {
+	case err := <-serverErrors:
+		cancelProcess()
+		<-runtimeErrors
+		return err
+	case err := <-runtimeErrors:
+		cancelProcess()
+		serverErr := <-serverErrors
+		if ctx.Err() != nil {
+			return serverErr
+		}
+		return fmt.Errorf("monitoring runtime: %w", err)
+	}
 }
 
-func adapterRuntime(pool *pgxpool.Pool, cfg config.Config) (*adapters.Supervisor, error) {
+func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*monitoring.Runtime, error) {
 	descriptors := make([]adapters.Descriptor, 0, 1)
 	if cfg.Adapters.SampleExecutable != "" {
 		descriptors = append(descriptors, adapters.Descriptor{
@@ -78,7 +95,16 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config) (*adapters.Supervisor
 	if err != nil {
 		return nil, err
 	}
-	return adapters.NewSupervisor(adapters.NewPostgreSQLStore(pool), registry, adapters.SupervisorOptions{}), nil
+	return monitoring.NewRuntime(pool, registry, monitoring.RuntimeOptions{
+		GlobalConcurrency:  cfg.Adapters.GlobalConcurrency,
+		ReconcileInterval:  cfg.Adapters.ReconcileInterval,
+		FreshnessInterval:  cfg.Adapters.FreshnessInterval,
+		FreshnessBatchSize: cfg.Adapters.FreshnessBatchSize,
+		EventReplaySize:    cfg.Adapters.EventReplaySize,
+		OnError: func(integrationID string, err error) {
+			logger.Error("integration supervisor exited", "integration_id", integrationID, "error", err)
+		},
+	}), nil
 }
 
 // BootstrapAdmin creates the one-time local administrator account.

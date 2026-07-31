@@ -66,6 +66,7 @@ type Descriptor struct {
 type Integration struct {
 	ID               string
 	AdapterID        string
+	Interval         time.Duration
 	ConfigNonsecret  map[string]any
 	SecretReferences map[string]string
 }
@@ -90,5 +91,7 @@ type Instance struct {
 type RuntimeError struct{ Code string }
 
 func (err *RuntimeError) Error() string { return fmt.Sprintf("adapter runtime failure: %s", err.Code) }
+
+func (err *RuntimeError) SafeCode() string { return err.Code }
 
 func runtimeError(code string) error { return &RuntimeError{Code: code} }

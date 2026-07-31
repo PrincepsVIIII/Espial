@@ -30,10 +30,11 @@ func (store *PostgreSQLStore) LoadIntegration(ctx context.Context, integrationID
 	var result Integration
 	var nonsecret, references []byte
 	var enabled bool
+	var intervalSeconds int
 	err := store.pool.QueryRow(ctx, `
-		SELECT id::text, adapter_id, enabled, config_nonsecret, secret_references
+		SELECT id::text, adapter_id, enabled, interval_seconds, config_nonsecret, secret_references
 		FROM integrations WHERE id = $1
-	`, integrationID).Scan(&result.ID, &result.AdapterID, &enabled, &nonsecret, &references)
+	`, integrationID).Scan(&result.ID, &result.AdapterID, &enabled, &intervalSeconds, &nonsecret, &references)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Integration{}, false, nil
 	}
@@ -43,6 +44,7 @@ func (store *PostgreSQLStore) LoadIntegration(ctx context.Context, integrationID
 	if !enabled {
 		return result, false, nil
 	}
+	result.Interval = time.Duration(intervalSeconds) * time.Second
 	if err := json.Unmarshal(nonsecret, &result.ConfigNonsecret); err != nil {
 		return Integration{}, false, fmt.Errorf("decode nonsecret integration config: %w", err)
 	}
@@ -50,6 +52,28 @@ func (store *PostgreSQLStore) LoadIntegration(ctx context.Context, integrationID
 		return Integration{}, false, fmt.Errorf("decode integration secret references: %w", err)
 	}
 	return result, true, nil
+}
+
+func (store *PostgreSQLStore) ListEnabledIntegrationIDs(ctx context.Context) ([]string, error) {
+	rows, err := store.pool.Query(ctx, `
+		SELECT id::text FROM integrations WHERE enabled = true ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list enabled adapter integrations: %w", err)
+	}
+	defer rows.Close()
+	var result []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan enabled adapter integration: %w", err)
+		}
+		result = append(result, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read enabled adapter integrations: %w", err)
+	}
+	return result, nil
 }
 
 func (store *PostgreSQLStore) LoadInstance(ctx context.Context, integrationID string) (Instance, bool, error) {

@@ -5,8 +5,9 @@ provides the process lifecycle, typed configuration, structured logs, PostgreSQL
 connection pool and migrations, graceful shutdown, health API, temporary local
 authentication with server-side sessions and role enforcement, and normalized
 resource/observation persistence with deterministic current-health evaluation. It
-also includes the trusted, supervised adapter runtime and standalone deterministic
-sample adapter used by the next scheduled-ingestion slice.
+also includes the trusted, supervised adapter runtime, scheduled normalized
+collection pipeline, database-safe freshness worker, bounded event hub, and the
+standalone deterministic sample adapter used to prove the pipeline.
 
 Current layout:
 
@@ -19,7 +20,11 @@ internal/app/     dependency wiring and graceful lifecycle
 internal/auth/    credentials, sessions, CSRF, roles, limits, and provider boundary
 internal/config/  defaults, JSON file, environment overrides, validation
 internal/health/  pure normalized state and freshness evaluation
+internal/monitoring/ collection/audit transaction, freshness worker, runtime wiring
 internal/observations/ domain validation and transactional ingestion
+internal/scheduler/ deterministic jitter, bounded dispatch, enabled reconciliation
+internal/events/   bounded post-commit invalidation replay and resync
+internal/audit/    append-only redacted operational audit writer
 internal/storage/ PostgreSQL pool and migration runner
 migrations/       embedded, forward-only SQL migrations
 ```
@@ -66,6 +71,11 @@ then by environment variables. Unknown JSON keys are rejected.
 | `ESPIAL_AUTH_LOGIN_RATE_LIMIT` | `10` | Login attempts allowed per source/window |
 | `ESPIAL_AUTH_LOGIN_RATE_WINDOW` | `1m` | Source-address login rate window |
 | `ESPIAL_SAMPLE_ADAPTER_EXECUTABLE` | none | Absolute trusted path to the bundled sample adapter; never supplied by an integration/API |
+| `ESPIAL_ADAPTER_GLOBAL_CONCURRENCY` | `4` | Process-wide collection limit, from 1 through 64 |
+| `ESPIAL_ADAPTER_RECONCILE_INTERVAL` | `10s` | Enabled-integration reconciliation interval |
+| `ESPIAL_FRESHNESS_INTERVAL` | `1s` | Persisted freshness deadline polling interval |
+| `ESPIAL_FRESHNESS_BATCH_SIZE` | `100` | Maximum claimed freshness rows per transaction |
+| `ESPIAL_EVENT_REPLAY_SIZE` | `1024` | Bounded in-process invalidation replay capacity |
 
 The DSN value is read from a file and is never included in configuration summaries
 or logs. The adapter executable path is likewise represented only as a configured/
@@ -100,9 +110,11 @@ resolved secrets travel through bounded stdin envelopes and known secrets are
 redacted from retained diagnostics.
 
 The bundled `espial-sample-adapter` supports deterministic healthy, warning, and
-critical collections plus test-only failure modes. Core wires its descriptor when
-`ESPIAL_SAMPLE_ADAPTER_EXECUTABLE` is configured, but Slice 1.5 owns scheduling and
-does not start it yet. See the [Slice 1.4 record](../docs/plans/SLICE_1_4_ADAPTER_RUNTIME.md).
+critical collections plus test-only failure modes. When its immutable executable
+path is configured, Core reconciles enabled integrations, starts the supervised
+process, and schedules collection. Successful normalized state, collection metadata,
+and audit success commit atomically; current-health and collection invalidations are
+published only afterward. See the [Slice 1.5 record](../docs/plans/SLICE_1_5_SCHEDULING_PIPELINE.md).
 
 ## Authentication API
 

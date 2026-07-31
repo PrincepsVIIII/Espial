@@ -14,6 +14,7 @@ erDiagram
     USERS ||--o{ AUDIT_EVENTS : acts
     INTEGRATIONS ||--o{ ADAPTER_INSTANCES : runs
     INTEGRATIONS ||--o{ RESOURCES : discovers
+    INTEGRATIONS ||--o{ INTEGRATION_COLLECTION_RUNS : collects
     RESOURCES ||--o{ OBSERVATIONS : receives
     RESOURCES ||--|| CURRENT_HEALTH : summarizes
     INTEGRATIONS ||--o{ AUDIT_EVENTS : targets
@@ -81,6 +82,20 @@ erDiagram
       timestamptz next_restart_at
       timestamptz updated_at
     }
+    INTEGRATION_COLLECTION_RUNS {
+      uuid id PK
+      uuid integration_id FK
+      timestamptz started_at
+      timestamptz completed_at
+      bigint duration_ms
+      text result
+      text error_code
+      integer resource_count
+      integer observation_count
+      integer observations_inserted
+      integer duplicate_observations
+      text correlation_id
+    }
     RESOURCES {
       uuid id PK
       uuid integration_id FK
@@ -137,6 +152,8 @@ erDiagram
 - `current_health` has exactly one row per resource and references the observation
   that last changed its evaluated state.
 - Observation ingestion and current-state replacement happen in one transaction.
+- A successful collection run and its audit-success record commit in that same
+  transaction; rejected/failed runs contain only safe categories and counts.
 - `observed_at` is source time; ingestion time is separately recorded in migrations
   even when omitted from the conceptual diagram.
 - `(integration_id, resource_id, check_type, observed_at)` is the normalized

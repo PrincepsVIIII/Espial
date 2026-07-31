@@ -18,7 +18,8 @@ Updated 2026-07-31:
 | Pre-1.3 webpage skeleton | Implemented | Public informational root, Dashboard-first auth return, responsive five-item top navigation, canonical route skeletons, honest domain-unavailable states, Core-unavailable handling, UI contract tests, and viewport review |
 | 1.3 Normalized storage and health | Implemented | Domain validation, injectable freshness evaluation, migration 000004, transactional resource/observation ingestion, delivery idempotency, stable row locking, post-commit changes, and PostgreSQL race/integration tests |
 | 1.4 Adapter runtime and sample | Implemented | Strict v1 protocol/manifest validation, bounded NDJSON process runtime, trusted registry and secret boundary, durable health/backoff state, graceful escalation/reaping, deterministic fault-capable sample binary, and black-box conformance/race/PostgreSQL tests |
-| 1.5–1.8 Monitoring vertical slice | Planned | Scheduling/ingestion, APIs/events, operational data UI, and deployment acceptance remain |
+| 1.5 Scheduler, ingestion, audit, events | Implemented | Deterministic bounded scheduling, runtime ownership, atomic collection/audit records, DB-safe freshness, bounded replay/resync hub, and PostgreSQL race/end-to-end tests |
+| 1.6–1.8 Monitoring delivery | Planned | Versioned REST/authenticated SSE, operational data UI, and deployment acceptance remain |
 
 The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
 200 during database loss while readiness returns HTTP 503 and recovers after the
@@ -363,8 +364,8 @@ adapter process or HTTP handler.
 **Detailed execution plan:** [Slice 1.4 adapter runtime and sample adapter](SLICE_1_4_ADAPTER_RUNTIME.md)
 
 **Status:** Implemented 2026-07-31. Core constructs the trusted sample registry at
-startup when its absolute executable path is configured; Slice 1.5 remains the
-owner of enabled-integration scheduling and collection ingestion.
+startup when its absolute executable path is configured; the completed Slice 1.5
+now owns enabled-integration scheduling and collection ingestion.
 
 **Build**
 
@@ -398,6 +399,12 @@ owner of enabled-integration scheduling and collection ingestion.
 broken, and recovered under automated tests.
 
 ### Slice 1.5 — Scheduler, ingestion, audit, and live event hub
+
+**Implementation record:** [Slice 1.5 scheduled monitoring pipeline](SLICE_1_5_SCHEDULING_PIPELINE.md)
+
+**Status:** Implemented 2026-07-31. Core now owns enabled-integration scheduling,
+atomic normalized collection/audit persistence, freshness transitions, and bounded
+post-commit invalidations.
 
 **Build**
 

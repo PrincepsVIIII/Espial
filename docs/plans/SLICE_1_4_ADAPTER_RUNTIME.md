@@ -321,7 +321,7 @@ Completed in this slice:
   canary secret absent from arguments/environment and redacted from both stderr and
   protocol log diagnostics.
 
-Slice 1.5 starts from the tested `Session.Collect` boundary. It will enumerate
-enabled integrations, schedule calls, pass the already validated normalized batch
-to Slice 1.3, and run freshness deadlines; none of those responsibilities are
-silently active in Slice 1.4.
+Slice 1.5 now consumes the tested `Session.Collect` boundary: it enumerates enabled
+integrations, schedules calls, passes validated normalized batches to Slice 1.3,
+and runs freshness deadlines. See the
+[Slice 1.5 implementation record](SLICE_1_5_SCHEDULING_PIPELINE.md).

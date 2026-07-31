@@ -55,7 +55,12 @@ type Auth struct {
 }
 
 type Adapters struct {
-	SampleExecutable string
+	SampleExecutable   string
+	GlobalConcurrency  int
+	ReconcileInterval  time.Duration
+	FreshnessInterval  time.Duration
+	FreshnessBatchSize int
+	EventReplaySize    int
 }
 
 // Load applies defaults, an optional JSON file, then environment overrides.
@@ -97,6 +102,11 @@ func defaults() Config {
 			FailureLimit: 5, LockoutDuration: 15 * time.Minute,
 			LoginRateLimit: 10, LoginRateWindow: time.Minute,
 		},
+		Adapters: Adapters{
+			GlobalConcurrency: 4, ReconcileInterval: 10 * time.Second,
+			FreshnessInterval: time.Second, FreshnessBatchSize: 100,
+			EventReplaySize: 1024,
+		},
 	}
 }
 
@@ -124,7 +134,12 @@ type fileConfig struct {
 		LoginRateWindow string `json:"login_rate_window"`
 	} `json:"auth"`
 	Adapters struct {
-		SampleExecutable string `json:"sample_executable"`
+		SampleExecutable   string `json:"sample_executable"`
+		GlobalConcurrency  *int   `json:"global_concurrency"`
+		ReconcileInterval  string `json:"reconcile_interval"`
+		FreshnessInterval  string `json:"freshness_interval"`
+		FreshnessBatchSize *int   `json:"freshness_batch_size"`
+		EventReplaySize    *int   `json:"event_replay_size"`
 	} `json:"adapters"`
 }
 
@@ -226,6 +241,32 @@ func applyFile(cfg *Config, name string) error {
 	if values.Adapters.SampleExecutable != "" {
 		cfg.Adapters.SampleExecutable = values.Adapters.SampleExecutable
 	}
+	if values.Adapters.GlobalConcurrency != nil {
+		cfg.Adapters.GlobalConcurrency = *values.Adapters.GlobalConcurrency
+	}
+	if values.Adapters.FreshnessBatchSize != nil {
+		cfg.Adapters.FreshnessBatchSize = *values.Adapters.FreshnessBatchSize
+	}
+	if values.Adapters.EventReplaySize != nil {
+		cfg.Adapters.EventReplaySize = *values.Adapters.EventReplaySize
+	}
+	for name, value := range map[string]string{
+		"adapters.reconcile_interval": values.Adapters.ReconcileInterval,
+		"adapters.freshness_interval": values.Adapters.FreshnessInterval,
+	} {
+		if value == "" {
+			continue
+		}
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		if name == "adapters.reconcile_interval" {
+			cfg.Adapters.ReconcileInterval = duration
+		} else {
+			cfg.Adapters.FreshnessInterval = duration
+		}
+	}
 	return nil
 }
 
@@ -244,6 +285,11 @@ func (cfg Config) SafeSummary() map[string]any {
 		"database_connect_timeout":      cfg.Database.ConnectTimeout,
 		"database_migration_timeout":    cfg.Database.MigrationTimeout,
 		"sample_adapter_configured":     cfg.Adapters.SampleExecutable != "",
+		"adapter_global_concurrency":    cfg.Adapters.GlobalConcurrency,
+		"adapter_reconcile_interval":    cfg.Adapters.ReconcileInterval,
+		"freshness_interval":            cfg.Adapters.FreshnessInterval,
+		"freshness_batch_size":          cfg.Adapters.FreshnessBatchSize,
+		"event_replay_size":             cfg.Adapters.EventReplaySize,
 	}
 }
 
@@ -304,6 +350,31 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_SAMPLE_ADAPTER_EXECUTABLE")); value != "" {
 		cfg.Adapters.SampleExecutable = value
+	}
+	for name, destination := range map[string]*time.Duration{
+		"ESPIAL_ADAPTER_RECONCILE_INTERVAL": &cfg.Adapters.ReconcileInterval,
+		"ESPIAL_FRESHNESS_INTERVAL":         &cfg.Adapters.FreshnessInterval,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			duration, err := time.ParseDuration(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = duration
+		}
+	}
+	for name, destination := range map[string]*int{
+		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY": &cfg.Adapters.GlobalConcurrency,
+		"ESPIAL_FRESHNESS_BATCH_SIZE":       &cfg.Adapters.FreshnessBatchSize,
+		"ESPIAL_EVENT_REPLAY_SIZE":          &cfg.Adapters.EventReplaySize,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = parsed
+		}
 	}
 	for name, destination := range map[string]*time.Duration{
 		"ESPIAL_AUTH_SESSION_IDLE":      &cfg.Auth.SessionIdle,
@@ -374,6 +445,17 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Adapters.SampleExecutable != "" && !filepath.IsAbs(cfg.Adapters.SampleExecutable) {
 		return errors.New("sample adapter executable must be an absolute path")
+	}
+	if cfg.Adapters.GlobalConcurrency < 1 || cfg.Adapters.GlobalConcurrency > 64 {
+		return errors.New("adapter global concurrency must be between 1 and 64")
+	}
+	if cfg.Adapters.ReconcileInterval < 100*time.Millisecond || cfg.Adapters.ReconcileInterval > 5*time.Minute ||
+		cfg.Adapters.FreshnessInterval < 100*time.Millisecond || cfg.Adapters.FreshnessInterval > time.Minute {
+		return errors.New("adapter monitoring intervals are outside safe bounds")
+	}
+	if cfg.Adapters.FreshnessBatchSize < 1 || cfg.Adapters.FreshnessBatchSize > 1000 ||
+		cfg.Adapters.EventReplaySize < 1 || cfg.Adapters.EventReplaySize > 10000 {
+		return errors.New("adapter monitoring capacities are outside safe bounds")
 	}
 	return nil
 }

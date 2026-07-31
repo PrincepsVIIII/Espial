@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -161,6 +162,42 @@ func TestInvalidBatchAndConflictRollbackEverything(t *testing.T) {
 	requireTableCount(t, pool, "observations", 1)
 	if published != 1 {
 		t.Fatalf("publish count = %d, want 1", published)
+	}
+}
+
+func TestCommitHookFailureRollsBackAndDoesNotPublish(t *testing.T) {
+	pool := observationTestPool(t)
+	createIntegration(t, pool, integrationA)
+	now := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
+	published := 0
+	service := NewService(pool, Options{
+		Clock:     health.FixedClock{Time: now},
+		Publisher: PublisherFunc(func([]health.Change) { published++ }),
+	})
+
+	_, err := service.IngestWithCommit(context.Background(), integrationA, validBatch(now),
+		func(ctx context.Context, tx pgx.Tx, _ Result) error {
+			if _, insertErr := tx.Exec(ctx, `
+				INSERT INTO audit_events (
+					id, action, target_type, target_id, result, correlation_id, occurred_at
+				) VALUES (
+					gen_random_uuid(), 'integration.collection.succeeded', 'integration',
+					$1, 'succeeded', 'rollback-test', $2
+				)
+			`, integrationA, now); insertErr != nil {
+				return insertErr
+			}
+			return errors.New("audit unavailable")
+		})
+	if err == nil || !strings.Contains(err.Error(), "record observation commit") {
+		t.Fatalf("error = %v", err)
+	}
+	requireTableCount(t, pool, "resources", 0)
+	requireTableCount(t, pool, "observations", 0)
+	requireTableCount(t, pool, "current_health", 0)
+	requireTableCount(t, pool, "audit_events", 0)
+	if published != 0 {
+		t.Fatalf("published = %d", published)
 	}
 }
 

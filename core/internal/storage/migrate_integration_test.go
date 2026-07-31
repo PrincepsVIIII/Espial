@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 5 {
+	if migrationCount != 6 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -74,6 +74,16 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 		t.Fatalf("adapter runtime column count = %d", runtimeColumns)
 	}
 
+	var collectionRunsExists bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.integration_collection_runs') IS NOT NULL
+	`).Scan(&collectionRunsExists); err != nil {
+		t.Fatalf("inspect collection runs table: %v", err)
+	}
+	if !collectionRunsExists {
+		t.Fatal("integration collection runs table is missing")
+	}
+
 	var roleCount int
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM roles").Scan(&roleCount); err != nil {
 		t.Fatalf("count roles: %v", err)
@@ -115,7 +125,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (6, '000006_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (7, '000007_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

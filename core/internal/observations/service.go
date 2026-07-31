@@ -22,6 +22,8 @@ type Service struct {
 	publisher Publisher
 }
 
+type CommitHook func(context.Context, pgx.Tx, Result) error
+
 func NewService(pool *pgxpool.Pool, options Options) *Service {
 	if options.Clock == nil {
 		options.Clock = health.SystemClock{}
@@ -30,6 +32,18 @@ func NewService(pool *pgxpool.Pool, options Options) *Service {
 }
 
 func (service *Service) Ingest(ctx context.Context, integrationID string, batch Batch) (Result, error) {
+	return service.IngestWithCommit(ctx, integrationID, batch, nil)
+}
+
+// IngestWithCommit runs hook inside the ingestion transaction after all normalized
+// writes succeed and before commit. A hook failure rolls back data and emits no
+// post-commit state changes.
+func (service *Service) IngestWithCommit(
+	ctx context.Context,
+	integrationID string,
+	batch Batch,
+	hook CommitHook,
+) (Result, error) {
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
@@ -145,6 +159,13 @@ func (service *Service) Ingest(ctx context.Context, integrationID string, batch 
 				change.Before = &before
 			}
 			result.Changes = append(result.Changes, change)
+		}
+	}
+	if hook != nil {
+		hookResult := result
+		hookResult.Changes = append([]health.Change(nil), result.Changes...)
+		if err := hook(ctx, tx, hookResult); err != nil {
+			return Result{}, fmt.Errorf("record observation commit: %w", err)
 		}
 	}
 

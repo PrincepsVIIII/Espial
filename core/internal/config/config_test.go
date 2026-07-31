@@ -22,6 +22,11 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_DATABASE_MIGRATION_TIMEOUT":    "1m",
 		"ESPIAL_AUTH_MODE":                     "local",
 		"ESPIAL_SAMPLE_ADAPTER_EXECUTABLE":     "/opt/espial/sample-adapter",
+		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY":    "7",
+		"ESPIAL_ADAPTER_RECONCILE_INTERVAL":    "3s",
+		"ESPIAL_FRESHNESS_INTERVAL":            "2s",
+		"ESPIAL_FRESHNESS_BATCH_SIZE":          "25",
+		"ESPIAL_EVENT_REPLAY_SIZE":             "512",
 	}
 
 	err := applyEnvironment(&cfg, func(key string) string { return values[key] })
@@ -45,6 +50,11 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 	}
 	if cfg.Adapters.SampleExecutable != "/opt/espial/sample-adapter" {
 		t.Fatalf("sample executable = %q", cfg.Adapters.SampleExecutable)
+	}
+	if cfg.Adapters.GlobalConcurrency != 7 || cfg.Adapters.ReconcileInterval != 3*time.Second ||
+		cfg.Adapters.FreshnessInterval != 2*time.Second || cfg.Adapters.FreshnessBatchSize != 25 ||
+		cfg.Adapters.EventReplaySize != 512 {
+		t.Fatalf("adapter settings = %#v", cfg.Adapters)
 	}
 }
 
@@ -118,6 +128,24 @@ func TestValidateRejectsRelativeSampleExecutable(t *testing.T) {
 	cfg.Adapters.SampleExecutable = "./sample-adapter"
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "absolute") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsUnsafeMonitoringBounds(t *testing.T) {
+	for name, mutate := range map[string]func(*Config){
+		"concurrency": func(cfg *Config) { cfg.Adapters.GlobalConcurrency = 0 },
+		"reconcile":   func(cfg *Config) { cfg.Adapters.ReconcileInterval = time.Millisecond },
+		"freshness":   func(cfg *Config) { cfg.Adapters.FreshnessInterval = 2 * time.Minute },
+		"batch":       func(cfg *Config) { cfg.Adapters.FreshnessBatchSize = 1001 },
+		"replay":      func(cfg *Config) { cfg.Adapters.EventReplaySize = 10001 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := defaults()
+			mutate(&cfg)
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("unsafe monitoring setting was accepted")
+			}
+		})
 	}
 }
 

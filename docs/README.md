@@ -14,6 +14,7 @@ intentions into implementable contracts.
 | [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
 | [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
 | [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |
+| [Slice 1.5 record](plans/SLICE_1_5_SCHEDULING_PIPELINE.md) | Bounded scheduling, atomic collection/audit, freshness ownership, and internal events |
 | [Backend plan](BACKEND_PLAN.md) | Long-term backend responsibilities and domain direction |
 | [Frontend/UI plan](FRONTEND_UI_PLAN.md) | Long-term information architecture and interaction direction |
 

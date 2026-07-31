@@ -13,6 +13,8 @@ type SupervisorOptions struct {
 	HealthyReset time.Duration
 	Process      ProcessOptions
 	Secrets      SecretResolver
+	Workload     Workload
+	Observer     LifecycleObserver
 }
 
 type Timer interface {
@@ -67,7 +69,13 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 				return loadErr
 			}
 			if exists && instance.State != "stopped" {
-				return supervisor.store.MarkStopped(ctx, integrationID, supervisor.options.Clock.Now())
+				stoppedAt := supervisor.options.Clock.Now()
+				if err := supervisor.store.MarkStopped(ctx, integrationID, stoppedAt); err != nil {
+					return err
+				}
+				if supervisor.options.Observer != nil {
+					return supervisor.options.Observer.Stopped(ctx, integration, stoppedAt)
+				}
 			}
 			return nil
 		}
@@ -88,22 +96,57 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 		if err := supervisor.store.MarkStarting(ctx, integrationID, now); err != nil {
 			return err
 		}
+		if supervisor.options.Observer != nil {
+			if err := supervisor.options.Observer.Starting(ctx, integration, now); err != nil {
+				return err
+			}
+		}
 		session, err := StartSession(ctx, descriptor, integration, supervisor.options.Secrets, supervisor.options.Process)
 		if err != nil {
 			if ctx.Err() != nil {
 				stopContext, cancel := supervisor.persistenceContext()
-				_ = supervisor.store.MarkStopped(stopContext, integrationID, supervisor.options.Clock.Now())
+				stoppedAt := supervisor.options.Clock.Now()
+				stopErr := supervisor.store.MarkStopped(stopContext, integrationID, stoppedAt)
+				if stopErr == nil && supervisor.options.Observer != nil {
+					_ = supervisor.options.Observer.Stopped(stopContext, integration, stoppedAt)
+				}
 				cancel()
 				return ctx.Err()
 			}
-			if _, markErr := supervisor.store.MarkFailed(ctx, integrationID, runtimeCode(err), supervisor.options.Clock.Now(), supervisor.options.Jitter()); markErr != nil {
+			failedAt := supervisor.options.Clock.Now()
+			failed, markErr := supervisor.store.MarkFailed(ctx, integrationID, runtimeCode(err), failedAt, supervisor.options.Jitter())
+			if markErr != nil {
 				return markErr
+			}
+			if supervisor.options.Observer != nil {
+				if observeErr := supervisor.options.Observer.Failed(ctx, integration, failed, failedAt); observeErr != nil {
+					return observeErr
+				}
 			}
 			continue
 		}
-		if err := supervisor.store.MarkHealthy(ctx, integrationID, session.Manifest.AdapterVersion, session.Version, supervisor.options.Clock.Now()); err != nil {
+		healthyAt := supervisor.options.Clock.Now()
+		if err := supervisor.store.MarkHealthy(ctx, integrationID, session.Manifest.AdapterVersion, session.Version, healthyAt); err != nil {
 			_ = session.Close(context.Background())
 			return err
+		}
+		healthyInstance, _, err := supervisor.store.LoadInstance(ctx, integrationID)
+		if err != nil {
+			_ = session.Close(context.Background())
+			return err
+		}
+		recovered := exists && (instance.State == "unhealthy" || instance.ConsecutiveFailures > 0)
+		if supervisor.options.Observer != nil {
+			if err := supervisor.options.Observer.Healthy(ctx, integration, healthyInstance, recovered, healthyAt); err != nil {
+				_ = session.Close(context.Background())
+				return err
+			}
+		}
+		workContext, cancelWork := context.WithCancel(ctx)
+		var workDone chan error
+		if supervisor.options.Workload != nil {
+			workDone = make(chan error, 1)
+			go func() { workDone <- supervisor.options.Workload.Run(workContext, integration, session) }()
 		}
 		resetTimer := supervisor.options.NewTimer(supervisor.options.HealthyReset)
 		reset := resetTimer.Channel()
@@ -111,11 +154,16 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 			select {
 			case <-ctx.Done():
 				resetTimer.Stop()
+				cancelWork()
 				stopContext, cancel := context.WithTimeout(context.Background(), supervisor.options.Process.ShutdownTimeout+supervisor.options.Process.TerminationTimeout)
 				_ = session.Close(stopContext)
 				cancel()
+				supervisor.drainWorkload(workDone)
 				persistenceContext, persistenceCancel := supervisor.persistenceContext()
 				err := supervisor.store.MarkStopped(persistenceContext, integrationID, supervisor.options.Clock.Now())
+				if err == nil && supervisor.options.Observer != nil {
+					err = supervisor.options.Observer.Stopped(persistenceContext, integration, supervisor.options.Clock.Now())
+				}
 				persistenceCancel()
 				if err != nil {
 					return err
@@ -123,12 +171,52 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 				return ctx.Err()
 			case <-session.Process.done:
 				resetTimer.Stop()
-				if _, err := supervisor.store.MarkFailed(ctx, integrationID, runtimeCode(session.Process.Failure()), supervisor.options.Clock.Now(), supervisor.options.Jitter()); err != nil {
+				cancelWork()
+				supervisor.drainWorkload(workDone)
+				failedAt := supervisor.options.Clock.Now()
+				failed, err := supervisor.store.MarkFailed(ctx, integrationID, runtimeCode(session.Process.Failure()), failedAt, supervisor.options.Jitter())
+				if err != nil {
 					return err
+				}
+				if supervisor.options.Observer != nil {
+					if err := supervisor.options.Observer.Failed(ctx, integration, failed, failedAt); err != nil {
+						return err
+					}
+				}
+				goto restart
+			case err := <-workDone:
+				resetTimer.Stop()
+				cancelWork()
+				if ctx.Err() != nil {
+					_ = session.Close(context.Background())
+					persistenceContext, persistenceCancel := supervisor.persistenceContext()
+					stopErr := supervisor.store.MarkStopped(persistenceContext, integrationID, supervisor.options.Clock.Now())
+					if stopErr == nil && supervisor.options.Observer != nil {
+						stopErr = supervisor.options.Observer.Stopped(persistenceContext, integration, supervisor.options.Clock.Now())
+					}
+					persistenceCancel()
+					if stopErr != nil {
+						return stopErr
+					}
+					return ctx.Err()
+				}
+				_ = session.Close(context.Background())
+				failedAt := supervisor.options.Clock.Now()
+				failed, markErr := supervisor.store.MarkFailed(ctx, integrationID, runtimeCode(err), failedAt, supervisor.options.Jitter())
+				if markErr != nil {
+					return markErr
+				}
+				if supervisor.options.Observer != nil {
+					if observeErr := supervisor.options.Observer.Failed(ctx, integration, failed, failedAt); observeErr != nil {
+						return observeErr
+					}
 				}
 				goto restart
 			case <-reset:
 				if err := supervisor.store.ResetFailures(ctx, integrationID, supervisor.options.Clock.Now()); err != nil {
+					cancelWork()
+					_ = session.Close(context.Background())
+					supervisor.drainWorkload(workDone)
 					return err
 				}
 				resetTimer.Stop()
@@ -136,6 +224,18 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 			}
 		}
 	restart:
+	}
+}
+
+func (supervisor *Supervisor) drainWorkload(done <-chan error) {
+	if done == nil {
+		return
+	}
+	timer := supervisor.options.NewTimer(supervisor.options.Process.RequestTimeout)
+	defer timer.Stop()
+	select {
+	case <-done:
+	case <-timer.Channel():
 	}
 }
 
@@ -160,6 +260,10 @@ func (supervisor *Supervisor) waitUntil(ctx context.Context, target time.Time) e
 }
 
 func runtimeCode(err error) string {
+	var safe interface{ SafeCode() string }
+	if errors.As(err, &safe) && errorCodePattern.MatchString(safe.SafeCode()) {
+		return safe.SafeCode()
+	}
 	var runtime *RuntimeError
 	if errors.As(err, &runtime) && errorCodePattern.MatchString(runtime.Code) {
 		return runtime.Code

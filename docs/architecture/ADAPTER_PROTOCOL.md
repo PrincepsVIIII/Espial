@@ -58,10 +58,11 @@ either `payload` or a safe structured `error`. Notifications use
 | `event` | adapter → Core notification | Optional event-driven normalized input |
 | `log` | adapter → Core notification | Structured, bounded diagnostic record |
 
-The first sample adapter must implement `manifest`, `validate_config`, `collect`,
-`health`, and `shutdown`. Slice 1.4 consumes `ready` and bounded `log`
-notifications. Event input remains disabled until Slice 1.5 can validate and ingest
-it without dropping data.
+The sample adapter implements `manifest`, `validate_config`, `collect`, `health`,
+and `shutdown`. Core consumes `ready` and bounded `log` notifications. Adapter push
+events remain disabled until a later slice defines durable acknowledgement and
+replay; Slice 1.5's event hub carries post-commit Core invalidations, not adapter
+input.
 
 ## Collection payload
 
