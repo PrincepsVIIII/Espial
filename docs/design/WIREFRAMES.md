@@ -56,10 +56,11 @@ SSO”; the local form moves behind “Emergency local access” with an audit w
 
 Dashboard is selected after login. The five items retain this order everywhere;
 Datacenter is one primary-navigation action away.
-Real child-route or user dropdowns open on click or keyboard activation, not hover
-alone. Arrow keys move within a menu, Escape closes it, and focus returns to the
-trigger. At narrow widths, the same items move into one labeled navigation control
-without changing their order or hiding sign-out.
+Desktop dropdowns reveal on hover or keyboard focus and remain available through
+click/touch activation. A short white rule appears beneath the hovered, focused, or
+current label. Arrow keys move within a menu, Escape closes it, and focus returns to
+the trigger. At narrow widths, the same items move into one labeled navigation
+control without changing their order or hiding sign-out.
 
 ## Dashboard (Phase 1)
 

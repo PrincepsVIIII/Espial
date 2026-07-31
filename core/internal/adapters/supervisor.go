@@ -89,6 +89,19 @@ func (supervisor *Supervisor) Run(ctx context.Context, integrationID string) err
 		}
 		if exists && instance.NextRestartAt != nil {
 			if err := supervisor.waitUntil(ctx, *instance.NextRestartAt); err != nil {
+				if ctx.Err() != nil {
+					stopContext, cancel := supervisor.persistenceContext()
+					stoppedAt := supervisor.options.Clock.Now()
+					stopErr := supervisor.store.MarkStopped(stopContext, integrationID, stoppedAt)
+					if stopErr == nil && supervisor.options.Observer != nil {
+						stopErr = supervisor.options.Observer.Stopped(stopContext, integration, stoppedAt)
+					}
+					cancel()
+					if stopErr != nil {
+						return stopErr
+					}
+					return ctx.Err()
+				}
 				return err
 			}
 		}

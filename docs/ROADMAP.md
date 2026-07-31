@@ -43,6 +43,12 @@ do not block the local-authenticated Phase 1 vertical slice.
 
 ## Phase 1: Monitoring foundation
 
+**Status:** Complete (2026-07-31). The automated ten-step acceptance scenario,
+race suite, dependency/application-image security gates, and operator runbooks pass.
+The production example is intentionally not release-approved until the owned site
+inputs and upstream base-image findings in the
+[Phase 1 threat review](security/THREAT_REVIEW_PHASE_1.md) are closed.
+
 **Implementation plan:** [Phase 1 Monitoring Foundation](plans/PHASE_1_IMPLEMENTATION.md)
 
 ### Backend

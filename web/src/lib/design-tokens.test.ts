@@ -13,6 +13,10 @@ const appShell = readFileSync(
   new URL('../routes/(app)/+layout.svelte', import.meta.url),
   'utf8',
 );
+const brandLogo = readFileSync(
+  new URL('../lib/components/BrandLogo.svelte', import.meta.url),
+  'utf8',
+);
 
 function token(name: string): string {
   const match = stylesheet.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
@@ -42,11 +46,13 @@ describe('UBNetDef design tokens', () => {
     expect(token('ub-blue')).toBe('#005bbb');
     expect(token('harriman-blue')).toBe('#002f56');
     expect(token('hayes-white')).toBe('#ffffff');
+    expect(token('netdef-cyan')).toBe('#55d6e2');
   });
 
   it('keeps UBNetDef attribution in both entry points', () => {
-    expect(loginPage).toContain('UBNetDef Infrastructure Operations');
-    expect(appShell).toContain('UBNetDef Operations');
+    expect(loginPage).toContain('BrandLogo');
+    expect(appShell).toContain('BrandLogo compact');
+    expect(brandLogo).toContain("label = 'UBNetDef'");
   });
 
   it('does not regress to the rejected template effects', () => {

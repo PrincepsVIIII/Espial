@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": "22.17.x"
+    "node": "22.23.x"
   },
   "scripts": {
     "check": "npm run check:repo && npm run core:check && npm run web:check",
     "check:repo": "npm run format:check && npm run contracts && npm run docs && npm run generate:check",
     "contracts": "node scripts/validate-contracts.mjs && node scripts/validate-openapi.mjs",
+    "acceptance:phase1": "node scripts/phase1-acceptance.mjs",
     "core:check": "npm run core:lint && npm run core:test",
     "core:format": "node scripts/run-go.mjs fmt ./...",
     "core:lint": "node scripts/run-go.mjs vet ./...",
@@ -21,6 +22,7 @@
     "format:check": "prettier --check package.json api/**/*.json scripts/**/*.mjs .github/**/*.yml deployments/**/*.yml && npm --prefix web run format:check",
     "generate": "node scripts/generate-types.mjs",
     "generate:check": "node scripts/generate-types.mjs --check",
+    "init": "node scripts/init.mjs",
     "lint": "npm run format:check && npm run core:lint",
     "test": "npm run contracts && npm run docs && npm run generate:check && npm run core:test"
   },

@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { onDestroy, onMount } from 'svelte';
   import { readCookie } from '$lib/auth';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
   import {
     liveConnection,
     startLiveInvalidations,
@@ -11,17 +12,47 @@
 
   let { data, children } = $props();
   let navOpen = $state(false);
+  let activeNav = $state<string | null>(null);
   let accountOpen = $state(false);
+  let restoringNavFocus = false;
+  let restoringAccountFocus = false;
   let navButton = $state<HTMLButtonElement>();
   let accountButton = $state<HTMLButtonElement>();
   let stopLive: (() => void) | null = null;
 
   const navItems = [
-    { label: 'Dashboard', href: '/dashboard' },
-    { label: 'Alerts', href: '/alerts' },
-    { label: 'Datacenter', href: '/datacenter' },
-    { label: 'Hypervisor', href: '/hypervisor' },
-    { label: 'Webpages', href: '/webpages' },
+    {
+      label: 'Dashboard',
+      href: '/dashboard',
+      children: [
+        { label: 'Resources', href: '/dashboard#resources-title' },
+        { label: 'Integrations', href: '/dashboard#integrations-title' },
+      ],
+    },
+    {
+      label: 'Alerts',
+      href: '/alerts',
+      children: [{ label: 'Planned workflow', href: '/alerts#planned-scope' }],
+    },
+    {
+      label: 'Datacenter',
+      href: '/datacenter',
+      children: [
+        { label: 'Planned drill-down', href: '/datacenter#planned-scope' },
+      ],
+    },
+    {
+      label: 'Hypervisor',
+      href: '/hypervisor',
+      children: [
+        { label: 'Planned inventory', href: '/hypervisor#planned-scope' },
+      ],
+    },
+    {
+      label: 'Webpages',
+      href: '/webpages',
+      children: [{ label: 'Planned checks', href: '/webpages#planned-scope' }],
+    },
   ];
 
   const liveLabels: Record<LiveStatus, string> = {
@@ -53,11 +84,47 @@
     navOpen = false;
   }
 
+  function closeNavDropdown(event: FocusEvent) {
+    const group = event.currentTarget as HTMLElement;
+    const next = event.relatedTarget as Node | null;
+    if (!next || !group.contains(next)) activeNav = null;
+  }
+
+  function closeNavDropdownOnPointerLeave(event: MouseEvent) {
+    const group = event.currentTarget as HTMLElement;
+    if (!group.contains(document.activeElement)) activeNav = null;
+  }
+
+  function closeAccountDropdown(event: FocusEvent) {
+    const menu = event.currentTarget as HTMLElement;
+    const next = event.relatedTarget as Node | null;
+    if (!next || !menu.contains(next)) accountOpen = false;
+  }
+
+  function closeAccountDropdownOnPointerLeave(event: MouseEvent) {
+    const menu = event.currentTarget as HTMLElement;
+    if (!menu.contains(document.activeElement)) accountOpen = false;
+  }
+
   function handleWindowKeydown(event: KeyboardEvent) {
     if (event.key !== 'Escape') return;
+    if (activeNav) {
+      const label = activeNav;
+      restoringNavFocus = true;
+      activeNav = null;
+      requestAnimationFrame(() => {
+        document
+          .querySelector<HTMLButtonElement>(`[data-nav-trigger="${label}"]`)
+          ?.focus({ preventScroll: true });
+        restoringNavFocus = false;
+      });
+      return;
+    }
     if (accountOpen) {
+      restoringAccountFocus = true;
       accountOpen = false;
       accountButton?.focus();
+      restoringAccountFocus = false;
       return;
     }
     if (navOpen) {
@@ -97,10 +164,8 @@
     <a class="skip-link" href="#main-content">Skip to content</a>
     <header class="app-header">
       <a class="wordmark" href="/dashboard" aria-label="Espial Dashboard">
-        <span class="product-lockup">
-          <span class="product-name">Espial</span>
-          <span class="product-context">UBNetDef Operations</span>
-        </span>
+        <BrandLogo compact />
+        <span class="espial-product">Espial</span>
       </a>
 
       <button
@@ -121,25 +186,70 @@
         class="primary-nav"
         aria-label="Primary"
       >
-        {#each navItems as item}
-          <a
-            class:active={isActive(item.href)}
-            aria-current={isActive(item.href) ? 'page' : undefined}
-            href={item.href}
-            onclick={closeNavigation}>{item.label}</a
-          >
-        {/each}
-        <div class="mobile-account">
-          <span>
-            <strong>{data.session.user.display_name}</strong>
-            <small>{data.session.user.roles.join(', ')}</small>
-            <small class={`live-text live-${$liveConnection.status}`}>
-              {liveLabels[$liveConnection.status]}
-            </small>
-          </span>
-          <button class="link-button" type="button" onclick={logout}
-            >Sign out</button
-          >
+        <div class="desktop-primary-nav">
+          {#each navItems as item}
+            <div
+              class="nav-group"
+              role="group"
+              onmouseenter={() => (activeNav = item.label)}
+              onmouseleave={closeNavDropdownOnPointerLeave}
+              onfocusout={closeNavDropdown}
+            >
+              <button
+                type="button"
+                class="nav-label"
+                class:active={isActive(item.href)}
+                data-nav-trigger={item.label}
+                aria-expanded={activeNav === item.label}
+                aria-controls={`nav-panel-${item.label.toLowerCase()}`}
+                onfocus={() => {
+                  if (!restoringNavFocus) activeNav = item.label;
+                }}
+                onclick={() => (activeNav = item.label)}
+              >
+                {item.label}
+              </button>
+              {#if activeNav === item.label}
+                <div
+                  class="nav-dropdown"
+                  id={`nav-panel-${item.label.toLowerCase()}`}
+                >
+                  <a
+                    href={item.href}
+                    aria-current={isActive(item.href) ? 'page' : undefined}
+                  >
+                    <strong>{item.label}</strong>
+                    <span>Open section</span>
+                  </a>
+                  {#each item.children as child}
+                    <a href={child.href}>{child.label}</a>
+                  {/each}
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
+        <div class="mobile-primary-nav">
+          {#each navItems as item}
+            <a
+              class:active={isActive(item.href)}
+              aria-current={isActive(item.href) ? 'page' : undefined}
+              href={item.href}
+              onclick={closeNavigation}>{item.label}</a
+            >
+          {/each}
+          <div class="mobile-account">
+            <span>
+              <strong>{data.session.user.display_name}</strong>
+              <small>{data.session.user.roles.join(', ')}</small>
+              <small class={`live-text live-${$liveConnection.status}`}>
+                {liveLabels[$liveConnection.status]}
+              </small>
+            </span>
+            <button class="link-button" type="button" onclick={logout}
+              >Sign out</button
+            >
+          </div>
         </div>
       </nav>
 
@@ -151,10 +261,15 @@
             ? `Last successful refresh: ${$liveConnection.last_refresh}`
             : 'Waiting for the first monitoring refresh'}
         >
-          <i aria-hidden="true"></i>
           {liveLabels[$liveConnection.status]}
         </span>
-        <div class="user-menu">
+        <div
+          class="user-menu"
+          role="group"
+          onmouseenter={() => (accountOpen = true)}
+          onmouseleave={closeAccountDropdownOnPointerLeave}
+          onfocusout={closeAccountDropdown}
+        >
           <button
             class="user-menu-trigger"
             type="button"
@@ -162,10 +277,12 @@
             aria-label={`User menu for ${data.session.user.display_name}`}
             aria-controls="user-menu-panel"
             aria-expanded={accountOpen}
-            onclick={() => (accountOpen = !accountOpen)}
+            onfocus={() => {
+              if (!restoringAccountFocus) accountOpen = true;
+            }}
+            onclick={() => (accountOpen = true)}
           >
             <span>{data.session.user.display_name}</span>
-            <span aria-hidden="true">▾</span>
           </button>
           {#if accountOpen}
             <div id="user-menu-panel" class="user-menu-panel">

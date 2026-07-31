@@ -79,31 +79,32 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 
 ## Project status
 
-Phase 0's architecture and design baseline is complete, and Phase 1 implementation
-is in progress. The repository now includes contract checks, generated TypeScript
-models, CI, the initial Go service lifecycle, PostgreSQL migrations, health probes,
-temporary local authentication, and a protected SvelteKit shell in the local stack. Environment-specific values
-that require UBNetDef operator input are recorded in the
+Phase 0 and the Phase 1 monitoring foundation are complete. The repository includes
+the supervised sample-adapter vertical slice, normalized health and freshness,
+audited local authentication/RBAC, REST/SSE, the operational SvelteKit Dashboard,
+repeatable clean-stack/restore acceptance, security gates, and hardened deployment
+examples. Environment-specific values that require UBNetDef operator input are recorded in the
 [environment inventory](docs/operations/ENVIRONMENT_INVENTORY.md), rather than
-being guessed. SSO is an explicit external dependency; Phase 1 will begin with
-audited local authentication now and retains a provider boundary for SSO when its
+being guessed. SSO is an explicit external dependency; Phase 1 uses audited local
+authentication and retains a provider boundary for SSO when its
 protocol is ready.
 
-Implementation is organized in the
-[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md). Espial is not yet a
-production-ready service.
+Implementation evidence is recorded in the
+[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md) and
+[Slice 1.8 acceptance record](docs/plans/SLICE_1_8_PHASE_ACCEPTANCE.md). Espial is
+not yet production-release-approved: named site inputs and current upstream image
+findings explicitly block production without blocking Phase 2 development.
 
 ## Development quick start
 
-Requirements: Docker, Node.js 22.17, and npm. A host Go installation is optional;
+Requirements: Docker, Node.js 22.23, and npm. A host Go installation is optional;
 the repository commands use the pinned Go 1.26 container when Go is unavailable.
 
 ```sh
-cp .env.example .env
 npm install
 npm --prefix web ci
 npm run check
-npm run dev
+npm run init
 ```
 
 Web is available on `http://localhost:5173`; Core is available on

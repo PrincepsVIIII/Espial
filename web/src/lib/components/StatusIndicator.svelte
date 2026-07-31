@@ -11,6 +11,5 @@
   class:compact
   aria-label={presentation.label}
 >
-  <span class="status-icon" aria-hidden="true">{presentation.icon}</span>
   <span>{presentation.label}</span>
 </span>

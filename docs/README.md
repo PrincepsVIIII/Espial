@@ -17,6 +17,7 @@ intentions into implementable contracts.
 | [Slice 1.5 record](plans/SLICE_1_5_SCHEDULING_PIPELINE.md) | Bounded scheduling, atomic collection/audit, freshness ownership, and internal events |
 | [Slice 1.6 record](plans/SLICE_1_6_REST_SSE_API.md) | Authenticated REST read models, stable cursors, administrator audit reads, SSE replay, and OpenAPI |
 | [Slice 1.7 record](plans/SLICE_1_7_OPERATIONAL_UI.md) | Authoritative Dashboard, typed SvelteKit loaders, live invalidation refresh, accessibility, and viewport verification |
+| [Slice 1.8 record](plans/SLICE_1_8_PHASE_ACCEPTANCE.md) | Hardened deployment, threat review, clean-stack acceptance, resource evidence, and Phase 1 release gates |
 | [Backend plan](BACKEND_PLAN.md) | Long-term backend responsibilities and domain direction |
 | [Frontend/UI plan](FRONTEND_UI_PLAN.md) | Long-term information architecture and interaction direction |
 
@@ -42,6 +43,13 @@ intentions into implementable contracts.
 
 - [Initial environment and integration inventory](operations/ENVIRONMENT_INVENTORY.md)
 - [Temporary local authentication runbook](operations/LOCAL_AUTH.md)
+- [Deployment and upgrade runbook](operations/DEPLOYMENT_RUNBOOK.md)
+- [Backup and restore runbook](operations/BACKUP_RESTORE.md)
+- [Troubleshooting runbook](operations/TROUBLESHOOTING.md)
+
+## Security
+
+- [Phase 1 threat review and vulnerability triage](security/THREAT_REVIEW_PHASE_1.md)
 
 ## Decisions
 

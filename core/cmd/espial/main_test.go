@@ -45,3 +45,27 @@ func TestReadPasswordRequiresMatchingConfirmation(t *testing.T) {
 		t.Fatal("mismatched confirmation was accepted")
 	}
 }
+
+func TestParseAdminCommands(t *testing.T) {
+	tests := []struct {
+		args      []string
+		operation string
+		username  string
+		role      string
+	}{
+		{[]string{"admin", "bootstrap", "--username", "admin"}, "bootstrap", "admin", ""},
+		{[]string{"admin", "user", "create", "--username", "viewer", "--role", "viewer"}, "create", "viewer", "viewer"},
+		{[]string{"admin", "user", "role", "--username", "viewer", "--role", "operator"}, "role", "viewer", "operator"},
+		{[]string{"admin", "user", "password", "--username", "viewer"}, "password", "viewer", ""},
+		{[]string{"admin", "user", "disable", "--username", "viewer"}, "disable", "viewer", ""},
+	}
+	for _, test := range tests {
+		command, ok := parseAdminCommand(test.args)
+		if !ok || command.operation != test.operation || command.username != test.username || command.role != test.role {
+			t.Fatalf("parse %#v = %#v, %v", test.args, command, ok)
+		}
+	}
+	if _, ok := parseAdminCommand([]string{"admin", "user", "create", "viewer"}); ok {
+		t.Fatal("malformed admin command was accepted")
+	}
+}

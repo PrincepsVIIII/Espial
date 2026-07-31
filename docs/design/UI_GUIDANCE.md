@@ -59,31 +59,38 @@ Contextual secondary controls may appear as tabs, breadcrumbs, a details drawer,
 a temporary task-specific rail when the content genuinely needs them, but they must
 not duplicate or replace the primary top navigation.
 
-The top bar must:
+The top bar is a floating, padded-down rectangular bar with restrained rounded
+corners. The page canvas remains visible around it so the application chrome feels
+separate from the background. It must:
 
 - remain visually and structurally consistent across authenticated routes;
 - visibly identify the current section;
 - support pointer, keyboard, and touch input with visible focus;
-- use dropdowns only for real child routes or user actions, never as decoration;
-- open dropdowns on activation rather than hover alone and support `Escape`; and
+- use dropdowns only for real destinations or user actions, never as decoration;
+- reveal desktop dropdowns on pointer hover and keyboard focus, while also
+  supporting click/tap activation and `Escape` to close;
+- show a short white horizontal rule beneath a hovered, focused, or current
+  navigation label without filling the whole item with a highlight; and
 - collapse into one clearly labeled menu on narrow screens while preserving the
   same item order and access to sign out.
 
 ## Color and surfaces
 
-Use a consistent dark-blue and blackish-gray scheme:
+Use a consistent cyan, dark-blue, and blackish-gray scheme derived from the supplied
+UBNetDef logo:
 
 - near-black blue/gray for the page canvas;
 - deep navy or Harriman Blue for the top bar and structural chrome;
 - flat charcoal-blue surfaces for content regions;
-- restrained UB Blue for primary actions, focus, links, and selected state; and
+- UBNetDef cyan for brand details, primary actions, focus, links, and selected state;
+- white for the navigation hover/current rule and high-priority text; and
 - semantic green, yellow/amber, red, gray, and stale-orange only for operational
   status.
 
-Content surfaces should normally be flat. One restrained linear gradient between
-adjacent dark navy values is allowed in the top navigation if it improves depth and
-has a flat-color fallback. Do not use bright, pastel, multicolor, radial, ambient,
-or content-card gradients. Do not use green as a product-brand color.
+Content surfaces are flat and sit distinctly above a near-black, visually quiet
+canvas. Do not use gradients, floating color fields, glow, blur, or texture to
+create that separation; use spacing, restrained borders, and tonal contrast. Do
+not use green as a product-brand color.
 
 Every text/background and focus-state pair must meet the contrast requirements in
 the [design system](DESIGN_SYSTEM.md). Status must always include text and/or an
@@ -91,7 +98,9 @@ icon or shape; color alone is insufficient.
 
 ## Composition and visual character
 
-Espial should look like a specific, serious infrastructure operations tool. Avoid
+Espial should look like a specific, serious UBNetDef infrastructure operations tool.
+Use the supplied UBNetDef logo unmodified in the public, login, and authenticated
+shells, with `Espial` identified as the product in adjacent text where needed. Avoid
 UI patterns commonly associated with generic AI-generated products:
 
 - glassmorphism, blurred panels, glowing borders, floating color blobs, and soft
@@ -106,6 +115,12 @@ UI patterns commonly associated with generic AI-generated products:
   as real; and
 - one-off page aesthetics that break the shared top bar, palette, geometry, or
   typography.
+
+The wow factor belongs to purposeful spatial motion: datacenter navigation,
+hardware inspection, and future Proxmox or integration views. Static application
+chrome stays calm. Avoid unnecessary badges, highlights, and icons. Operational
+state always has a visible text label; add an icon or shape only when it improves
+recognition or encodes a distinct action/state. Never use color alone.
 
 Prefer compact information hierarchy, thin dividers, lightly radiused or square
 geometry, factual labels, useful tables, direct status language, and monospaced
@@ -137,10 +152,13 @@ as successful content.
 Before a UI change is complete, verify:
 
 1. The page follows the public/authenticated structure and exact primary navigation.
-2. The dark-blue/blackish-gray palette remains consistent and accessible.
+2. The logo-derived cyan/dark-blue/blackish-gray palette remains consistent and
+   accessible.
 3. No permanent primary sidebar or generic AI-looking pattern was introduced.
 4. Content is authoritative or explicitly labeled unavailable—not fabricated.
 5. Keyboard, touch, narrow-screen, and reduced-motion behavior remain usable.
 6. Relevant detailed contracts, wireframes, and visual tests were updated.
+7. Static chrome is restrained and visual emphasis is reserved for useful data,
+   selection, focus, and purposeful spatial motion.
 
 Record material changes or exceptions in [UI review notes](UI_REVIEW.md).

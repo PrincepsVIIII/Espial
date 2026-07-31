@@ -1,6 +1,7 @@
 # Design system baseline
 
-Espial uses a dark, dense NOC interface anchored by University at Buffalo blue.
+Espial uses a dark, dense NOC interface anchored by the supplied UBNetDef logo's
+cyan and white.
 This baseline defines semantics, not a finished component library.
 
 The [general UI guidance](UI_GUIDANCE.md) is the authoritative product and
@@ -8,21 +9,17 @@ navigation contract. This document supplies its concrete tokens and component ru
 
 ## Brand use
 
-UB Blue is `#005bbb` and Hayes Hall White is `#ffffff`, following the official
-[University at Buffalo web color palette](https://www.buffalo.edu/brand/creative/color/color-palette.html).
-Espial uses the text lockup `Espial / UBNetDef Infrastructure Operations` or the
-compact `Espial / UBNetDef Operations` in persistent navigation. `Espial` is the
-product; `UBNetDef` is the operating organization and must remain visible on login,
-the authenticated shell, and operator-facing exports.
+The supplied UBNetDef logo is the primary visual mark and must be used unmodified.
+Its cyan (`#55d6e2`) and Hayes Hall White (`#ffffff`) establish the product accent
+and navigation rule. `Espial` is the product and appears as adjacent text where
+context is needed; `UBNetDef` is the operating organization and must remain visible
+on login, the authenticated shell, and operator-facing exports.
 
-UB Blue and Hayes Hall White remain the official brand references, but Espial's
-application frame is intentionally darker than UB Blue. Harriman Blue (`#002f56`)
-and adjacent deep navy tones carry the top navigation and spatial-view chrome; UB
-Blue is reserved for selection, focus, and primary action. Secondary colors are
-reserved for operational meaning. Espial currently uses a plain typographic product
-lockup with a blue rule; it does not invent a university or departmental logo.
-Official UB marks must use approved assets and must never be reconstructed, altered,
-or combined into a new logo.
+Harriman Blue (`#002f56`) remains a supporting institutional reference, while
+near-black navy tones carry the top navigation and spatial-view chrome. UBNetDef
+cyan is reserved for selection, focus, links, and primary action. Secondary colors
+are reserved for operational meaning. Approved marks must never be reconstructed,
+altered, recolored, or combined into a new logo.
 
 ## Token baseline
 
@@ -32,16 +29,16 @@ or combined into a new logo.
 
   --ub-blue: #005bbb;
   --ub-blue-bright: #2f79d0;
+  --netdef-cyan: #55d6e2;
   --harriman-blue: #002f56;
-  --nav-blue-start: #02182b;
-  --nav-blue-end: #063860;
+  --nav-blue: #09131c;
   --hayes-white: #ffffff;
-  --canvas: #07111d;
-  --surface-1: #0c1826;
-  --surface-2: #112235;
-  --surface-3: #172b40;
-  --border: #29445f;
-  --border-strong: #3c5d7d;
+  --canvas: #05080b;
+  --surface-1: #0b1218;
+  --surface-2: #101a22;
+  --surface-3: #16232d;
+  --border: #253540;
+  --border-strong: #3b5361;
   --text: #f4f7fb;
   --text-muted: #a9bacb;
 
@@ -60,8 +57,8 @@ or combined into a new logo.
   --space-6: 1.5rem;
   --space-8: 2rem;
 
-  --radius-sm: 0.2rem;
-  --radius-md: 0.3rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.7rem;
   --font-sans: Inter, ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
@@ -79,9 +76,7 @@ token set; components must not introduce one-off light surfaces in the meantime.
 Espial must look like a specific UBNetDef operations tool, not a generic SaaS
 starter or AI-generated dashboard. Reviews reject:
 
-- pastel, multicolor, radial, or ambient gradients, glass effects, glows, and
-  floating blobs. One restrained linear gradient between the two dark navigation
-  tokens is allowed only on structural chrome, with a flat fallback;
+- gradients, glass effects, glows, textures, and floating color fields;
 - a grid of oversized rounded cards where a table, definition list, or bordered
   operational section communicates the hierarchy better;
 - excessive pills, uniformly rounded containers, decorative shadows, or icons that
@@ -102,8 +97,9 @@ authenticated pages into marketing layouts.
 Every frontend slice must be reviewed at 1440px, 1280px, and a narrow viewport
 before it is complete. The review confirms:
 
-1. UBNetDef is visibly attributed and UB Blue remains the dominant accent.
-2. The screen answers a named operator question with implemented data only.
+1. UBNetDef is visibly attributed and its cyan remains the dominant accent.
+2. The supplied UBNetDef logo remains intact and the screen answers a named
+   operator question with implemented data only.
 3. Dark surfaces, focus states, and semantic status pairs pass contrast checks.
 4. Status never relies on color alone and keyboard landmarks remain usable.
 5. No anti-template pattern above has entered through a new component.
@@ -113,32 +109,37 @@ coherence until the end of Phase 1.
 
 ## Status semantics
 
-| State | Icon concept | Required label | Meaning |
-|---|---|---|---|
-| Healthy | check | Healthy | Fresh observation meets expectations |
-| Warning | triangle | Warning | Degraded or approaching a threshold |
-| Critical | octagon/exclamation | Critical | Failed or beyond a critical threshold |
-| Unknown | question/disconnect | Unknown | No trustworthy current determination |
-| Stale | clock | Stale | Last known data exceeded its refresh window |
-| Maintenance | wrench | Maintenance | Explicitly suppressed operational period |
-| Disabled | pause | Disabled | Collection intentionally disabled |
+| State       | Optional cue        | Required label | Meaning                                     |
+| ----------- | ------------------- | -------------- | ------------------------------------------- |
+| Healthy     | check               | Healthy        | Fresh observation meets expectations        |
+| Warning     | triangle            | Warning        | Degraded or approaching a threshold         |
+| Critical    | octagon/exclamation | Critical       | Failed or beyond a critical threshold       |
+| Unknown     | question/disconnect | Unknown        | No trustworthy current determination        |
+| Stale       | clock               | Stale          | Last known data exceeded its refresh window |
+| Maintenance | wrench              | Maintenance    | Explicitly suppressed operational period    |
+| Disabled    | pause               | Disabled       | Collection intentionally disabled           |
 
-Every instance includes icon, visible label, and accessible name. `Unknown` and
-`stale` must never inherit healthy styling. Timestamps show relative time with the
+Every instance includes a visible label and accessible name. Add the optional cue
+only where it makes dense operational data easier to scan. `Unknown` and `stale`
+must never inherit healthy styling. Timestamps show relative time with the
 absolute UTC and local time available on focus/hover.
 
 ## Layout and component rules
 
 - 16px minimum body text; dense tables may use 14px with adequate line height.
-- Borders and spacing establish hierarchy. Only the documented dark-blue structural
-  navigation gradient is permitted; content backgrounds remain flat.
+- Borders, spacing, and flat tonal contrast establish hierarchy; backgrounds remain
+  flat.
 - Cards are compact summaries, not oversized containers for every section.
-- Primary navigation is a persistent top bar with accessible click/keyboard
-  dropdowns on desktop and one collapsed menu on smaller screens.
+- Primary navigation is a floating top bar with restrained rounded corners. Desktop
+  dropdowns open on hover and focus, support click/touch, and close with `Escape`;
+  smaller screens use one collapsed menu.
+- Hovered, focused, and current navigation labels use a short white underline, not
+  a filled tile or decorative glow.
 - Keyboard focus is visible on every interactive element.
 - Hover-only information has a focus and non-pointer equivalent.
 - Physical visualizations always have a table/list representation.
-- Motion is brief, respects `prefers-reduced-motion`, and never delays data.
+- Motion is brief, respects `prefers-reduced-motion`, and never delays data. Richer
+  motion is reserved for spatial inspection and future integration visualizations.
 
 ## Phase 1 component set
 

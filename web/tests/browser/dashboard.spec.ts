@@ -9,7 +9,7 @@ test.beforeEach(async ({ request }) => {
 
 test('public page is factual, accessible, and keeps sign-in visible', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     'Understand system health',
@@ -18,6 +18,24 @@ test('public page is factual, accessible, and keeps sign-in visible', async ({
   await expect(page.getByText('Core switch 1')).toHaveCount(0);
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('public.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+});
+
+test('login carries the same UBNetDef brand shell', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/login');
+  await expect(page.getByRole('img', { name: 'UBNetDef' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('login.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
 });
 
 for (const viewport of [
@@ -90,6 +108,24 @@ test('user dropdown supports keyboard Escape and returns focus', async ({
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('button', { name: 'Sign out' })).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test('primary navigation dropdown opens on hover and closes with Escape', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/dashboard');
+  await waitForHydration(page);
+  const trigger = page.getByRole('button', { name: 'Dashboard' });
+  await trigger.hover();
+  await expect(page.getByRole('link', { name: 'Resources' })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('dashboard-dropdown.png'),
+    animations: 'disabled',
+  });
+  await page.getByRole('link', { name: 'Resources' }).focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('link', { name: 'Resources' })).toHaveCount(0);
   await expect(trigger).toBeFocused();
 });
 

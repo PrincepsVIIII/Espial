@@ -1,0 +1,67 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "23 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            web/package-lock.json
+      - run: npm ci
+      - run: npm ci
+        working-directory: web
+      - run: npm audit --omit=dev --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: web
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+        working-directory: core
+
+  repository-and-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - name: Scan repository configuration and secrets
+        run: >-
+          docker run --rm
+          -v "$GITHUB_WORKSPACE:/workspace:ro"
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          fs --scanners misconfig,secret --exit-code 1 --severity HIGH,CRITICAL --skip-version-check
+          --skip-dirs /workspace/.git --skip-files /workspace/.env.example
+          --skip-files /workspace/deployments/local/database_dsn.example /workspace
+      - name: Build release-shaped images
+        run: |
+          docker build --tag espial-core:security core
+          docker build --tag espial-web:security web
+      - name: Scan Core image
+        run: >-
+          docker run --rm
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          image --scanners vuln --exit-code 1 --severity HIGH,CRITICAL --skip-version-check
+          espial-core:security
+      - name: Scan Web image
+        run: >-
+          docker run --rm
+          aquasec/trivy:0.72.0@sha256:cffe3f5161a47a6823fbd23d985795b3ed72a4c806da4c4df16266c02accdd6f
+          image --scanners vuln --exit-code 1 --severity HIGH,CRITICAL --skip-version-check
+          espial-web:security

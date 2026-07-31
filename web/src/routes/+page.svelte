@@ -1,3 +1,7 @@
+<script lang="ts">
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
+</script>
+
 <svelte:head>
   <title>Espial · UBNetDef Infrastructure Operations</title>
   <meta
@@ -9,10 +13,8 @@
 <div class="public-page">
   <header class="public-header">
     <a class="wordmark" href="/" aria-label="Espial public home">
-      <span class="product-lockup">
-        <span class="product-name">Espial</span>
-        <span class="product-context">UBNetDef Infrastructure Operations</span>
-      </span>
+      <BrandLogo />
+      <span class="espial-product">Espial</span>
     </a>
     <a class="login-link" href="/login">Log in</a>
   </header>

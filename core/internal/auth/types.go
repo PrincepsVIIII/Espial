@@ -15,6 +15,9 @@ var (
 	ErrInvalidCredentials  = errors.New("invalid username or password")
 	ErrRateLimited         = errors.New("too many login attempts")
 	ErrSessionNotFound     = errors.New("session not found")
+	ErrUserNotFound        = errors.New("local user not found")
+	ErrRoleNotFound        = errors.New("role not found")
+	ErrUsernameTaken       = errors.New("username already exists")
 )
 
 type User struct {

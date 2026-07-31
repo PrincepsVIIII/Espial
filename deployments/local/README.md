@@ -6,20 +6,24 @@ never be reused.
 
 ## Start
 
-From the repository root:
+For a new clone, install dependencies and run the initializer:
 
 ```sh
-cp .env.example .env
 npm install
 npm --prefix web ci
-npm run dev
+npm run init
 ```
+
+It creates a random local database secret and `.env` when absent, runs migrations,
+prompts for the initial administrator without echo, and starts the stack. It never
+creates a default password. Use `npm run dev` on later starts.
 
 The default host ports are Web `5173`, Core `18080`, and PostgreSQL `55432`, all
 bound to loopback. Change `ESPIAL_WEB_PORT`, `ESPIAL_CORE_PORT`, or `POSTGRES_PORT`
 in `.env` if needed.
 
-Create the first local administrator in a second terminal:
+If the database exists but has not been bootstrapped, create the first local
+administrator in a second terminal:
 
 ```sh
 docker compose --env-file .env -f deployments/local/compose.yml run --rm core admin bootstrap --username admin

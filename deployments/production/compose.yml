@@ -1,0 +1,168 @@
+x-service-hardening: &service-hardening
+  restart: unless-stopped
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  init: true
+  logging:
+    driver: json-file
+    options:
+      max-size: 10m
+      max-file: "5"
+
+services:
+  proxy:
+    <<: *service-hardening
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    environment:
+      ESPIAL_PUBLIC_HOST: ${ESPIAL_PUBLIC_HOST:?set the HTTPS host name}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    networks: [edge, private]
+    depends_on:
+      web:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256m
+
+  web:
+    <<: *service-hardening
+    image: ${ESPIAL_WEB_IMAGE:?set an immutable Espial Web image reference}
+    environment:
+      ESPIAL_CORE_URL: http://core:8080
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [private]
+    depends_on:
+      core:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:5173/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256m
+
+  migrate:
+    image: ${ESPIAL_CORE_IMAGE:?set an immutable Espial Core image reference}
+    command: [migrate]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      ESPIAL_ENV: production
+      ESPIAL_PUBLIC_URL: https://${ESPIAL_PUBLIC_HOST}
+      ESPIAL_DATABASE_DSN_FILE: /run/secrets/database_owner_dsn
+    secrets: [database_owner_dsn]
+    networks: [private]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  core:
+    <<: *service-hardening
+    image: ${ESPIAL_CORE_IMAGE:?set an immutable Espial Core image reference}
+    environment:
+      ESPIAL_ENV: production
+      ESPIAL_LISTEN_ADDRESS: 0.0.0.0:8080
+      ESPIAL_PUBLIC_URL: https://${ESPIAL_PUBLIC_HOST}
+      ESPIAL_AUTH_MODE: local
+      ESPIAL_DATABASE_DSN_FILE: /run/secrets/database_app_dsn
+      ESPIAL_DATABASE_MIGRATE_ON_START: "false"
+      ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS: ${ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS:-20}
+      ESPIAL_SAMPLE_ADAPTER_EXECUTABLE: /espial-sample-adapter
+      ESPIAL_ADAPTER_GLOBAL_CONCURRENCY: ${ESPIAL_ADAPTER_GLOBAL_CONCURRENCY:-4}
+      ESPIAL_ADAPTER_RECONCILE_INTERVAL: ${ESPIAL_ADAPTER_RECONCILE_INTERVAL:-10s}
+      ESPIAL_FRESHNESS_INTERVAL: ${ESPIAL_FRESHNESS_INTERVAL:-1s}
+      ESPIAL_FRESHNESS_BATCH_SIZE: ${ESPIAL_FRESHNESS_BATCH_SIZE:-100}
+      ESPIAL_EVENT_REPLAY_SIZE: ${ESPIAL_EVENT_REPLAY_SIZE:-1024}
+      ESPIAL_SSE_HEARTBEAT: ${ESPIAL_SSE_HEARTBEAT:-15s}
+      ESPIAL_SSE_MAX_CLIENTS: ${ESPIAL_SSE_MAX_CLIENTS:-100}
+    secrets: [database_app_dsn]
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    networks: [private]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, /espial, healthcheck]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 1g
+
+  postgres:
+    <<: *service-hardening
+    image: postgres:17.10-alpine3.23@sha256:8189a1f6e40904781fc9e2612687877791d21679866db58b1de996b31fc312e4
+    environment:
+      POSTGRES_DB: espial
+      POSTGRES_USER: espial_owner
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_owner_password
+    secrets:
+      - postgres_owner_password
+      - postgres_app_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres-init-app-role.sh:/docker-entrypoint-initdb.d/10-espial-app-role.sh:ro
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /var/run/postgresql:size=16m,mode=3775
+    networks: [private]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U espial_owner -d espial]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    deploy:
+      resources:
+        limits:
+          cpus: "2.00"
+          memory: 2g
+
+networks:
+  edge: {}
+  private:
+    internal: true
+
+volumes:
+  postgres-data: {}
+  caddy-data: {}
+  caddy-config: {}
+
+secrets:
+  postgres_owner_password:
+    file: ${ESPIAL_POSTGRES_OWNER_PASSWORD_FILE:?set the owner password secret path}
+  postgres_app_password:
+    file: ${ESPIAL_POSTGRES_APP_PASSWORD_FILE:?set the app password secret path}
+  database_owner_dsn:
+    file: ${ESPIAL_DATABASE_OWNER_DSN_FILE:?set the migration DSN secret path}
+  database_app_dsn:
+    file: ${ESPIAL_DATABASE_APP_DSN_FILE:?set the runtime DSN secret path}

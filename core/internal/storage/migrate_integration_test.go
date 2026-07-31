@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 6 {
+	if migrationCount != 7 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -90,6 +90,18 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	}
 	if roleCount != 3 {
 		t.Fatalf("role count = %d", roleCount)
+	}
+
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO audit_events (id, action, target_type, result, correlation_id)
+		VALUES (gen_random_uuid(), 'migration.test', 'audit', 'succeeded', 'migration-test')`); err != nil {
+		t.Fatalf("insert audit event: %v", err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE audit_events SET result = 'failed' WHERE action = 'migration.test'"); err == nil {
+		t.Fatal("audit event update was accepted")
+	}
+	if _, err := pool.Exec(ctx, "DELETE FROM audit_events WHERE action = 'migration.test'"); err == nil {
+		t.Fatal("audit event deletion was accepted")
 	}
 }
 

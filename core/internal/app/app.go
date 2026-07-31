@@ -30,11 +30,13 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
-	migrationContext, cancelMigration := context.WithTimeout(processContext, cfg.Database.MigrationTimeout)
-	err = storage.Migrate(migrationContext, pool)
-	cancelMigration()
-	if err != nil {
-		return fmt.Errorf("migrate database: %w", err)
+	if cfg.Database.MigrateOnStart {
+		migrationContext, cancelMigration := context.WithTimeout(processContext, cfg.Database.MigrationTimeout)
+		err = storage.Migrate(migrationContext, pool)
+		cancelMigration()
+		if err != nil {
+			return fmt.Errorf("migrate database: %w", err)
+		}
 	}
 	authService, err := auth.NewService(pool, authOptions(cfg))
 	if err != nil {
@@ -112,24 +114,74 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) 
 
 // BootstrapAdmin creates the one-time local administrator account.
 func BootstrapAdmin(ctx context.Context, cfg config.Config, username, password string) (auth.User, error) {
-	pool, err := openDatabase(ctx, cfg)
+	service, closeService, err := localAuthService(ctx, cfg)
 	if err != nil {
 		return auth.User{}, err
 	}
-	defer pool.Close()
+	defer closeService()
+	return service.BootstrapAdmin(ctx, username, password, "bootstrap-cli", "")
+}
+
+// CreateLocalUser creates a supported host-administered local account.
+func CreateLocalUser(ctx context.Context, cfg config.Config, username, password, role string) (auth.User, error) {
+	service, closeService, err := localAuthService(ctx, cfg)
+	if err != nil {
+		return auth.User{}, err
+	}
+	defer closeService()
+	return service.CreateLocalUser(ctx, username, password, role, "admin-cli")
+}
+
+// AssignLocalRole replaces a user's role and immediately revokes their sessions.
+func AssignLocalRole(ctx context.Context, cfg config.Config, username, role string) error {
+	service, closeService, err := localAuthService(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer closeService()
+	return service.AssignRole(ctx, username, role, "admin-cli")
+}
+
+// ResetLocalPassword replaces a credential and immediately revokes sessions.
+func ResetLocalPassword(ctx context.Context, cfg config.Config, username, password string) error {
+	service, closeService, err := localAuthService(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer closeService()
+	return service.ResetLocalPassword(ctx, username, password, "admin-cli")
+}
+
+// SetLocalUserEnabled changes account availability and immediately revokes sessions.
+func SetLocalUserEnabled(ctx context.Context, cfg config.Config, username string, enabled bool) error {
+	service, closeService, err := localAuthService(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer closeService()
+	return service.SetLocalUserEnabled(ctx, username, enabled, "admin-cli")
+}
+
+func localAuthService(ctx context.Context, cfg config.Config) (*auth.Service, func(), error) {
+	pool, err := openDatabase(ctx, cfg)
+	if err != nil {
+		return nil, func() {}, err
+	}
 
 	migrationContext, cancelMigration := context.WithTimeout(ctx, cfg.Database.MigrationTimeout)
 	err = storage.Migrate(migrationContext, pool)
 	cancelMigration()
 	if err != nil {
-		return auth.User{}, fmt.Errorf("migrate database: %w", err)
+		pool.Close()
+		return nil, func() {}, fmt.Errorf("migrate database: %w", err)
 	}
 
 	service, err := auth.NewService(pool, authOptions(cfg))
 	if err != nil {
-		return auth.User{}, fmt.Errorf("initialize authentication: %w", err)
+		pool.Close()
+		return nil, func() {}, fmt.Errorf("initialize authentication: %w", err)
 	}
-	return service.BootstrapAdmin(ctx, username, password, "bootstrap-cli", "")
+	return service, pool.Close, nil
 }
 
 // Migrate applies pending database migrations and exits.

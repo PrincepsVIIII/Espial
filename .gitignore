@@ -1,5 +1,9 @@
 .DS_Store
 .env
+deployments/local/database_dsn.local
+deployments/production/.env
+deployments/production/secrets/*
+!deployments/production/secrets/README.md
 .env.*
 !.env.example
 node_modules/

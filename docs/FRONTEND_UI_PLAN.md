@@ -37,27 +37,25 @@ The product name is **Espial**. UBNetDef should remain clearly visible as the or
 
 The visual identity should combine:
 
-- a deep navy/dark-blue application frame, with official UB Blue used sparingly for
-  brand reference, selected state, and primary actions
+- the supplied UBNetDef logo, used unmodified, with its cyan as the primary accent
+- a near-black canvas that visually recedes behind deep navy application chrome
 - dark neutral surfaces
 - clear operational status colors
 - compact information density
 - strong typography
-- restrained motion
+- restrained static chrome and high-impact purposeful spatial motion
 - clear diagrams and physical layouts
 
 UBNetDef attribution is part of the product chrome, not footer-only decoration.
-Login and persistent navigation use `Espial / UBNetDef Infrastructure Operations`
-or the compact equivalent. The top navigation is visually darker than UB Blue:
-Harriman Blue (`#002f56`) or a nearby deep navy anchors the frame, while UB Blue
-(`#005bbb`) is a restrained selection/action accent. A subtle dark-blue-only linear
-gradient may distinguish structural navigation from content if it improves depth;
-flat dark blue remains the fallback. Green is operational status, never branding.
+Login and persistent navigation use the supplied UBNetDef mark with `Espial`
+identified alongside it as the product. The top navigation is a padded-down,
+floating dark rectangle with restrained rounded corners. Cyan is the restrained
+selection/action accent, white is the hover/current underline, and green is
+operational status only.
 
 ### 3.2 Avoid
 
-- bright, multicolor, pastel, radial, or ambient gradients; a restrained linear
-  gradient between adjacent dark-blue navigation tokens is the only exception
+- gradients, ambient color fields, or textured backgrounds
 - excessive glow or neon effects
 - oversized rounded cards
 - fake terminal decorations
@@ -78,14 +76,16 @@ these patterns is incomplete even when its routes and data loading work.
 
 Each status should use more than color alone.
 
-| State | Visual treatment |
-|---|---|
-| Healthy | icon, label, and calm success color |
-| Warning | icon, label, and amber treatment |
-| Critical | icon, label, and strong high-contrast treatment |
-| Unknown | question or disconnected icon with neutral treatment |
-| Stale | clock icon, timestamp emphasis, and muted warning treatment |
-| Maintenance | wrench icon and explicit maintenance label |
+| State       | Visual treatment                                     |
+| ----------- | ---------------------------------------------------- |
+| Healthy     | visible label and calm success color                 |
+| Warning     | visible label and amber treatment                    |
+| Critical    | visible label and strong high-contrast treatment     |
+| Unknown     | visible label with neutral treatment                 |
+| Stale       | visible label, timestamp emphasis, and muted warning |
+| Maintenance | visible label and explicit maintenance treatment     |
+
+Icons and shapes are optional cues for dense views, not mandatory decoration.
 
 ## 4. Information architecture
 
@@ -99,10 +99,11 @@ Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  |  Li
 
 These target `/dashboard`, `/alerts`, `/datacenter`, `/hypervisor`, and `/webpages`.
 Dashboard is the default destination after login; Datacenter remains one primary
-navigation action away. Child-route dropdowns may be added only when a section has
-real children. Dropdowns support click and keyboard activation, arrow-key movement,
-`Escape` to close, visible focus, and route-aware selected state; they do not open
-on hover alone. Unimplemented areas show an honest unavailable or not-configured
+navigation action away. Dropdowns contain real destinations or actions. On desktop
+they reveal on pointer hover and keyboard focus, also support click/touch activation,
+arrow-key movement, `Escape` to close, visible focus, and route-aware selected state.
+Hovered, focused, and current labels receive a short white underline instead of a
+filled highlight. Unimplemented areas show an honest unavailable or not-configured
 state rather than fake content. On narrow screens the same items collapse behind
 one menu button without changing their order.
 

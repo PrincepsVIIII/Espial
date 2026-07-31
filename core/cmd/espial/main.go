@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/app"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
@@ -30,7 +34,15 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stdout, version)
 		return 0
 	}
-	if len(args) != 1 && !(len(args) == 4 && args[0] == "admin" && args[1] == "bootstrap" && args[2] == "--username") {
+	if len(args) == 1 && args[0] == "healthcheck" {
+		if err := healthcheck(ctx); err != nil {
+			fmt.Fprintf(stderr, "healthcheck failed: %v\n", err)
+			return 1
+		}
+		return 0
+	}
+	admin, adminOK := parseAdminCommand(args)
+	if len(args) != 1 && !adminOK {
 		printUsage(stderr)
 		return 2
 	}
@@ -48,15 +60,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 	case "migrate":
 		err = app.Migrate(ctx, cfg)
 	case "admin":
-		var password string
-		password, err = readPassword(os.Stdin, stderr)
-		if err == nil {
-			var user auth.User
-			user, err = app.BootstrapAdmin(ctx, cfg, args[3], password)
-			if err == nil {
-				fmt.Fprintf(stdout, "bootstrapped local administrator %q\n", user.Username)
-			}
-		}
+		err = runAdmin(ctx, cfg, admin, os.Stdin, stdout, stderr)
 	default:
 		printUsage(stderr)
 		return 2
@@ -69,8 +73,104 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) int {
 }
 
 func printUsage(output io.Writer) {
-	fmt.Fprintln(output, "usage: espial <serve|migrate|version>")
+	fmt.Fprintln(output, "usage: espial <serve|migrate|version|healthcheck>")
 	fmt.Fprintln(output, "       espial admin bootstrap --username NAME")
+	fmt.Fprintln(output, "       espial admin user create --username NAME --role ROLE")
+	fmt.Fprintln(output, "       espial admin user role --username NAME --role ROLE")
+	fmt.Fprintln(output, "       espial admin user password --username NAME")
+	fmt.Fprintln(output, "       espial admin user <enable|disable> --username NAME")
+}
+
+type adminCommand struct {
+	operation string
+	username  string
+	role      string
+}
+
+func parseAdminCommand(args []string) (adminCommand, bool) {
+	if len(args) == 4 && args[0] == "admin" && args[1] == "bootstrap" && args[2] == "--username" {
+		return adminCommand{operation: "bootstrap", username: args[3]}, true
+	}
+	if len(args) == 7 && args[0] == "admin" && args[1] == "user" &&
+		(args[2] == "create" || args[2] == "role") && args[3] == "--username" && args[5] == "--role" {
+		return adminCommand{operation: args[2], username: args[4], role: args[6]}, true
+	}
+	if len(args) == 5 && args[0] == "admin" && args[1] == "user" &&
+		(args[2] == "password" || args[2] == "enable" || args[2] == "disable") && args[3] == "--username" {
+		return adminCommand{operation: args[2], username: args[4]}, true
+	}
+	return adminCommand{}, false
+}
+
+func runAdmin(ctx context.Context, cfg config.Config, command adminCommand, input io.Reader, stdout, stderr io.Writer) error {
+	switch command.operation {
+	case "bootstrap", "create", "password":
+		password, err := readPassword(input, stderr)
+		if err != nil {
+			return err
+		}
+		switch command.operation {
+		case "bootstrap":
+			user, err := app.BootstrapAdmin(ctx, cfg, command.username, password)
+			if err == nil {
+				fmt.Fprintf(stdout, "bootstrapped local administrator %q\n", user.Username)
+			}
+			return err
+		case "create":
+			user, err := app.CreateLocalUser(ctx, cfg, command.username, password, command.role)
+			if err == nil {
+				fmt.Fprintf(stdout, "created local user %q with role %q\n", user.Username, command.role)
+			}
+			return err
+		default:
+			err := app.ResetLocalPassword(ctx, cfg, command.username, password)
+			if err == nil {
+				fmt.Fprintf(stdout, "reset local password for %q and revoked existing sessions\n", auth.NormalizeUsername(command.username))
+			}
+			return err
+		}
+	case "role":
+		err := app.AssignLocalRole(ctx, cfg, command.username, command.role)
+		if err == nil {
+			fmt.Fprintf(stdout, "assigned role %q to %q and revoked existing sessions\n", command.role, auth.NormalizeUsername(command.username))
+		}
+		return err
+	case "enable", "disable":
+		enabled := command.operation == "enable"
+		err := app.SetLocalUserEnabled(ctx, cfg, command.username, enabled)
+		if err == nil {
+			fmt.Fprintf(stdout, "%sd local user %q and revoked existing sessions\n", command.operation, auth.NormalizeUsername(command.username))
+		}
+		return err
+	default:
+		return errors.New("unsupported administrator command")
+	}
+}
+
+func healthcheck(ctx context.Context) error {
+	address := strings.TrimSpace(os.Getenv("ESPIAL_LISTEN_ADDRESS"))
+	if address == "" {
+		address = "127.0.0.1:8080"
+	}
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return fmt.Errorf("invalid listen address: %w", err)
+	}
+	requestContext, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	request, err := http.NewRequestWithContext(requestContext, http.MethodGet, "http://127.0.0.1:"+port+"/api/v1/health/ready", nil)
+	if err != nil {
+		return err
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("readiness returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }
 
 func readPassword(input io.Reader, output io.Writer) (string, error) {

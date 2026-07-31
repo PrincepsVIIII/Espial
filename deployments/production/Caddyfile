@@ -1,0 +1,25 @@
+{
+	admin off
+}
+
+https://{$ESPIAL_PUBLIC_HOST} {
+	encode zstd gzip
+
+	@api path /api/*
+	handle @api {
+		reverse_proxy core:8080 {
+			flush_interval -1
+			stream_timeout 24h
+			stream_close_delay 5m
+		}
+	}
+
+	handle {
+		reverse_proxy web:5173
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+}

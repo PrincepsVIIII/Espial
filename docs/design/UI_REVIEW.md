@@ -198,3 +198,53 @@ layout and behavior but are never compiled into or displayed by the production U
   menus, 401/403/outage behavior, live reconnect, full resync, reduced motion, and
   large/laptop/narrow captures.
 - Production SvelteKit SSR build completed successfully.
+
+## 2026-07-31 — UBNetDef minimalist shell and navigation review
+
+### Scope
+
+Reviewed the supplied UBNetDef logo integration, public and login entry points,
+authenticated shell, desktop dropdowns, narrow navigation, Dashboard status
+treatment, and the updated guidance against the
+[general UI guidance](UI_GUIDANCE.md) and
+[design system](DESIGN_SYSTEM.md).
+
+### Material decisions
+
+- Used the supplied logo unmodified in a shared component across public, login, and
+  authenticated chrome. `Espial` remains adjacent product context rather than part
+  of a reconstructed mark.
+- Derived the primary accent from the logo cyan and moved the canvas to a quieter
+  near-black. Flat tonal contrast, thin borders, and spacing separate content from
+  the background without gradients, glow, blur, ambient fields, or shadows.
+- Changed the top bar into a padded-down floating rectangle with restrained rounded
+  corners. Desktop labels use a short white hover/focus/current rule instead of
+  filled hover tiles.
+- Added real destination dropdowns that reveal on hover or keyboard focus, remain
+  available by click/touch, and close with `Escape` while returning focus. Narrow
+  layouts retain the direct five-link menu and account actions.
+- Removed decorative live, unavailable, refresh, summary, and row-status glyphs.
+  Operational states retain explicit text and semantic color/border cues, so color
+  is not the only carrier of meaning.
+- Reaffirmed that ambitious motion belongs to datacenter inspection and future
+  Proxmox/integration visualizations; the persistent shell remains calm.
+
+### Visual review
+
+- Inspected public, login, authenticated Dashboard, and open-dropdown captures.
+- At 1440px and 1280px, the logo, five primary labels, live text, and account menu
+  fit inside the floating bar; the canvas remains visible around the chrome.
+- At 500px, the bar stays detached from the viewport edge, the menu preserves route
+  order and sign out, and resource fields remain available in labeled stacked rows.
+- The open dropdown aligns below its label, preserves the white underline, and does
+  not move page content. No decorative icon or filled hover treatment was added.
+
+### Verification evidence
+
+- Svelte diagnostics: zero errors and zero warnings.
+- Unit/contract suite: 37 tests passed.
+- Chromium suite: 13 tests passed, including public and Dashboard accessibility,
+  public/login/large/laptop/narrow/open-dropdown captures, hover navigation,
+  keyboard `Escape` focus return, and reduced motion.
+- Production SvelteKit SSR build and formatting checks completed successfully.
+- Documentation links passed across 51 Markdown files.

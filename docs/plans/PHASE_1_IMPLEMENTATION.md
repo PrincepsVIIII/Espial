@@ -1,6 +1,7 @@
 # Phase 1 implementation plan: monitoring foundation
 
-**Status:** In progress
+**Status:** Complete (2026-07-31); production deployment remains gated by the
+explicitly owned environment and upstream-image blockers.
 **Inputs:** [Roadmap](../ROADMAP.md), [backend plan](../BACKEND_PLAN.md),
 [frontend/UI plan](../FRONTEND_UI_PLAN.md), and the accepted
 [Phase 0 baseline](../phase-0/README.md)
@@ -21,7 +22,7 @@ Updated 2026-07-31:
 | 1.5 Scheduler, ingestion, audit, events | Implemented | Deterministic bounded scheduling, runtime ownership, atomic collection/audit records, DB-safe freshness, bounded replay/resync hub, and PostgreSQL race/end-to-end tests |
 | 1.6 Versioned REST and SSE API | Implemented | Authenticated overview/resource/integration/audit APIs, stable bounded cursors, optimistic integration writes, bounded SSE replay/revalidation, shared schemas, checked OpenAPI, fuzz/race/PostgreSQL tests |
 | 1.7 SvelteKit operational UI | Implemented | SSR session/monitoring loaders, typed API client, authoritative Dashboard counts/integrations/resources, URL filters, SSE reconnect/resync, responsive status UI, accessibility and three-viewport browser tests |
-| 1.8 Deployment acceptance | Planned | Deployment hardening and the clean-stack vertical acceptance scenario remain |
+| 1.8 Deployment acceptance | Implemented | One-command initialization, audited account administration, hardened production example, append-only audit enforcement, security workflows/threat review, operator runbooks, resource evidence, and automated ten-step clean-stack acceptance |
 
 The local stack has been exercised against PostgreSQL 17. Liveness remains HTTP
 200 during database loss while readiness returns HTTP 503 and recovers after the
@@ -684,30 +685,30 @@ needed if the Phase 1 boundary is respected.
 
 Phase 1 is complete only when all are true:
 
-- [ ] Core and Web run as separate processes and can be upgraded independently.
-- [ ] Local authentication is safe, audited, and role enforcement is proven directly
+- [x] Core and Web run as separate processes and can be upgraded independently.
+- [x] Local authentication is safe, audited, and role enforcement is proven directly
   against Core; the SSO provider boundary and insertion plan remain intact.
-- [ ] A sample adapter passes conformance and reports normalized health without Core
+- [x] A sample adapter passes conformance and reports normalized health without Core
   changes.
-- [ ] Adapter crash/hang/malformed output is isolated and drives stale/unknown state.
-- [ ] PostgreSQL migrations, transactional ingestion, and current health are tested.
-- [ ] Operators can see current counts, integration health, resources, timestamps,
+- [x] Adapter crash/hang/malformed output is isolated and drives stale/unknown state.
+- [x] PostgreSQL migrations, transactional ingestion, and current health are tested.
+- [x] Operators can see current counts, integration health, resources, timestamps,
   and live connection state in an accessible Svelte UI.
-- [ ] The public root explains Espial without operational disclosure and keeps
+- [x] The public root explains Espial without operational disclosure and keeps
   sign-in available at the top right.
-- [ ] Authenticated primary navigation uses an accessible top bar and presents
+- [x] Authenticated primary navigation uses an accessible top bar and presents
   Dashboard, Alerts, Datacenter, Hypervisor, and Webpages in that order on narrow
   screens as well as desktop.
-- [ ] Login, shell, Dashboard, Alerts, Datacenter, loading, empty, error, and
+- [x] Login, shell, Dashboard, Alerts, Datacenter, loading, empty, error, and
   monitoring states share the reviewed dark UBNetDef visual language and pass the
   design-system review gate.
-- [ ] SSE improves freshness but loss/reconnect never corrupts authoritative state.
-- [ ] Administrative and authentication activity has redacted audit evidence.
-- [ ] Graceful shutdown, race-sensitive code, bounded queues, and leak-prone adapter
+- [x] SSE improves freshness but loss/reconnect never corrupts authoritative state.
+- [x] Administrative and authentication activity has redacted audit evidence.
+- [x] Graceful shutdown, race-sensitive code, bounded queues, and leak-prone adapter
   lifecycle paths pass automated checks.
-- [ ] Local deployment, production example, bootstrap, backup/restore, upgrade, and
+- [x] Local deployment, production example, bootstrap, backup/restore, upgrade, and
   recovery documentation have been exercised.
-- [ ] Production-specific unknowns are either resolved or explicitly block production
+- [x] Production-specific unknowns are either resolved or explicitly block production
   without blocking continued development.
 
 After these criteria pass, Phase 2 can build incidents and notifications on a

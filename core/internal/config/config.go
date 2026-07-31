@@ -41,6 +41,7 @@ type Server struct {
 
 type Database struct {
 	DSNFile            string
+	MigrateOnStart     bool
 	MaxOpenConnections int32
 	ConnectTimeout     time.Duration
 	MigrationTimeout   time.Duration
@@ -97,6 +98,7 @@ func defaults() Config {
 			SSEMaxClients:     100,
 		},
 		Database: Database{
+			MigrateOnStart:     true,
 			MaxOpenConnections: 20,
 			ConnectTimeout:     5 * time.Second,
 			MigrationTimeout:   2 * time.Minute,
@@ -126,6 +128,7 @@ type fileConfig struct {
 	} `json:"server"`
 	Database struct {
 		DSNFile            string `json:"dsn_file"`
+		MigrateOnStart     *bool  `json:"migrate_on_start"`
 		MaxOpenConnections *int32 `json:"max_open_connections"`
 		ConnectTimeout     string `json:"connect_timeout"`
 		MigrationTimeout   string `json:"migration_timeout"`
@@ -205,6 +208,9 @@ func applyFile(cfg *Config, name string) error {
 	}
 	if values.Database.DSNFile != "" {
 		cfg.Database.DSNFile = values.Database.DSNFile
+	}
+	if values.Database.MigrateOnStart != nil {
+		cfg.Database.MigrateOnStart = *values.Database.MigrateOnStart
 	}
 	if values.Database.MaxOpenConnections != nil {
 		cfg.Database.MaxOpenConnections = *values.Database.MaxOpenConnections
@@ -297,6 +303,7 @@ func (cfg Config) SafeSummary() map[string]any {
 		"auth_session_absolute":         cfg.Auth.SessionAbsolute,
 		"auth_lockout_duration":         cfg.Auth.LockoutDuration,
 		"database_dsn_configured":       cfg.Database.DSNFile != "",
+		"database_migrate_on_start":     cfg.Database.MigrateOnStart,
 		"database_max_open_connections": cfg.Database.MaxOpenConnections,
 		"database_connect_timeout":      cfg.Database.ConnectTimeout,
 		"database_migration_timeout":    cfg.Database.MigrationTimeout,
@@ -355,6 +362,13 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_DATABASE_DSN_FILE")); value != "" {
 		cfg.Database.DSNFile = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_DATABASE_MIGRATE_ON_START")); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_DATABASE_MIGRATE_ON_START: %w", err)
+		}
+		cfg.Database.MigrateOnStart = parsed
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS")); value != "" {
 		count, err := strconv.ParseInt(value, 10, 32)

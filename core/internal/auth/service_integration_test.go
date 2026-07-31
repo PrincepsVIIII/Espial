@@ -147,6 +147,60 @@ func TestLoginLockoutSessionExpiryRoleRefreshAndRevocation(t *testing.T) {
 	}
 }
 
+func TestLocalUserAdministrationIsAuditedAndRevokesSessions(t *testing.T) {
+	pool := authTestPool(t)
+	service := testService(t, pool, nil)
+	ctx := context.Background()
+	user, err := service.CreateLocalUser(ctx, "phase-viewer", "A viewer password phrase 90210", "viewer", "create-user")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(user.Roles) != 1 || user.Roles[0] != "viewer" || user.HasPermission("audit:read") {
+		t.Fatalf("created user = %#v", user)
+	}
+	if _, err := service.CreateLocalUser(ctx, "phase-viewer", "Another viewer password 90210", "viewer", "duplicate"); !errors.Is(err, ErrUsernameTaken) {
+		t.Fatalf("duplicate user error = %v", err)
+	}
+	if _, err := service.CreateLocalUser(ctx, "missing-role", "A missing role password 90210", "owner", "missing-role"); !errors.Is(err, ErrRoleNotFound) {
+		t.Fatalf("missing role error = %v", err)
+	}
+
+	session, err := service.Login(ctx, user.Username, "A viewer password phrase 90210", "127.0.0.1", "viewer-login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.AssignRole(ctx, user.Username, "operator", "assign-role"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Authenticate(ctx, session.Token); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("role assignment did not revoke session: %v", err)
+	}
+
+	if err := service.ResetLocalPassword(ctx, user.Username, "A replacement password phrase 90210", "reset-password"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Login(ctx, user.Username, "A viewer password phrase 90210", "127.0.0.1", "old-password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("old password login = %v", err)
+	}
+	if err := service.SetLocalUserEnabled(ctx, user.Username, false, "disable-user"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Login(ctx, user.Username, "A replacement password phrase 90210", "127.0.0.1", "disabled-login"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("disabled login = %v", err)
+	}
+	if err := service.SetLocalUserEnabled(ctx, user.Username, true, "enable-user"); err != nil {
+		t.Fatal(err)
+	}
+
+	var actions int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM audit_events
+		WHERE action IN ('auth.local.user.created', 'auth.role.assigned', 'auth.password.reset', 'auth.user.disabled', 'auth.user.enabled')
+		  AND target_id = $1`, user.ID).Scan(&actions); err != nil || actions != 5 {
+		t.Fatalf("administrative audit events = %d, %v", actions, err)
+	}
+}
+
 func testService(t *testing.T, pool *pgxpool.Pool, now func() time.Time) *Service {
 	t.Helper()
 	options := DefaultOptions()

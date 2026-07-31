@@ -150,6 +150,196 @@ func (service *Service) BootstrapAdmin(ctx context.Context, username, password, 
 	}, nil
 }
 
+// CreateLocalUser creates an audited local account with one built-in role. This is
+// intentionally exposed to the host-side administrative CLI, not the public API.
+func (service *Service) CreateLocalUser(ctx context.Context, username, password, role, requestID string) (User, error) {
+	username = NormalizeUsername(username)
+	role = strings.ToLower(strings.TrimSpace(role))
+	if err := validateUsername(username); err != nil {
+		return User{}, err
+	}
+	passwordHash, err := service.options.Hasher.Hash(password)
+	if err != nil {
+		return User{}, err
+	}
+
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return User{}, fmt.Errorf("begin local user creation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	var roleID string
+	var permissions []string
+	if err := tx.QueryRow(ctx, `
+		SELECT id::text, ARRAY(SELECT jsonb_array_elements_text(permissions) ORDER BY 1)
+		FROM roles WHERE name = $1`, role).Scan(&roleID, &permissions); errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrRoleNotFound
+	} else if err != nil {
+		return User{}, fmt.Errorf("load local user role: %w", err)
+	}
+	var userID string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (id, username, display_name, identity_provider, external_subject)
+		VALUES (gen_random_uuid(), $1, $1, 'local', $1)
+		ON CONFLICT DO NOTHING
+		RETURNING id::text`, username).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return User{}, ErrUsernameTaken
+	}
+	if err != nil {
+		return User{}, fmt.Errorf("create local user: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)", userID, passwordHash); err != nil {
+		return User{}, fmt.Errorf("store local user credential: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)", userID, roleID); err != nil {
+		return User{}, fmt.Errorf("grant local user role: %w", err)
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		Action: "auth.local.user.created", TargetType: "user", TargetID: userID,
+		Result: "succeeded", CorrelationID: requestID,
+	}); err != nil {
+		return User{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return User{}, fmt.Errorf("commit local user creation: %w", err)
+	}
+	return User{ID: userID, Username: username, DisplayName: username, Roles: []string{role}, Permissions: permissions}, nil
+}
+
+// AssignRole replaces a local user's roles with one built-in role and revokes all
+// sessions so the new authorization boundary is immediate.
+func (service *Service) AssignRole(ctx context.Context, username, role, requestID string) error {
+	username = NormalizeUsername(username)
+	role = strings.ToLower(strings.TrimSpace(role))
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin role assignment: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	userID, err := localUserID(ctx, tx, username)
+	if err != nil {
+		return err
+	}
+	var roleID string
+	if err := tx.QueryRow(ctx, "SELECT id::text FROM roles WHERE name = $1", role).Scan(&roleID); errors.Is(err, pgx.ErrNoRows) {
+		return ErrRoleNotFound
+	} else if err != nil {
+		return fmt.Errorf("load role: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM user_roles WHERE user_id = $1", userID); err != nil {
+		return fmt.Errorf("remove existing roles: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)", userID, roleID); err != nil {
+		return fmt.Errorf("assign role: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", userID); err != nil {
+		return fmt.Errorf("revoke sessions after role assignment: %w", err)
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		Action: "auth.role.assigned", TargetType: "user", TargetID: userID,
+		Result: "succeeded", CorrelationID: requestID,
+	}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit role assignment: %w", err)
+	}
+	return nil
+}
+
+// ResetLocalPassword replaces a password, clears lockout state, and revokes all
+// existing sessions without ever returning or logging the credential.
+func (service *Service) ResetLocalPassword(ctx context.Context, username, password, requestID string) error {
+	username = NormalizeUsername(username)
+	passwordHash, err := service.options.Hasher.Hash(password)
+	if err != nil {
+		return err
+	}
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin password reset: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	userID, err := localUserID(ctx, tx, username)
+	if err != nil {
+		return err
+	}
+	result, err := tx.Exec(ctx, `
+		UPDATE local_credentials
+		SET password_hash = $2, password_changed_at = now(), failed_attempts = 0, locked_until = NULL
+		WHERE user_id = $1`, userID, passwordHash)
+	if err != nil {
+		return fmt.Errorf("reset local password: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return ErrUserNotFound
+	}
+	if _, err := tx.Exec(ctx, "UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", userID); err != nil {
+		return fmt.Errorf("revoke sessions after password reset: %w", err)
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		Action: "auth.password.reset", TargetType: "user", TargetID: userID,
+		Result: "succeeded", CorrelationID: requestID,
+	}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit password reset: %w", err)
+	}
+	return nil
+}
+
+// SetLocalUserEnabled changes account availability and revokes sessions. It is safe
+// to call repeatedly and still leaves an audit record of the administrative action.
+func (service *Service) SetLocalUserEnabled(ctx context.Context, username string, enabled bool, requestID string) error {
+	username = NormalizeUsername(username)
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin user status change: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	userID, err := localUserID(ctx, tx, username)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE users SET enabled = $2, updated_at = now() WHERE id = $1", userID, enabled); err != nil {
+		return fmt.Errorf("change local user status: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL", userID); err != nil {
+		return fmt.Errorf("revoke sessions after user status change: %w", err)
+	}
+	action := "auth.user.disabled"
+	if enabled {
+		action = "auth.user.enabled"
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		Action: action, TargetType: "user", TargetID: userID,
+		Result: "succeeded", CorrelationID: requestID,
+	}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit user status change: %w", err)
+	}
+	return nil
+}
+
+func localUserID(ctx context.Context, tx pgx.Tx, username string) (string, error) {
+	var userID string
+	err := tx.QueryRow(ctx, `
+		SELECT id::text FROM users
+		WHERE lower(username) = lower($1) AND identity_provider = 'local'
+		FOR UPDATE`, username).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", ErrUserNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("load local user: %w", err)
+	}
+	return userID, nil
+}
+
 func (service *Service) Login(ctx context.Context, username, password, sourceAddress, requestID string) (Session, error) {
 	now := service.options.Now().UTC()
 	if !service.options.LoginLimiter.Allow(sourceAddress, now) {

@@ -15,6 +15,7 @@ const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
 const overviewRedirect = source('../routes/(app)/overview/+page.ts');
 const stylesheet = source('../styles.css');
+const brandLogo = source('../lib/components/BrandLogo.svelte');
 
 describe('public entry contract', () => {
   it('identifies Espial and UBNetDef and keeps login at the public root', () => {
@@ -35,13 +36,15 @@ describe('public entry contract', () => {
 describe('authenticated shell contract', () => {
   it('keeps the five primary routes in the required order', () => {
     const expected = [
-      "{ label: 'Dashboard', href: '/dashboard' }",
-      "{ label: 'Alerts', href: '/alerts' }",
-      "{ label: 'Datacenter', href: '/datacenter' }",
-      "{ label: 'Hypervisor', href: '/hypervisor' }",
-      "{ label: 'Webpages', href: '/webpages' }",
+      '/dashboard',
+      '/alerts',
+      '/datacenter',
+      '/hypervisor',
+      '/webpages',
     ];
-    const positions = expected.map((item) => appShell.indexOf(item));
+    const positions = expected.map((href) =>
+      appShell.indexOf(`href: '${href}'`),
+    );
     expect(positions.every((position) => position >= 0)).toBe(true);
     expect(positions).toEqual([...positions].sort((a, b) => a - b));
   });
@@ -52,6 +55,15 @@ describe('authenticated shell contract', () => {
     expect(appShell).not.toMatch(/class="sidebar"|<aside/i);
     expect(stylesheet).toContain('.primary-nav.open');
     expect(stylesheet).not.toContain('.sidebar');
+  });
+
+  it('uses the supplied brand asset and minimalist floating navigation contract', () => {
+    expect(appShell).toContain('BrandLogo compact');
+    expect(brandLogo).toContain('data:image/png;base64');
+    expect(stylesheet).toContain('.nav-label::after');
+    expect(stylesheet).toContain('background: var(--hayes-white)');
+    expect(stylesheet).toContain('.nav-dropdown');
+    expect(stylesheet).toMatch(/\.app-header\s*\{[\s\S]*?top:\s*1rem/);
   });
 
   it('loads the session through SvelteKit and has a Core-unavailable state', () => {

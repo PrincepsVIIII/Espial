@@ -3,6 +3,7 @@
   import { page } from '$app/state';
   import { onMount } from 'svelte';
   import { safeReturnTo } from '$lib/auth';
+  import BrandLogo from '$lib/components/BrandLogo.svelte';
 
   let username = '';
   let password = '';
@@ -41,9 +42,9 @@
 <main class="login-page">
   <div class="login-frame">
     <header class="login-header">
-      <div class="product-lockup">
-        <span class="product-name">Espial</span>
-        <span class="product-context">UBNetDef Infrastructure Operations</span>
+      <div class="wordmark" aria-label="Espial by UBNetDef">
+        <BrandLogo />
+        <span class="espial-product">Espial</span>
       </div>
       <a class="public-home-link" href="/">Public overview</a>
     </header>

@@ -19,9 +19,7 @@
     <p class="eyebrow">{eyebrow}</p>
     <h1>{title}</h1>
   </div>
-  <span class="state-label state-unknown"
-    ><i aria-hidden="true"></i>Not available</span
-  >
+  <span class="state-label state-unknown">Not available</span>
 </header>
 
 <section class="state-panel" aria-labelledby="availability-title">
@@ -32,7 +30,7 @@
     </h2>
     <p>{description}</p>
   </div>
-  <div class="planned-scope">
+  <div class="planned-scope" id="planned-scope">
     <h3>Planned scope</h3>
     <ul>
       {#each planned as item}

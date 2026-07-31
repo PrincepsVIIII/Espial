@@ -59,7 +59,6 @@
 
 {#if navigating.to?.url.pathname === '/dashboard'}
   <div class="refresh-notice" aria-live="polite">
-    <span class="activity-mark" aria-hidden="true"></span>
     Refreshing monitoring data…
   </div>
 {/if}
@@ -79,9 +78,6 @@
         {@const presentation = statusPresentation(state)}
         <div class={`count-${presentation.className}`}>
           <dt>
-            <span class="status-icon" aria-hidden="true"
-              >{presentation.icon}</span
-            >
             {presentation.label}
           </dt>
           <dd>{countFor(data.overview, state)}</dd>

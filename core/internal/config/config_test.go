@@ -19,6 +19,7 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_SSE_HEARTBEAT":                 "12s",
 		"ESPIAL_SSE_MAX_CLIENTS":               "75",
 		"ESPIAL_DATABASE_DSN_FILE":             "/run/secrets/test_dsn",
+		"ESPIAL_DATABASE_MIGRATE_ON_START":     "false",
 		"ESPIAL_DATABASE_MAX_OPEN_CONNECTIONS": "8",
 		"ESPIAL_DATABASE_CONNECT_TIMEOUT":      "4s",
 		"ESPIAL_DATABASE_MIGRATION_TIMEOUT":    "1m",
@@ -49,6 +50,9 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 	}
 	if cfg.Database.MaxOpenConnections != 8 {
 		t.Fatalf("max open connections = %d", cfg.Database.MaxOpenConnections)
+	}
+	if cfg.Database.MigrateOnStart {
+		t.Fatal("database migration-on-start override was not applied")
 	}
 	if cfg.Database.ConnectTimeout != 4*time.Second {
 		t.Fatalf("connect timeout = %s", cfg.Database.ConnectTimeout)
@@ -106,6 +110,19 @@ func TestLoadRejectsInvalidDuration(t *testing.T) {
 
 	_, err := Load()
 	if err == nil || !strings.Contains(err.Error(), "ESPIAL_SHUTDOWN_TIMEOUT") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestLoadRejectsInvalidMigrationBoolean(t *testing.T) {
+	cfg := defaults()
+	err := applyEnvironment(&cfg, func(key string) string {
+		if key == "ESPIAL_DATABASE_MIGRATE_ON_START" {
+			return "sometimes"
+		}
+		return ""
+	})
+	if err == nil || !strings.Contains(err.Error(), "ESPIAL_DATABASE_MIGRATE_ON_START") {
 		t.Fatalf("error = %v", err)
 	}
 }

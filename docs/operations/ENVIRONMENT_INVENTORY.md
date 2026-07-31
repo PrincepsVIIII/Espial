@@ -49,13 +49,14 @@ token behavior is allowed.
 
 | Decision | Current baseline | Close before production? |
 |---|---|:---:|
-| Deployment topology | Dedicated single management host, separate containers/processes | Yes—name host/failure domain |
-| Container runtime and reverse proxy | Compose-compatible and proxy-neutral | Yes |
-| Database backup destination and retention | TBD (Operations) | Yes |
-| Secret file/store mechanism | TBD (Security/Operations) | Yes |
-| External heartbeat destination | TBD (Operations) | Yes |
-| Adapter network egress policy | Least privilege; concrete rules TBD per integration | Yes per adapter |
-| Six-month audit capacity estimate | TBD after user/event counts | Yes |
+| Deployment topology | Dedicated single management host, separate containers/processes | Yes—Infrastructure lead names host/failure domain |
+| Container runtime and reverse proxy | Compose-compatible; Caddy reference | Yes—Operations approves runtime/proxy |
+| Database backup destination and retention | TBD (Operations owner) | Yes—Operations blocks production |
+| Secret file/store mechanism | TBD (Security owner) | Yes—Security blocks production |
+| External heartbeat destination | TBD (Operations owner) | Yes—Operations blocks production |
+| Adapter network egress policy | Least privilege; concrete rules TBD | Yes—each integration owner blocks its adapter |
+| Six-month audit capacity estimate | TBD after user/event counts | Yes—Project owner supplies scale; DBA approves capacity |
+| Official proxy/database image scan findings | Owned in Phase 1 threat review | Yes—Maintainer repins; Security approves any exception |
 
 ## Phase 1 non-blocking sample values
 

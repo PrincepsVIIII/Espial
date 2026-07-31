@@ -146,6 +146,7 @@ func (store *memoryInstanceStore) MarkStopped(_ context.Context, _ string, now t
 	store.stops++
 	store.instance.State = "stopped"
 	store.instance.LastStoppedAt = timeValue(now)
+	store.instance.NextRestartAt = nil
 	return nil
 }
 
@@ -185,6 +186,57 @@ func TestSupervisorStartsHealthyProcessAndStopsOnCancellation(t *testing.T) {
 	store.mu.Lock()
 	defer store.mu.Unlock()
 	if store.starts != 1 || store.healthy != 1 || store.stops != 1 || store.instance.State != "stopped" {
+		t.Fatalf("store = %#v", store)
+	}
+}
+
+func TestSupervisorCancellationDuringBackoffPersistsStoppedState(t *testing.T) {
+	now := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
+	store := &memoryInstanceStore{
+		integration: Integration{ID: adapterIntegrationA, AdapterID: "org.ubnetdef.espial.sample"},
+		enabled:     true,
+		exists:      true,
+		instance: Instance{
+			IntegrationID: adapterIntegrationA, State: "unhealthy",
+			ConsecutiveFailures: 3, NextRestartAt: timeValue(now.Add(time.Minute)),
+		},
+	}
+	registry, err := NewRegistry(Descriptor{
+		AdapterID: "org.ubnetdef.espial.sample", Executable: "/not-used-during-backoff",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	never := make(chan time.Time)
+	waiting := make(chan struct{})
+	supervisor := NewSupervisor(store, registry, SupervisorOptions{
+		Clock: fixedAdapterClock{now: now},
+		NewTimer: func(time.Duration) Timer {
+			close(waiting)
+			return channelTimer{channel: never}
+		},
+		Process: fastProcessOptions(now),
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() { result <- supervisor.Run(ctx, adapterIntegrationA) }()
+	select {
+	case <-waiting:
+	case <-time.After(3 * time.Second):
+		t.Fatal("supervisor did not enter backoff")
+	}
+	cancel()
+	select {
+	case err := <-result:
+		if err != context.Canceled {
+			t.Fatalf("run error = %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("backing-off supervisor did not stop")
+	}
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	if store.stops != 1 || store.instance.State != "stopped" {
 		t.Fatalf("store = %#v", store)
 	}
 }

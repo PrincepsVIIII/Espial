@@ -17,10 +17,11 @@ import (
 const AdapterID = "org.ubnetdef.espial.sample"
 
 type Config struct {
-	Scenario  string `json:"scenario"`
-	Count     int    `json:"count"`
-	DelayMS   int    `json:"delay_ms"`
-	FaultMode string `json:"fault_mode"`
+	Scenario              string `json:"scenario"`
+	Count                 int    `json:"count"`
+	DelayMS               int    `json:"delay_ms"`
+	FaultMode             string `json:"fault_mode"`
+	ExpectedRefreshSecond int    `json:"expected_refresh_seconds"`
 }
 
 type ExitError struct{ Code int }
@@ -40,6 +41,9 @@ func Manifest() adapters.Manifest {
 				"count":      map[string]any{"type": "integer", "minimum": 1, "maximum": 10},
 				"delay_ms":   map[string]any{"type": "integer", "minimum": 0, "maximum": 5000},
 				"fault_mode": map[string]any{"enum": validFaults()},
+				"expected_refresh_seconds": map[string]any{
+					"type": "integer", "minimum": 1, "maximum": 86400,
+				},
 			},
 		},
 	}
@@ -198,7 +202,7 @@ func collectionPayload(observedAt time.Time, config Config) adapters.CollectionP
 		result.Observations[index] = adapters.CollectionObservation{
 			ExternalResourceID: externalID, CheckType: "sample.availability", State: state,
 			Summary: fmt.Sprintf("Sample node reports %s.", state), ObservedAt: observedAt.UTC(),
-			ExpectedRefreshSeconds: 300, Measurements: map[string]any{"ordinal": index + 1},
+			ExpectedRefreshSeconds: config.ExpectedRefreshSecond, Measurements: map[string]any{"ordinal": index + 1},
 			Metadata: map[string]any{"adapter": AdapterID},
 		}
 	}
@@ -221,13 +225,16 @@ func decodeConfig(payload json.RawMessage) (Config, error) {
 		return Config{}, err
 	}
 	if !contains(validScenarios(), config.Scenario) || config.Count < 1 || config.Count > 10 ||
-		config.DelayMS < 0 || config.DelayMS > 5000 || !contains(validFaults(), config.FaultMode) {
+		config.DelayMS < 0 || config.DelayMS > 5000 || !contains(validFaults(), config.FaultMode) ||
+		config.ExpectedRefreshSecond < 1 || config.ExpectedRefreshSecond > 86400 {
 		return Config{}, errors.New("invalid config")
 	}
 	return config, nil
 }
 
-func defaultConfig() Config { return Config{Scenario: "healthy", Count: 1, FaultMode: "none"} }
+func defaultConfig() Config {
+	return Config{Scenario: "healthy", Count: 1, FaultMode: "none", ExpectedRefreshSecond: 300}
+}
 
 func validScenarios() []string { return []string{"healthy", "warning", "critical"} }
 
