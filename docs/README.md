@@ -1,0 +1,48 @@
+# Espial documentation
+
+This directory is the entry point for project decisions, implementation plans,
+design guidance, and operator inputs. The original backend, frontend, and roadmap
+documents remain the product-level source material; the folders below turn those
+intentions into implementable contracts.
+
+## Start here
+
+| Document | Use it for |
+|---|---|
+| [Roadmap](ROADMAP.md) | Phase boundaries, ordering, and product scope |
+| [Phase 0 record](phase-0/README.md) | Completed design deliverables, decisions, and known external inputs |
+| [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
+| [Backend plan](BACKEND_PLAN.md) | Long-term backend responsibilities and domain direction |
+| [Frontend/UI plan](FRONTEND_UI_PLAN.md) | Long-term information architecture and interaction direction |
+
+## Architecture and contracts
+
+- [Architecture index](architecture/README.md)
+- [API conventions](architecture/API_CONVENTIONS.md)
+- [Adapter protocol](architecture/ADAPTER_PROTOCOL.md)
+- [Authentication and authorization](architecture/AUTHENTICATION.md)
+- [Initial data model](architecture/DATA_MODEL.md)
+- [Deployment baseline](architecture/DEPLOYMENT.md)
+- [Versioned JSON schemas](../api/README.md)
+
+## Design
+
+- [Design tokens and status semantics](design/DESIGN_SYSTEM.md)
+- [Phase 0 wireframes](design/WIREFRAMES.md)
+
+## Operations and discovery
+
+- [Initial environment and integration inventory](operations/ENVIRONMENT_INVENTORY.md)
+
+## Decisions
+
+Architecture decision records are indexed in [adr/README.md](adr/README.md).
+Accepted ADRs are the authority when a planning document presents several options.
+
+## Documentation conventions
+
+- Use repository-relative links so documents render in GitHub and local editors.
+- Record durable choices in an ADR; record execution order in a plan.
+- Put operator-specific facts in `operations/`, not in schemas or application code.
+- Mark unknown facts as `TBD (owner)` instead of silently assuming them.
+- Update this index when adding a new documentation category.

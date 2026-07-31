@@ -15,6 +15,11 @@ The order of work is intentional:
 
 ## Phase 0: Discovery and design
 
+**Status:** Design baseline complete (2026-07-30). See the
+[Phase 0 record](phase-0/README.md). Site-specific inventory values and the final
+SSO protocol remain externally supplied inputs and are explicitly tracked; they
+do not block the local-authenticated Phase 1 vertical slice.
+
 ### Goals
 
 - document the current environment
@@ -37,6 +42,8 @@ The order of work is intentional:
 - Go module, repository layout, formatting, testing, and CI conventions
 
 ## Phase 1: Monitoring foundation
+
+**Implementation plan:** [Phase 1 Monitoring Foundation](plans/PHASE_1_IMPLEMENTATION.md)
 
 ### Backend
 

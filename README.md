@@ -70,9 +70,25 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 
 ## Documentation
 
-- [Backend Plan](docs/BACKEND_PLAN.md)
-- [Frontend and UI Plan](docs/FRONTEND_UI_PLAN.md)
-- [Project Roadmap](docs/ROADMAP.md)
+- [Documentation index](docs/README.md)
+- [Project roadmap](docs/ROADMAP.md)
+- [Phase 0 design baseline](docs/phase-0/README.md)
+- [Phase 1 implementation plan](docs/plans/PHASE_1_IMPLEMENTATION.md)
+- [Backend plan](docs/BACKEND_PLAN.md)
+- [Frontend and UI plan](docs/FRONTEND_UI_PLAN.md)
+
+## Project status
+
+Phase 0's architecture and design baseline is complete. Environment-specific values
+that require UBNetDef operator input are recorded in the
+[environment inventory](docs/operations/ENVIRONMENT_INVENTORY.md), rather than
+being guessed. SSO is an explicit external dependency; Phase 1 will begin with
+audited local authentication and retain a provider boundary for SSO when its
+protocol is ready.
+
+Implementation is organized in the
+[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md). The repository currently
+contains contracts and design decisions, not a production-ready service.
 
 ## Guiding principles
 

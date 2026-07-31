@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/adapter-envelope.schema.json",
+  "title": "Adapter protocol envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocol_version", "kind", "operation", "sent_at"],
+  "properties": {
+    "protocol_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+$"},
+    "kind": {"enum": ["request", "response", "notification"]},
+    "operation": {
+      "enum": ["manifest", "validate_config", "collect", "health", "shutdown", "ready", "event", "log"]
+    },
+    "request_id": {"type": "string", "format": "uuid"},
+    "sent_at": {"type": "string", "format": "date-time"},
+    "deadline": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object", "additionalProperties": true},
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "retryable": {"type": "boolean"}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"kind": {"enum": ["request", "response"]}}},
+      "then": {"required": ["request_id"]}
+    },
+    {
+      "if": {"properties": {"kind": {"const": "request"}}},
+      "then": {"required": ["deadline"]}
+    },
+    {
+      "not": {"required": ["payload", "error"]}
+    }
+  ]
+}
