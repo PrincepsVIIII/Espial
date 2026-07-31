@@ -5,11 +5,23 @@
   import { safeReturnTo } from '$lib/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
 
-  let username = '';
-  let password = '';
-  let submitting = false;
-  let error = '';
-  let capabilities = { local: true, sso: false };
+  let username = $state('');
+  let password = $state('');
+  let submitting = $state(false);
+  let error = $state('');
+  let capabilities = $state({ local: true, sso: false });
+  let notice = $derived(
+    page.url.searchParams.get('notice') === 'password_changed'
+      ? 'Password changed and active sessions revoked. Sign in again to continue.'
+      : '',
+  );
+  let receiptRequestID = $derived(
+    /^[A-Za-z0-9._:-]{1,128}$/.test(
+      page.url.searchParams.get('request_id') ?? '',
+    )
+      ? (page.url.searchParams.get('request_id') ?? '')
+      : '',
+  );
 
   onMount(async () => {
     const response = await fetch('/api/v1/auth/capabilities');
@@ -69,6 +81,14 @@
           Use the administrator account created during bootstrap. UBNetDef SSO
           will replace this primary flow when its integration is ready.
         </p>
+        {#if notice}
+          <div class="login-notice" role="status">
+            <strong>{notice}</strong>
+            {#if receiptRequestID}
+              <span>Request ID: <code>{receiptRequestID}</code></span>
+            {/if}
+          </div>
+        {/if}
         {#if capabilities.local}
           <form onsubmit={login}>
             <label

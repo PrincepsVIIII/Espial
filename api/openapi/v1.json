@@ -438,6 +438,11 @@
             "name": "actor_user_id",
             "in": "query",
             "schema": { "type": "string", "format": "uuid" }
+          },
+          {
+            "name": "correlation_id",
+            "in": "query",
+            "schema": { "type": "string", "maxLength": 128 }
           }
         ],
         "responses": {
@@ -452,6 +457,170 @@
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/roles": {
+      "get": {
+        "operationId": "listManagedRoles",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Built-in roles available to user administrators.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RoleList" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/users": {
+      "get": {
+        "operationId": "listManagedUsers",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Administrator-only bounded user page.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ManagedUserList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      },
+      "post": {
+        "operationId": "createManagedUser",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ManagedUserCreate" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Local user created and audited.",
+            "headers": {
+              "Location": { "schema": { "type": "string" } },
+              "ETag": { "schema": { "type": "string" } },
+              "X-Request-ID": { "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ManagedUser" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "operationId": "updateManagedUser",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ManagedUserUpdate" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User replaced, affected sessions revoked, and change audited.",
+            "headers": {
+              "ETag": { "schema": { "type": "string" } },
+              "X-Request-ID": { "schema": { "type": "string" } }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ManagedUser" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/users/{id}/password": {
+      "post": {
+        "operationId": "resetManagedUserPassword",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["password"],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 15,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Password reset, sessions revoked, and change audited.",
+            "headers": { "X-Request-ID": { "schema": { "type": "string" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
           "500": { "$ref": "#/components/responses/InternalError" }
         }
       }
@@ -583,6 +752,113 @@
           "next_cursor": { "type": "string", "maxLength": 2048 },
           "from": { "type": "string", "format": "date-time" },
           "to": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ManagedUser": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "identity_provider",
+          "enabled",
+          "roles",
+          "active_sessions",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "username": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
+          "identity_provider": { "type": "string" },
+          "enabled": { "type": "boolean" },
+          "roles": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "active_sessions": { "type": "integer", "minimum": 0 },
+          "password_changed_at": { "type": "string", "format": "date-time" },
+          "created_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ManagedUserList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "#/components/schemas/ManagedUser" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "ManagedUserCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["username", "display_name", "role", "password"],
+        "properties": {
+          "username": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "email": { "type": "string", "format": "email", "maxLength": 254 },
+          "role": { "type": "string" },
+          "password": { "type": "string", "minLength": 15, "maxLength": 128 }
+        }
+      },
+      "ManagedUserUpdate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["display_name", "email", "role", "enabled"],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "email": {
+            "anyOf": [
+              { "type": "string", "format": "email", "maxLength": 254 },
+              { "const": "" }
+            ]
+          },
+          "role": { "type": "string" },
+          "enabled": { "type": "boolean" }
+        }
+      },
+      "Role": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "permissions"],
+        "properties": {
+          "name": { "type": "string" },
+          "permissions": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      },
+      "RoleList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/Role" }
+          }
         }
       },
       "IntegrationCreated": {

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/managed-user.schema.json",
+  "title": "Managed user",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "username",
+    "display_name",
+    "identity_provider",
+    "enabled",
+    "roles",
+    "active_sessions",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "username": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "email": { "type": "string", "format": "email", "maxLength": 254 },
+    "identity_provider": { "type": "string", "minLength": 1 },
+    "enabled": { "type": "boolean" },
+    "roles": { "type": "array", "items": { "type": "string" } },
+    "active_sessions": { "type": "integer", "minimum": 0 },
+    "password_changed_at": { "type": "string", "format": "date-time" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

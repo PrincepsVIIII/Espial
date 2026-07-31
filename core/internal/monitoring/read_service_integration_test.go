@@ -191,6 +191,13 @@ func TestAuditReadUsesBoundedStableCursorAndRecordsAdministrativeRead(t *testing
 	if len(seen) != 5 {
 		t.Fatalf("audit count across pages = %d", len(seen))
 	}
+	receipt, err := service.Audit(context.Background(), AuditFilter{
+		Limit: 10, From: base.Add(-time.Minute), To: base.Add(10 * time.Minute),
+		FromExplicit: true, ToExplicit: true, CorrelationID: "audit-3",
+	})
+	if err != nil || len(receipt.Items) != 1 || receipt.Items[0].CorrelationID != "audit-3" {
+		t.Fatalf("audit receipt lookup = %#v, %v", receipt, err)
+	}
 	if err := service.RecordAuditRead(context.Background(),
 		"70000000-0000-4000-8000-000000000011", "127.0.0.1", "audit-read", filter,
 	); err != nil {

@@ -94,16 +94,19 @@ The bar keeps the Espial/UBNetDef lockup on the left and session state, user men
 and sign-out access on the right. The primary items and order are fixed:
 
 ```text
-Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  |  Live  User ▾
+Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  Audit  |  User ▾
 ```
 
-These target `/dashboard`, `/alerts`, `/datacenter`, `/hypervisor`, and `/webpages`.
+These target `/dashboard`, `/alerts`, `/datacenter`, `/hypervisor`, `/webpages`, and
+permission-gated `/audit`; user administration is the real `/audit/users` child.
 Dashboard is the default destination after login; Datacenter remains one primary
 navigation action away. Dropdowns contain real destinations or actions. On desktop
 they reveal on pointer hover and keyboard focus, also support click/touch activation,
 arrow-key movement, `Escape` to close, visible focus, and route-aware selected state.
-Hovered, focused, and current labels receive a short white underline instead of a
-filled highlight. Unimplemented areas show an honest unavailable or not-configured
+The primary label itself always navigates directly; a separate accessible submenu
+trigger exists only for real child pages. Hovered, focused, and current labels
+receive a short white underline instead of a filled highlight. Unimplemented areas
+show an honest unavailable or not-configured
 state rather than fake content. On narrow screens the same items collapse behind
 one menu button without changing their order.
 
@@ -515,7 +518,7 @@ separate public-status product is explicitly approved.
 
 1. Establish design tokens, status semantics, UBNetDef attribution, and automated
    contrast checks.
-2. Build the public informational entry, exact five-section top navigation, and
+2. Build the public informational entry, exact six-section top navigation, and
    authenticated shell, then complete the visual review gate before feature pages.
 3. Implement authentication states and role-aware controls without introducing a
    separate generic login-page aesthetic.
@@ -550,7 +553,8 @@ The frontend is successful when:
 - visual review finds no generic AI-dashboard patterns listed in Section 3.2
 - the public root explains Espial without disclosing operations and keeps sign-in
   available in the top-right navigation
-- every authenticated page uses Dashboard, Alerts, Datacenter, Hypervisor, and
-  Webpages in that order, with Dashboard as the post-login destination
+- every authenticated page uses Dashboard, Alerts, Datacenter, Hypervisor,
+  Webpages, and permission-gated Audit in that order, with Dashboard as the
+  post-login destination
 - room, rack, server, and drive selection form one deep-linkable and accessible
   drill-down with motion-independent fallbacks

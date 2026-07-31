@@ -137,7 +137,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (7, '000007_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (8, '000008_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

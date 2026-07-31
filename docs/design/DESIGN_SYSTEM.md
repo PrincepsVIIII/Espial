@@ -133,6 +133,8 @@ absolute UTC and local time available on focus/hover.
 - Primary navigation is a floating top bar with restrained rounded corners. Desktop
   dropdowns open on hover and focus, support click/touch, and close with `Escape`;
   smaller screens use one collapsed menu.
+- Primary labels are links and activate their own route. A separate, accessible
+  child-menu trigger is used when touch input needs to open a real submenu.
 - Hovered, focused, and current navigation labels use a short white underline, not
   a filled tile or decorative glow.
 - Keyboard focus is visible on every interactive element.
@@ -143,7 +145,8 @@ absolute UTC and local time available on focus/hover.
 
 ## Phase 1 component set
 
-Implement only what the first vertical slice uses: application shell, navigation,
-status badge, integration health row, resource table, timestamp, empty/error/loading
-states, local login form, role-aware control wrapper, and live-connection indicator.
-Broader component inventory stays in the [frontend plan](../FRONTEND_UI_PLAN.md).
+The established set includes application shell, navigation, status text,
+integration health row, resource table, timestamp, empty/error/loading states,
+local login, role-aware controls, audit table and filters, administrative user table,
+mutation receipt, and disconnected/reconnecting notice. Broader component inventory
+stays in the [frontend plan](../FRONTEND_UI_PLAN.md).

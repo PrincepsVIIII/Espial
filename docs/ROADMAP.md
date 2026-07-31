@@ -73,7 +73,8 @@ inputs and upstream base-image findings in the
 - temporary public informational entry page with sign-in at the top right
 - SvelteKit application shell
 - UBNetDef dark NOC theme
-- dark top navigation: Dashboard, Alerts, Datacenter, Hypervisor, and Webpages
+- dark top navigation: Dashboard, Alerts, Datacenter, Hypervisor, Webpages, and
+  permission-gated Audit
 - Dashboard as the default authenticated destination; Alerts and Datacenter remain
   one primary navigation action away and show honest unavailable/not-configured
   states until their domain phases are implemented
@@ -92,6 +93,17 @@ inputs and upstream base-image findings in the
 - operators can see current state through the Svelte UI
 
 ## Phase 2: Incidents, notifications, and certificates
+
+Groundwork already established before Phase 2 feature work:
+
+- Alerts is a direct primary route with an honest unavailable state until incident
+  read models exist;
+- Core already defines the `incidents:operate` authorization boundary;
+- administrator Audit and Users routes provide inspectable request-correlated
+  evidence for access changes; and
+- the shell accepts only implemented dropdown children, so Phase 2 destinations
+  must ship with their real route, permission boundary, loading/error states, and
+  backend contract rather than appearing as planned navigation.
 
 ### Backend
 

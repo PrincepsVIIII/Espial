@@ -20,45 +20,48 @@
   let accountButton = $state<HTMLButtonElement>();
   let stopLive: (() => void) | null = null;
 
-  const navItems = [
+  const navItems = $derived([
     {
       label: 'Dashboard',
       href: '/dashboard',
-      children: [
-        { label: 'Resources', href: '/dashboard#resources-title' },
-        { label: 'Integrations', href: '/dashboard#integrations-title' },
-      ],
+      children: [],
     },
     {
       label: 'Alerts',
       href: '/alerts',
-      children: [{ label: 'Planned workflow', href: '/alerts#planned-scope' }],
+      children: [],
     },
     {
       label: 'Datacenter',
       href: '/datacenter',
-      children: [
-        { label: 'Planned drill-down', href: '/datacenter#planned-scope' },
-      ],
+      children: [],
     },
     {
       label: 'Hypervisor',
       href: '/hypervisor',
-      children: [
-        { label: 'Planned inventory', href: '/hypervisor#planned-scope' },
-      ],
+      children: [],
     },
     {
       label: 'Webpages',
       href: '/webpages',
-      children: [{ label: 'Planned checks', href: '/webpages#planned-scope' }],
+      children: [],
     },
-  ];
+    ...(data.session?.user.permissions.includes('audit:read')
+      ? [
+          {
+            label: 'Audit',
+            href: '/audit',
+            children: data.session?.user.permissions.includes('users:manage')
+              ? [{ label: 'Users', href: '/audit/users' }]
+              : [],
+          },
+        ]
+      : []),
+  ]);
 
-  const liveLabels: Record<LiveStatus, string> = {
-    live: 'Live',
-    reconnecting: 'Reconnecting',
-    disconnected: 'Disconnected',
+  const interruptionLabels: Partial<Record<LiveStatus, string>> = {
+    reconnecting: 'Live updates interrupted. Reconnecting…',
+    disconnected: 'Live updates are disconnected. Displayed data may be stale.',
   };
 
   onMount(() => {
@@ -191,36 +194,44 @@
             <div
               class="nav-group"
               role="group"
-              onmouseenter={() => (activeNav = item.label)}
+              onmouseenter={() => {
+                if (item.children.length) activeNav = item.label;
+              }}
               onmouseleave={closeNavDropdownOnPointerLeave}
               onfocusout={closeNavDropdown}
             >
-              <button
-                type="button"
-                class="nav-label"
+              <a
+                class="nav-link"
                 class:active={isActive(item.href)}
-                data-nav-trigger={item.label}
-                aria-expanded={activeNav === item.label}
-                aria-controls={`nav-panel-${item.label.toLowerCase()}`}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                href={item.href}
                 onfocus={() => {
-                  if (!restoringNavFocus) activeNav = item.label;
+                  if (!restoringNavFocus && item.children.length) {
+                    activeNav = item.label;
+                  }
                 }}
-                onclick={() => (activeNav = item.label)}
               >
                 {item.label}
-              </button>
-              {#if activeNav === item.label}
+              </a>
+              {#if item.children.length}
+                <button
+                  type="button"
+                  class="nav-child-toggle"
+                  data-nav-trigger={item.label}
+                  aria-label={`${item.label} sections`}
+                  aria-expanded={activeNav === item.label}
+                  aria-controls={`nav-panel-${item.label.toLowerCase()}`}
+                  onclick={() =>
+                    (activeNav = activeNav === item.label ? null : item.label)}
+                >
+                  <span aria-hidden="true">⌄</span>
+                </button>
+              {/if}
+              {#if item.children.length && activeNav === item.label}
                 <div
                   class="nav-dropdown"
                   id={`nav-panel-${item.label.toLowerCase()}`}
                 >
-                  <a
-                    href={item.href}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                  >
-                    <strong>{item.label}</strong>
-                    <span>Open section</span>
-                  </a>
                   {#each item.children as child}
                     <a href={child.href}>{child.label}</a>
                   {/each}
@@ -231,20 +242,28 @@
         </div>
         <div class="mobile-primary-nav">
           {#each navItems as item}
-            <a
-              class:active={isActive(item.href)}
-              aria-current={isActive(item.href) ? 'page' : undefined}
-              href={item.href}
-              onclick={closeNavigation}>{item.label}</a
-            >
+            <div class="mobile-nav-group">
+              <a
+                class:active={isActive(item.href)}
+                aria-current={isActive(item.href) ? 'page' : undefined}
+                href={item.href}
+                onclick={closeNavigation}>{item.label}</a
+              >
+              {#each item.children as child}
+                <a
+                  class="mobile-child-link"
+                  class:active={isActive(child.href)}
+                  aria-current={isActive(child.href) ? 'page' : undefined}
+                  href={child.href}
+                  onclick={closeNavigation}>{child.label}</a
+                >
+              {/each}
+            </div>
           {/each}
           <div class="mobile-account">
             <span>
               <strong>{data.session.user.display_name}</strong>
               <small>{data.session.user.roles.join(', ')}</small>
-              <small class={`live-text live-${$liveConnection.status}`}>
-                {liveLabels[$liveConnection.status]}
-              </small>
             </span>
             <button class="link-button" type="button" onclick={logout}
               >Sign out</button
@@ -254,15 +273,6 @@
       </nav>
 
       <div class="app-meta">
-        <span
-          class={`connection-status live-${$liveConnection.status}`}
-          aria-live="polite"
-          title={$liveConnection.last_refresh
-            ? `Last successful refresh: ${$liveConnection.last_refresh}`
-            : 'Waiting for the first monitoring refresh'}
-        >
-          {liveLabels[$liveConnection.status]}
-        </span>
         <div
           class="user-menu"
           role="group"
@@ -296,6 +306,16 @@
         </div>
       </div>
     </header>
-    <main id="main-content" class="content">{@render children()}</main>
+    <main id="main-content" class="content">
+      {#if interruptionLabels[$liveConnection.status]}
+        <div class="connection-notice" role="status" aria-live="polite">
+          <span>{interruptionLabels[$liveConnection.status]}</span>
+          {#if $liveConnection.last_refresh}
+            <small>Last refresh: {$liveConnection.last_refresh}</small>
+          {/if}
+        </div>
+      {/if}
+      {@render children()}
+    </main>
   </div>
 {/if}

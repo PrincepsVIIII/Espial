@@ -69,6 +69,8 @@ for (const viewport of [
         'Datacenter',
         'Hypervisor',
         'Webpages',
+        'Audit',
+        'Users',
       ]);
       await expect(
         navigation.getByRole('button', { name: 'Sign out' }),
@@ -102,7 +104,7 @@ test('user dropdown supports keyboard Escape and returns focus', async ({
   await page.goto('/dashboard');
   await waitForHydration(page);
   const trigger = page.getByRole('button', {
-    name: 'User menu for NOC Operator',
+    name: 'User menu for NOC Administrator',
   });
   await trigger.click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
@@ -111,21 +113,24 @@ test('user dropdown supports keyboard Escape and returns focus', async ({
   await expect(trigger).toBeFocused();
 });
 
-test('primary navigation dropdown opens on hover and closes with Escape', async ({
+test('primary navigation links directly and its real child menu closes with Escape', async ({
   page,
 }, testInfo) => {
   await page.goto('/dashboard');
   await waitForHydration(page);
-  const trigger = page.getByRole('button', { name: 'Dashboard' });
+  await expect(
+    page.getByRole('link', { name: 'Dashboard', exact: true }),
+  ).toHaveAttribute('href', '/dashboard');
+  const trigger = page.getByRole('button', { name: 'Audit sections' });
   await trigger.hover();
-  await expect(page.getByRole('link', { name: 'Resources' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Users' })).toBeVisible();
   await page.screenshot({
-    path: testInfo.outputPath('dashboard-dropdown.png'),
+    path: testInfo.outputPath('audit-dropdown.png'),
     animations: 'disabled',
   });
-  await page.getByRole('link', { name: 'Resources' }).focus();
+  await page.getByRole('link', { name: 'Users' }).focus();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('link', { name: 'Resources' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Users' })).toHaveCount(0);
   await expect(trigger).toBeFocused();
 });
 
@@ -136,9 +141,9 @@ test('SSE reconnects, refreshes REST, and respects reduced motion', async ({
   await request.get(`${mockCore}/__test/control?events=disconnect-once`);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/dashboard');
-  const liveStatus = page.locator('.connection-status');
-  await expect(liveStatus).toHaveText('Reconnecting');
-  await expect(liveStatus).toHaveText('Live', {
+  const interruption = page.locator('.connection-notice');
+  await expect(interruption).toContainText('Reconnecting');
+  await expect(interruption).toHaveCount(0, {
     timeout: 5_000,
   });
   await expect
@@ -159,9 +164,6 @@ test('resync triggers a full authoritative refresh', async ({
 }) => {
   await request.get(`${mockCore}/__test/control?events=resync`);
   await page.goto('/dashboard');
-  await expect(page.locator('.connection-status')).toHaveText('Live', {
-    timeout: 5_000,
-  });
   await expect
     .poll(async () => {
       const response = await request.get(`${mockCore}/__test/state`);
@@ -175,6 +177,67 @@ test('resync triggers a full authoritative refresh', async ({
       return (await response.json()).monitoringReads;
     })
     .toBeGreaterThanOrEqual(6);
+});
+
+test('floating navigation stays fixed while dashboard content scrolls', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1280, height: 500 });
+  await page.goto('/dashboard');
+  await waitForHydration(page);
+  const header = page.locator('.app-header');
+  const before = await header.boundingBox();
+  expect(
+    await header.evaluate((element) => getComputedStyle(element).position),
+  ).toBe('fixed');
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  const after = await header.boundingBox();
+  expect(after?.y).toBeCloseTo(before?.y ?? 0, 0);
+});
+
+test('user changes return a receipt linked to the exact audit evidence', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/audit/users');
+  await waitForHydration(page);
+  await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible();
+  const usersAccessibility = await new AxeBuilder({ page }).analyze();
+  expect(
+    usersAccessibility.violations.filter((violation) =>
+      ['serious', 'critical'].includes(violation.impact ?? ''),
+    ),
+  ).toEqual([]);
+  await page.screenshot({
+    path: testInfo.outputPath('users.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+  await page.getByLabel('Username').fill('new-viewer');
+  await page.getByLabel('Display name').fill('New Viewer');
+  await page.getByLabel('Email').fill('viewer@example.test');
+  await page.getByLabel('Role').selectOption('viewer');
+  await page
+    .getByLabel('Password', { exact: true })
+    .fill('A browser viewer password 90210');
+  await page
+    .getByLabel('Confirm password')
+    .fill('A browser viewer password 90210');
+  await page.getByRole('button', { name: 'Create user' }).click();
+  const receiptLink = page.getByRole('link', {
+    name: 'View matching audit record',
+  });
+  await expect(page.getByText('Created new-viewer.')).toBeVisible();
+  await expect(receiptLink).toBeVisible();
+  await receiptLink.click();
+  await expect(page).toHaveURL(/\/audit\?correlation_id=/);
+  await expect(page.getByText('auth.local.user.created')).toBeVisible();
+  await page.getByText('View redacted change summary').click();
+  await expect(page.getByText('new-viewer')).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath('audit-receipt.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
 });
 
 test('permission and Core failures retain shell context without stale rows', async ({
@@ -216,7 +279,6 @@ test('Dashboard has no serious automated accessibility violations', async ({
 });
 
 async function waitForHydration(page: import('@playwright/test').Page) {
-  await expect(page.locator('.connection-status')).toHaveText('Live', {
-    timeout: 5_000,
-  });
+  await expect(page.locator('.shell')).toBeVisible({ timeout: 5_000 });
+  await page.waitForFunction(() => document.readyState === 'complete');
 }

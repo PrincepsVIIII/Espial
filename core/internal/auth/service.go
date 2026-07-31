@@ -3,9 +3,12 @@ package auth
 import (
 	"context"
 	"crypto/subtle"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
+	"net/mail"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +20,12 @@ import (
 )
 
 const bootstrapLockID int64 = 0x45535049414c4155 // "ESPIALAU"
+const managedUserLockID int64 = 0x45535049414c5553 // "ESPIALUS"
+
+const (
+	defaultManagedUserLimit = 50
+	maximumManagedUserLimit = 200
+)
 
 type Options struct {
 	Hasher          PasswordHasher
@@ -148,6 +157,323 @@ func (service *Service) BootstrapAdmin(ctx context.Context, username, password, 
 		Roles:       []string{"administrator"},
 		Permissions: administratorPermissions(),
 	}, nil
+}
+
+// ManagedUsers returns a stable, bounded administration view without credentials.
+func (service *Service) ManagedUsers(ctx context.Context, filter ManagedUserFilter) (ManagedUserList, error) {
+	if filter.Limit <= 0 {
+		filter.Limit = defaultManagedUserLimit
+	}
+	if filter.Limit > maximumManagedUserLimit {
+		filter.Limit = maximumManagedUserLimit
+	}
+	cursorUsername, cursorID, err := decodeManagedUserCursor(filter.Cursor)
+	if err != nil {
+		return ManagedUserList{}, ErrInvalidCursor
+	}
+	rows, err := service.pool.Query(ctx, `
+		SELECT u.id::text, u.username, u.display_name, u.email, u.identity_provider,
+			u.enabled, COALESCE(array_agg(DISTINCT r.name) FILTER (WHERE r.name IS NOT NULL), '{}'),
+			count(DISTINCT s.id) FILTER (WHERE s.revoked_at IS NULL AND s.expires_at > now()),
+			c.password_changed_at, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN user_roles ur ON ur.user_id = u.id
+		LEFT JOIN roles r ON r.id = ur.role_id
+		LEFT JOIN sessions s ON s.user_id = u.id
+		LEFT JOIN local_credentials c ON c.user_id = u.id
+		WHERE ($1 = '' OR (lower(u.username), u.id::text) > ($1, $2))
+		GROUP BY u.id, c.password_changed_at
+		ORDER BY lower(u.username), u.id::text
+		LIMIT $3
+	`, cursorUsername, cursorID, filter.Limit+1)
+	if err != nil {
+		return ManagedUserList{}, fmt.Errorf("list managed users: %w", err)
+	}
+	defer rows.Close()
+	items := make([]ManagedUser, 0, filter.Limit+1)
+	for rows.Next() {
+		var item ManagedUser
+		var email *string
+		if err := rows.Scan(
+			&item.ID, &item.Username, &item.DisplayName, &email, &item.IdentityProvider,
+			&item.Enabled, &item.Roles, &item.ActiveSessions, &item.PasswordChanged,
+			&item.CreatedAt, &item.UpdatedAt,
+		); err != nil {
+			return ManagedUserList{}, fmt.Errorf("scan managed user: %w", err)
+		}
+		if email != nil {
+			item.Email = *email
+		}
+		item.CreatedAt, item.UpdatedAt = item.CreatedAt.UTC(), item.UpdatedAt.UTC()
+		if item.PasswordChanged != nil {
+			changed := item.PasswordChanged.UTC()
+			item.PasswordChanged = &changed
+		}
+		if item.Roles == nil {
+			item.Roles = []string{}
+		}
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return ManagedUserList{}, fmt.Errorf("read managed users: %w", err)
+	}
+	result := ManagedUserList{Items: items}
+	if len(result.Items) > filter.Limit {
+		result.Items = result.Items[:filter.Limit]
+		last := result.Items[len(result.Items)-1]
+		result.NextCursor = encodeManagedUserCursor(last.Username, last.ID)
+	}
+	return result, nil
+}
+
+func (service *Service) ManagedRoles(ctx context.Context) ([]RoleView, error) {
+	rows, err := service.pool.Query(ctx, `
+		SELECT name, ARRAY(SELECT jsonb_array_elements_text(permissions) ORDER BY 1)
+		FROM roles ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("list managed roles: %w", err)
+	}
+	defer rows.Close()
+	roles := make([]RoleView, 0, 4)
+	for rows.Next() {
+		var role RoleView
+		if err := rows.Scan(&role.Name, &role.Permissions); err != nil {
+			return nil, fmt.Errorf("scan managed role: %w", err)
+		}
+		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read managed roles: %w", err)
+	}
+	return roles, nil
+}
+
+// CreateManagedUser creates a local account and its redacted audit evidence in one transaction.
+func (service *Service) CreateManagedUser(ctx context.Context, input CreateManagedUser) (ManagedUser, error) {
+	input.Username = NormalizeUsername(input.Username)
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	input.Email = strings.TrimSpace(input.Email)
+	input.Role = strings.ToLower(strings.TrimSpace(input.Role))
+	if err := validateUsername(input.Username); err != nil {
+		return ManagedUser{}, err
+	}
+	if err := validateManagedIdentity(input.DisplayName, input.Email); err != nil {
+		return ManagedUser{}, err
+	}
+	passwordHash, err := service.options.Hasher.Hash(input.Password)
+	if err != nil {
+		return ManagedUser{}, err
+	}
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return ManagedUser{}, fmt.Errorf("begin managed user creation: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	var roleID string
+	if err := tx.QueryRow(ctx, "SELECT id::text FROM roles WHERE name = $1", input.Role).Scan(&roleID); errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUser{}, ErrRoleNotFound
+	} else if err != nil {
+		return ManagedUser{}, fmt.Errorf("load managed user role: %w", err)
+	}
+	var user ManagedUser
+	var email *string
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (id, username, display_name, email, identity_provider, external_subject)
+		VALUES (gen_random_uuid(), $1, $2, NULLIF($3, ''), 'local', $1)
+		ON CONFLICT DO NOTHING
+		RETURNING id::text, username, display_name, email, identity_provider, enabled, created_at, updated_at
+	`, input.Username, input.DisplayName, input.Email).Scan(
+		&user.ID, &user.Username, &user.DisplayName, &email, &user.IdentityProvider,
+		&user.Enabled, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUser{}, ErrUsernameTaken
+	}
+	if err != nil {
+		return ManagedUser{}, fmt.Errorf("create managed user: %w", err)
+	}
+	if email != nil {
+		user.Email = *email
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)", user.ID, passwordHash); err != nil {
+		return ManagedUser{}, fmt.Errorf("store managed credential: %w", err)
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)", user.ID, roleID); err != nil {
+		return ManagedUser{}, fmt.Errorf("grant managed role: %w", err)
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		ActorUserID: input.Context.ActorUserID, Action: "auth.local.user.created",
+		TargetType: "user", TargetID: user.ID, Result: "succeeded",
+		SourceAddress: input.Context.SourceAddress, CorrelationID: input.Context.CorrelationID,
+		AfterSummary: map[string]any{
+			"username": user.Username, "display_name": user.DisplayName, "email": user.Email,
+			"role": input.Role, "enabled": true,
+		},
+	}); err != nil {
+		return ManagedUser{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ManagedUser{}, fmt.Errorf("commit managed user creation: %w", err)
+	}
+	user.Roles = []string{input.Role}
+	user.CreatedAt, user.UpdatedAt = user.CreatedAt.UTC(), user.UpdatedAt.UTC()
+	return user, nil
+}
+
+// UpdateManagedUser replaces editable identity, role, and enablement state atomically.
+func (service *Service) UpdateManagedUser(ctx context.Context, input UpdateManagedUser) (ManagedUser, error) {
+	input.DisplayName = strings.TrimSpace(input.DisplayName)
+	input.Email = strings.TrimSpace(input.Email)
+	input.Role = strings.ToLower(strings.TrimSpace(input.Role))
+	if err := validateManagedIdentity(input.DisplayName, input.Email); err != nil {
+		return ManagedUser{}, err
+	}
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return ManagedUser{}, fmt.Errorf("begin managed user update: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", managedUserLockID); err != nil {
+		return ManagedUser{}, fmt.Errorf("lock managed user update: %w", err)
+	}
+	var before ManagedUser
+	var email *string
+	var currentRole string
+	err = tx.QueryRow(ctx, `
+		SELECT u.id::text, u.username, u.display_name, u.email, u.identity_provider,
+			u.enabled, COALESCE((SELECT r.name FROM user_roles ur JOIN roles r ON r.id = ur.role_id WHERE ur.user_id = u.id ORDER BY r.name LIMIT 1), ''),
+			u.created_at, u.updated_at
+		FROM users u WHERE u.id::text = $1 FOR UPDATE
+	`, input.ID).Scan(
+		&before.ID, &before.Username, &before.DisplayName, &email, &before.IdentityProvider,
+		&before.Enabled, &currentRole, &before.CreatedAt, &before.UpdatedAt,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUser{}, ErrUserNotFound
+	}
+	if err != nil {
+		return ManagedUser{}, fmt.Errorf("load managed user: %w", err)
+	}
+	if email != nil {
+		before.Email = *email
+	}
+	before.Roles = []string{currentRole}
+	if input.ExpectedUpdatedAt.IsZero() || !before.UpdatedAt.UTC().Equal(input.ExpectedUpdatedAt.UTC()) {
+		return ManagedUser{}, ErrUserChanged
+	}
+	if input.ID == input.Context.ActorUserID && (!input.Enabled || input.Role != "administrator") {
+		return ManagedUser{}, ErrSelfLockout
+	}
+	if currentRole == "administrator" && before.Enabled && (!input.Enabled || input.Role != "administrator") {
+		var others int
+		if err := tx.QueryRow(ctx, `
+			SELECT count(*) FROM users u JOIN user_roles ur ON ur.user_id = u.id
+			JOIN roles r ON r.id = ur.role_id
+			WHERE u.enabled AND r.name = 'administrator' AND u.id::text <> $1
+		`, input.ID).Scan(&others); err != nil {
+			return ManagedUser{}, fmt.Errorf("count enabled administrators: %w", err)
+		}
+		if others == 0 {
+			return ManagedUser{}, ErrLastAdministrator
+		}
+	}
+	var roleID string
+	if err := tx.QueryRow(ctx, "SELECT id::text FROM roles WHERE name = $1", input.Role).Scan(&roleID); errors.Is(err, pgx.ErrNoRows) {
+		return ManagedUser{}, ErrRoleNotFound
+	} else if err != nil {
+		return ManagedUser{}, fmt.Errorf("load replacement role: %w", err)
+	}
+	var updated ManagedUser
+	email = nil
+	err = tx.QueryRow(ctx, `
+		UPDATE users SET display_name = $2, email = NULLIF($3, ''), enabled = $4, updated_at = now()
+		WHERE id::text = $1
+		RETURNING id::text, username, display_name, email, identity_provider, enabled, created_at, updated_at
+	`, input.ID, input.DisplayName, input.Email, input.Enabled).Scan(
+		&updated.ID, &updated.Username, &updated.DisplayName, &email, &updated.IdentityProvider,
+		&updated.Enabled, &updated.CreatedAt, &updated.UpdatedAt,
+	)
+	if err != nil {
+		return ManagedUser{}, fmt.Errorf("update managed user: %w", err)
+	}
+	if email != nil {
+		updated.Email = *email
+	}
+	if currentRole != input.Role {
+		if _, err := tx.Exec(ctx, "DELETE FROM user_roles WHERE user_id::text = $1", input.ID); err != nil {
+			return ManagedUser{}, fmt.Errorf("remove managed roles: %w", err)
+		}
+		if _, err := tx.Exec(ctx, "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)", input.ID, roleID); err != nil {
+			return ManagedUser{}, fmt.Errorf("assign managed role: %w", err)
+		}
+	}
+	if currentRole != input.Role || before.Enabled != input.Enabled {
+		if _, err := tx.Exec(ctx, "UPDATE sessions SET revoked_at = now() WHERE user_id::text = $1 AND revoked_at IS NULL", input.ID); err != nil {
+			return ManagedUser{}, fmt.Errorf("revoke sessions after managed user update: %w", err)
+		}
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		ActorUserID: input.Context.ActorUserID, Action: "auth.user.updated",
+		TargetType: "user", TargetID: input.ID, Result: "succeeded",
+		SourceAddress: input.Context.SourceAddress, CorrelationID: input.Context.CorrelationID,
+		BeforeSummary: managedUserSummary(before, currentRole),
+		AfterSummary:  managedUserSummary(updated, input.Role),
+	}); err != nil {
+		return ManagedUser{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return ManagedUser{}, fmt.Errorf("commit managed user update: %w", err)
+	}
+	updated.Roles = []string{input.Role}
+	updated.CreatedAt, updated.UpdatedAt = updated.CreatedAt.UTC(), updated.UpdatedAt.UTC()
+	return updated, nil
+}
+
+// ResetManagedUserPassword replaces a local credential and records the acting administrator.
+func (service *Service) ResetManagedUserPassword(ctx context.Context, input ResetManagedPassword) error {
+	passwordHash, err := service.options.Hasher.Hash(input.Password)
+	if err != nil {
+		return err
+	}
+	tx, err := service.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin managed password reset: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	var username, provider string
+	if err := tx.QueryRow(ctx, "SELECT username, identity_provider FROM users WHERE id::text = $1 FOR UPDATE", input.ID).Scan(&username, &provider); errors.Is(err, pgx.ErrNoRows) {
+		return ErrUserNotFound
+	} else if err != nil {
+		return fmt.Errorf("load password reset target: %w", err)
+	}
+	if provider != "local" {
+		return ErrUserNotFound
+	}
+	result, err := tx.Exec(ctx, `
+		UPDATE local_credentials SET password_hash = $2, password_changed_at = now(),
+			failed_attempts = 0, locked_until = NULL WHERE user_id::text = $1
+	`, input.ID, passwordHash)
+	if err != nil {
+		return fmt.Errorf("reset managed password: %w", err)
+	}
+	if result.RowsAffected() != 1 {
+		return ErrUserNotFound
+	}
+	if _, err := tx.Exec(ctx, "UPDATE sessions SET revoked_at = now() WHERE user_id::text = $1 AND revoked_at IS NULL", input.ID); err != nil {
+		return fmt.Errorf("revoke sessions after managed password reset: %w", err)
+	}
+	if err := insertAudit(ctx, tx, auditEvent{
+		ActorUserID: input.Context.ActorUserID, Action: "auth.password.reset",
+		TargetType: "user", TargetID: input.ID, Result: "succeeded",
+		SourceAddress: input.Context.SourceAddress, CorrelationID: input.Context.CorrelationID,
+		AfterSummary: map[string]any{"username": username, "sessions_revoked": true},
+	}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit managed password reset: %w", err)
+	}
+	return nil
 }
 
 // CreateLocalUser creates an audited local account with one built-in role. This is
@@ -693,6 +1019,8 @@ type auditEvent struct {
 	Result        string
 	SourceAddress string
 	CorrelationID string
+	BeforeSummary map[string]any
+	AfterSummary  map[string]any
 }
 
 func (service *Service) audit(ctx context.Context, event auditEvent) error {
@@ -704,9 +1032,10 @@ func (service *Service) audit(ctx context.Context, event auditEvent) error {
 }
 
 const auditSQL = `
-	INSERT INTO audit_events (
-		id, actor_user_id, action, target_type, target_id, result, source_address, correlation_id
-	) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7)`
+		INSERT INTO audit_events (
+			id, actor_user_id, action, target_type, target_id, result, source_address,
+			correlation_id, before_summary, after_summary
+		) VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb)`
 
 func insertAudit(ctx context.Context, tx pgx.Tx, event auditEvent) error {
 	if _, err := tx.Exec(ctx, auditSQL, auditArguments(event)...); err != nil {
@@ -723,10 +1052,73 @@ func auditArguments(event auditEvent) []any {
 	if event.CorrelationID == "" {
 		event.CorrelationID = "system"
 	}
+	var before, after any
+	if event.BeforeSummary != nil {
+		if encoded, err := json.Marshal(event.BeforeSummary); err == nil {
+			before = string(encoded)
+		}
+	}
+	if event.AfterSummary != nil {
+		if encoded, err := json.Marshal(event.AfterSummary); err == nil {
+			after = string(encoded)
+		}
+	}
 	return []any{
 		actor, event.Action, event.TargetType, nullableText(event.TargetID), event.Result,
-		nullableAddress(event.SourceAddress), event.CorrelationID,
+		nullableAddress(event.SourceAddress), event.CorrelationID, before, after,
 	}
+}
+
+func validateManagedIdentity(displayName, email string) error {
+	if !utf8.ValidString(displayName) || utf8.RuneCountInString(displayName) < 1 || utf8.RuneCountInString(displayName) > 128 {
+		return errors.New("display name must contain between 1 and 128 Unicode characters")
+	}
+	if email == "" {
+		return nil
+	}
+	if len(email) > 254 {
+		return errors.New("email address is too long")
+	}
+	address, err := mail.ParseAddress(email)
+	if err != nil || !strings.EqualFold(address.Address, email) {
+		return errors.New("email address is invalid")
+	}
+	return nil
+}
+
+func managedUserSummary(user ManagedUser, role string) map[string]any {
+	return map[string]any{
+		"username": user.Username, "display_name": user.DisplayName, "email": user.Email,
+		"role": role, "enabled": user.Enabled,
+	}
+}
+
+type managedUserCursor struct {
+	Username string `json:"username"`
+	ID       string `json:"id"`
+}
+
+func encodeManagedUserCursor(username, id string) string {
+	encoded, _ := json.Marshal(managedUserCursor{Username: strings.ToLower(username), ID: id})
+	return base64.RawURLEncoding.EncodeToString(encoded)
+}
+
+func decodeManagedUserCursor(raw string) (string, string, error) {
+	if raw == "" {
+		return "", "", nil
+	}
+	if len(raw) > 2048 {
+		return "", "", errors.New("invalid user cursor")
+	}
+	decoded, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return "", "", errors.New("invalid user cursor")
+	}
+	var cursor managedUserCursor
+	if err := json.Unmarshal(decoded, &cursor); err != nil || cursor.Username == "" || cursor.ID == "" {
+		return "", "", errors.New("invalid user cursor")
+	}
+	return cursor.Username, cursor.ID, nil
 }
 
 func nullableText(value string) any {

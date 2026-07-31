@@ -50,17 +50,21 @@ SSO”; the local form moves behind “Emergency local access” with an audit w
 ```text
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Espial / UBNetDef  Dashboard  Alerts  Datacenter  Hypervisor  Webpages     │
-│                                                Live ●   user / role ▾       │
+│                 Audit ▾                                      user / role ▾ │
 └────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Dashboard is selected after login. The five items retain this order everywhere;
-Datacenter is one primary-navigation action away.
-Desktop dropdowns reveal on hover or keyboard focus and remain available through
-click/touch activation. A short white rule appears beneath the hovered, focused, or
-current label. Arrow keys move within a menu, Escape closes it, and focus returns to
-the trigger. At narrow widths, the same items move into one labeled navigation
-control without changing their order or hiding sign-out.
+Dashboard is selected after login. The six items retain this order everywhere;
+Datacenter and Audit are each one primary-navigation action away. Audit is
+permission-gated and its submenu contains the implemented Users destination only
+when the session has `users:manage`.
+Primary labels navigate directly. Desktop dropdowns reveal on hover or keyboard
+focus and remain available through click/touch activation. A short white rule
+appears beneath the hovered, focused, or current label. Escape closes an open menu
+and returns focus to its trigger. At narrow widths, the same permitted items and
+real children move into one labeled navigation control without changing their order
+or hiding sign-out. Normal connection health does not occupy the navigation;
+reconnection or disconnection appears as a temporary content notice.
 
 ## Dashboard (Phase 1)
 

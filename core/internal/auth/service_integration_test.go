@@ -201,6 +201,201 @@ func TestLocalUserAdministrationIsAuditedAndRevokesSessions(t *testing.T) {
 	}
 }
 
+func TestManagedUserAdministrationProvidesSafeAtomicEvidence(t *testing.T) {
+	pool := authTestPool(t)
+	service := testService(t, pool, nil)
+	ctx := context.Background()
+	administrator, err := service.BootstrapAdmin(ctx, "managed-admin", "A valid administrator password 90210", "bootstrap-managed", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := service.CreateManagedUser(ctx, CreateManagedUser{
+		Username: "managed-viewer", DisplayName: "Managed Viewer", Email: "viewer@example.test",
+		Role: "viewer", Password: "A managed viewer password 90210",
+		Context: AdministrationContext{ActorUserID: administrator.ID, SourceAddress: "127.0.0.2", CorrelationID: "managed-create"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Email != "viewer@example.test" || len(created.Roles) != 1 || created.Roles[0] != "viewer" {
+		t.Fatalf("created managed user = %#v", created)
+	}
+
+	session, err := service.Login(ctx, created.Username, "A managed viewer password 90210", "127.0.0.3", "managed-login")
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, err := service.ManagedUsers(ctx, ManagedUserFilter{Limit: 1})
+	if err != nil || len(listed.Items) != 1 || listed.NextCursor == "" {
+		t.Fatalf("first managed user page = %#v, %v", listed, err)
+	}
+	next, err := service.ManagedUsers(ctx, ManagedUserFilter{Limit: 10, Cursor: listed.NextCursor})
+	if err != nil || len(next.Items) != 1 || next.Items[0].ID != created.ID || next.Items[0].ActiveSessions != 1 {
+		t.Fatalf("second managed user page = %#v, %v", next, err)
+	}
+	if _, err := service.ManagedUsers(ctx, ManagedUserFilter{Cursor: "not-a-cursor"}); !errors.Is(err, ErrInvalidCursor) {
+		t.Fatalf("invalid cursor = %v", err)
+	}
+	roles, err := service.ManagedRoles(ctx)
+	if err != nil || len(roles) != 3 {
+		t.Fatalf("managed roles = %#v, %v", roles, err)
+	}
+
+	updated, err := service.UpdateManagedUser(ctx, UpdateManagedUser{
+		ID: created.ID, DisplayName: "Managed Operator", Email: "", Role: "operator", Enabled: true,
+		ExpectedUpdatedAt: created.UpdatedAt,
+		Context:           AdministrationContext{ActorUserID: administrator.ID, SourceAddress: "127.0.0.2", CorrelationID: "managed-update"},
+	})
+	if err != nil || updated.DisplayName != "Managed Operator" || updated.Email != "" || updated.Roles[0] != "operator" {
+		t.Fatalf("updated managed user = %#v, %v", updated, err)
+	}
+	if _, err := service.Authenticate(ctx, session.Token); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("role change did not revoke session: %v", err)
+	}
+	if _, err := service.UpdateManagedUser(ctx, UpdateManagedUser{
+		ID: created.ID, DisplayName: "Stale", Role: "viewer", Enabled: true,
+		ExpectedUpdatedAt: created.UpdatedAt,
+		Context:           AdministrationContext{ActorUserID: administrator.ID},
+	}); !errors.Is(err, ErrUserChanged) {
+		t.Fatalf("stale update = %v", err)
+	}
+
+	newSession, err := service.Login(ctx, created.Username, "A managed viewer password 90210", "127.0.0.3", "managed-login-two")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.ResetManagedUserPassword(ctx, ResetManagedPassword{
+		ID: created.ID, Password: "A replacement managed password 90210",
+		Context: AdministrationContext{ActorUserID: administrator.ID, SourceAddress: "127.0.0.2", CorrelationID: "managed-password"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := service.Authenticate(ctx, newSession.Token); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("password change did not revoke session: %v", err)
+	}
+	if _, err := service.Login(ctx, created.Username, "A managed viewer password 90210", "127.0.0.3", "old-managed-password"); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("old password login = %v", err)
+	}
+
+	adminView, err := service.ManagedUsers(ctx, ManagedUserFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var currentAdministrator ManagedUser
+	for _, candidate := range adminView.Items {
+		if candidate.ID == administrator.ID {
+			currentAdministrator = candidate
+		}
+	}
+	if _, err := service.UpdateManagedUser(ctx, UpdateManagedUser{
+		ID: administrator.ID, DisplayName: currentAdministrator.DisplayName, Email: currentAdministrator.Email,
+		Role: "viewer", Enabled: true, ExpectedUpdatedAt: currentAdministrator.UpdatedAt,
+		Context: AdministrationContext{ActorUserID: administrator.ID},
+	}); !errors.Is(err, ErrSelfLockout) {
+		t.Fatalf("self lockout = %v", err)
+	}
+	if _, err := service.UpdateManagedUser(ctx, UpdateManagedUser{
+		ID: administrator.ID, DisplayName: currentAdministrator.DisplayName, Email: currentAdministrator.Email,
+		Role: "viewer", Enabled: true, ExpectedUpdatedAt: currentAdministrator.UpdatedAt,
+		Context: AdministrationContext{ActorUserID: "70000000-0000-4000-8000-000000000099"},
+	}); !errors.Is(err, ErrLastAdministrator) {
+		t.Fatalf("last administrator = %v", err)
+	}
+
+	var evidence int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM audit_events
+		WHERE correlation_id IN ('managed-create', 'managed-update', 'managed-password')
+		  AND actor_user_id = $1`, administrator.ID).Scan(&evidence); err != nil || evidence != 3 {
+		t.Fatalf("managed user audit evidence = %d, %v", evidence, err)
+	}
+	var leakedPassword bool
+	if err := pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM audit_events
+			WHERE correlation_id IN ('managed-create', 'managed-update', 'managed-password')
+			  AND (before_summary::text ILIKE '%password%' OR after_summary::text ILIKE '%90210%')
+		)`).Scan(&leakedPassword); err != nil || leakedPassword {
+		t.Fatalf("password leaked in audit evidence = %v, %v", leakedPassword, err)
+	}
+}
+
+func TestConcurrentManagedUpdatesPreserveAnEnabledAdministrator(t *testing.T) {
+	pool := authTestPool(t)
+	service := testService(t, pool, nil)
+	ctx := context.Background()
+	first, err := service.BootstrapAdmin(ctx, "first-managed-admin", "A first administrator password 90210", "bootstrap-first", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := service.CreateManagedUser(ctx, CreateManagedUser{
+		Username: "second-managed-admin", DisplayName: "Second Admin", Role: "administrator",
+		Password: "A second administrator password 90210",
+		Context:  AdministrationContext{ActorUserID: first.ID, CorrelationID: "create-second"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed, err := service.ManagedUsers(ctx, ManagedUserFilter{Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var firstView ManagedUser
+	for _, candidate := range listed.Items {
+		if candidate.ID == first.ID {
+			firstView = candidate
+		}
+	}
+
+	inputs := []UpdateManagedUser{
+		{
+			ID: first.ID, DisplayName: firstView.DisplayName, Email: firstView.Email,
+			Role: "viewer", Enabled: true, ExpectedUpdatedAt: firstView.UpdatedAt,
+			Context: AdministrationContext{ActorUserID: second.ID, CorrelationID: "demote-first"},
+		},
+		{
+			ID: second.ID, DisplayName: second.DisplayName, Email: second.Email,
+			Role: "viewer", Enabled: true, ExpectedUpdatedAt: second.UpdatedAt,
+			Context: AdministrationContext{ActorUserID: first.ID, CorrelationID: "demote-second"},
+		},
+	}
+	results := make(chan error, len(inputs))
+	var wait sync.WaitGroup
+	for _, input := range inputs {
+		wait.Add(1)
+		go func(update UpdateManagedUser) {
+			defer wait.Done()
+			_, updateErr := service.UpdateManagedUser(ctx, update)
+			results <- updateErr
+		}(input)
+	}
+	wait.Wait()
+	close(results)
+	succeeded, protected := 0, 0
+	for updateErr := range results {
+		switch {
+		case updateErr == nil:
+			succeeded++
+		case errors.Is(updateErr, ErrLastAdministrator):
+			protected++
+		default:
+			t.Fatalf("concurrent managed update = %v", updateErr)
+		}
+	}
+	if succeeded != 1 || protected != 1 {
+		t.Fatalf("concurrent results succeeded=%d protected=%d", succeeded, protected)
+	}
+	var administrators int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*) FROM users u
+		JOIN user_roles ur ON ur.user_id = u.id
+		JOIN roles r ON r.id = ur.role_id
+		WHERE u.enabled AND r.name = 'administrator'
+	`).Scan(&administrators); err != nil || administrators != 1 {
+		t.Fatalf("enabled administrators = %d, %v", administrators, err)
+	}
+}
+
 func testService(t *testing.T, pool *pgxpool.Pool, now func() time.Time) *Service {
 	t.Helper()
 	options := DefaultOptions()

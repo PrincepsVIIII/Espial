@@ -167,16 +167,17 @@ type AuditList struct {
 }
 
 type AuditFilter struct {
-	Limit        int
-	Cursor       string
-	From         time.Time
-	To           time.Time
-	FromExplicit bool
-	ToExplicit   bool
-	Actions      []string
-	Results      []string
-	TargetTypes  []string
-	ActorUserID  string
+	Limit         int
+	Cursor        string
+	From          time.Time
+	To            time.Time
+	FromExplicit  bool
+	ToExplicit    bool
+	Actions       []string
+	Results       []string
+	TargetTypes   []string
+	ActorUserID   string
+	CorrelationID string
 }
 
 type CreateIntegration struct {

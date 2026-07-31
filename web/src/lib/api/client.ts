@@ -38,11 +38,54 @@ export type MonitoringPayload = {
   integrations: IntegrationListResponse;
 };
 
+export type ResponseMetadata = {
+  request_id?: string;
+  etag?: string;
+};
+
 export async function requestJSON<T>(
   fetcher: typeof fetch,
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  return (await requestJSONWithMetadata<T>(fetcher, path, init)).data;
+}
+
+export async function requestJSONWithMetadata<T>(
+  fetcher: typeof fetch,
+  path: string,
+  init: RequestInit = {},
+): Promise<{ data: T } & ResponseMetadata> {
+  const response = await performRequest(fetcher, path, init);
+  try {
+    return {
+      data: (await response.json()) as T,
+      ...responseMetadata(response),
+    };
+  } catch {
+    throw new ApiFailure({
+      status: response.status,
+      code: 'invalid_response',
+      message: 'Espial Core returned an unreadable response.',
+      request_id: response.headers.get('X-Request-ID') ?? undefined,
+    });
+  }
+}
+
+export async function requestVoidWithMetadata(
+  fetcher: typeof fetch,
+  path: string,
+  init: RequestInit = {},
+): Promise<ResponseMetadata> {
+  const response = await performRequest(fetcher, path, init);
+  return responseMetadata(response);
+}
+
+async function performRequest(
+  fetcher: typeof fetch,
+  path: string,
+  init: RequestInit,
+): Promise<Response> {
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   headers.set('X-Request-ID', requestID());
@@ -61,16 +104,16 @@ export async function requestJSON<T>(
     });
   }
   if (!response.ok) throw new ApiFailure(await responseProblem(response));
-  try {
-    return (await response.json()) as T;
-  } catch {
-    throw new ApiFailure({
-      status: response.status,
-      code: 'invalid_response',
-      message: 'Espial Core returned an unreadable response.',
-      request_id: response.headers.get('X-Request-ID') ?? undefined,
-    });
-  }
+  return response;
+}
+
+function responseMetadata(response: Response): ResponseMetadata {
+  const requestID = response.headers.get('X-Request-ID') ?? undefined;
+  const etag = response.headers.get('ETag') ?? undefined;
+  return {
+    ...(requestID ? { request_id: requestID } : {}),
+    ...(etag ? { etag } : {}),
+  };
 }
 
 export function problemFrom(error: unknown): ClientProblem {
@@ -78,7 +121,7 @@ export function problemFrom(error: unknown): ClientProblem {
   return {
     status: 0,
     code: 'unexpected_error',
-    message: 'Monitoring data could not be loaded.',
+    message: 'The request could not be completed.',
   };
 }
 

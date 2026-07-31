@@ -10,6 +10,8 @@ let eventID = 0;
 
 const now = '2026-07-31T12:00:00Z';
 const integrationID = '60000000-0000-4000-8000-000000000001';
+let users = initialUsers();
+let auditEvents = initialAuditEvents();
 const resources = [
   resource(
     '61000000-0000-4000-8000-000000000001',
@@ -58,6 +60,8 @@ const server = http.createServer((request, response) => {
       streamConnections = 0;
       monitoringReads = 0;
       eventID = 0;
+      users = initialUsers();
+      auditEvents = initialAuditEvents();
     }
     return json(response, 200, state());
   }
@@ -70,10 +74,16 @@ const server = http.createServer((request, response) => {
     return json(response, 200, {
       user: {
         id: '70000000-0000-4000-8000-000000000001',
-        username: 'operator',
-        display_name: 'NOC Operator',
-        roles: ['operator'],
-        permissions: ['overview:read', 'resources:read', 'integrations:read'],
+        username: 'admin',
+        display_name: 'NOC Administrator',
+        roles: ['administrator'],
+        permissions: [
+          'overview:read',
+          'resources:read',
+          'integrations:read',
+          'audit:read',
+          'users:manage',
+        ],
       },
       expires_at: '2026-07-31T18:00:00Z',
       capabilities: { local: true, sso: false },
@@ -165,6 +175,82 @@ const server = http.createServer((request, response) => {
       ],
     });
   }
+  if (url.pathname === '/api/v1/audit' && request.method === 'GET') {
+    const correlationID = url.searchParams.get('correlation_id');
+    return json(response, 200, {
+      items: correlationID
+        ? auditEvents.filter((event) => event.correlation_id === correlationID)
+        : auditEvents,
+      from: '2026-07-30T12:00:00Z',
+      to: now,
+    });
+  }
+  if (url.pathname === '/api/v1/roles' && request.method === 'GET') {
+    return json(response, 200, {
+      items: [
+        { name: 'administrator', permissions: ['users:manage', 'audit:read'] },
+        { name: 'operator', permissions: ['resources:read'] },
+        { name: 'viewer', permissions: ['resources:read'] },
+      ],
+    });
+  }
+  if (url.pathname === '/api/v1/users' && request.method === 'GET') {
+    return json(response, 200, { items: users });
+  }
+  if (url.pathname === '/api/v1/users' && request.method === 'POST') {
+    return readJSON(request).then((body) => {
+      const requestID =
+        request.headers['x-request-id'] ?? 'browser-user-create';
+      const created = {
+        id: `70000000-0000-4000-8000-${String(users.length + 1).padStart(12, '0')}`,
+        username: body.username,
+        display_name: body.display_name,
+        ...(body.email ? { email: body.email } : {}),
+        identity_provider: 'local',
+        enabled: true,
+        roles: [body.role],
+        active_sessions: 0,
+        created_at: now,
+        updated_at: now,
+      };
+      users.push(created);
+      auditEvents.unshift(
+        userAudit(requestID, 'auth.local.user.created', created),
+      );
+      return json(response, 201, created, requestID, `"${now}"`);
+    });
+  }
+  const userMatch = url.pathname.match(
+    /^\/api\/v1\/users\/([0-9a-f-]+)(\/password)?$/,
+  );
+  if (userMatch && request.method === 'PUT' && !userMatch[2]) {
+    return readJSON(request).then((body) => {
+      const user = users.find((candidate) => candidate.id === userMatch[1]);
+      if (!user)
+        return apiError(response, 404, 'not_found', 'The user was not found.');
+      Object.assign(user, {
+        display_name: body.display_name,
+        ...(body.email ? { email: body.email } : {}),
+        enabled: body.enabled,
+        roles: [body.role],
+        updated_at: '2026-07-31T12:01:00Z',
+      });
+      if (!body.email) delete user.email;
+      const requestID =
+        request.headers['x-request-id'] ?? 'browser-user-update';
+      auditEvents.unshift(userAudit(requestID, 'auth.user.updated', user));
+      return json(response, 200, user, requestID, `"${user.updated_at}"`);
+    });
+  }
+  if (userMatch && request.method === 'POST' && userMatch[2]) {
+    const user = users.find((candidate) => candidate.id === userMatch[1]);
+    if (!user)
+      return apiError(response, 404, 'not_found', 'The user was not found.');
+    const requestID =
+      request.headers['x-request-id'] ?? 'browser-password-reset';
+    auditEvents.unshift(userAudit(requestID, 'auth.password.reset', user));
+    return empty(response, 204, requestID);
+  }
   apiError(response, 404, 'not_found', 'The requested record was not found.');
 });
 
@@ -237,10 +323,17 @@ function state() {
   };
 }
 
-function json(response, status, body) {
+function json(
+  response,
+  status,
+  body,
+  requestID = 'browser-test-request',
+  etag,
+) {
   response.writeHead(status, {
     'Content-Type': 'application/json',
-    'X-Request-ID': 'browser-test-request',
+    'X-Request-ID': requestID,
+    ...(etag ? { ETag: etag } : {}),
   });
   response.end(JSON.stringify(body));
 }
@@ -251,9 +344,78 @@ function apiError(response, status, code, message) {
   });
 }
 
-function empty(response, status) {
-  response.writeHead(status);
+function empty(response, status, requestID = 'browser-test-request') {
+  response.writeHead(status, { 'X-Request-ID': requestID });
   response.end();
+}
+
+function readJSON(request) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk) => (raw += chunk));
+    request.on('end', () => {
+      try {
+        resolve(JSON.parse(raw || '{}'));
+      } catch (error) {
+        reject(error);
+      }
+    });
+    request.on('error', reject);
+  });
+}
+
+function initialUsers() {
+  return [
+    {
+      id: '70000000-0000-4000-8000-000000000001',
+      username: 'admin',
+      display_name: 'NOC Administrator',
+      email: 'admin@example.test',
+      identity_provider: 'local',
+      enabled: true,
+      roles: ['administrator'],
+      active_sessions: 1,
+      password_changed_at: now,
+      created_at: '2026-07-30T12:00:00Z',
+      updated_at: now,
+    },
+  ];
+}
+
+function initialAuditEvents() {
+  return [
+    {
+      id: '80000000-0000-4000-8000-000000000001',
+      actor_user_id: '70000000-0000-4000-8000-000000000001',
+      actor_username: 'admin',
+      action: 'auth.local.bootstrap',
+      target_type: 'user',
+      target_id: '70000000-0000-4000-8000-000000000001',
+      result: 'succeeded',
+      correlation_id: 'bootstrap-browser-test',
+      occurred_at: '2026-07-30T12:00:00Z',
+    },
+  ];
+}
+
+function userAudit(correlationID, action, user) {
+  return {
+    id: `80000000-0000-4000-8000-${String(auditEvents.length + 1).padStart(12, '0')}`,
+    actor_user_id: '70000000-0000-4000-8000-000000000001',
+    actor_username: 'admin',
+    action,
+    target_type: 'user',
+    target_id: user.id,
+    result: 'succeeded',
+    correlation_id: correlationID,
+    after_summary: {
+      username: user.username,
+      role: user.roles[0],
+      enabled: user.enabled,
+    },
+    occurred_at: now,
+  };
 }
 
 const shutdown = () => server.close(() => process.exit(0));

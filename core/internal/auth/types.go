@@ -18,6 +18,10 @@ var (
 	ErrUserNotFound        = errors.New("local user not found")
 	ErrRoleNotFound        = errors.New("role not found")
 	ErrUsernameTaken       = errors.New("username already exists")
+	ErrInvalidCursor       = errors.New("invalid user cursor")
+	ErrUserChanged         = errors.New("user changed since it was read")
+	ErrSelfLockout         = errors.New("administrators cannot remove their own access")
+	ErrLastAdministrator   = errors.New("at least one enabled administrator is required")
 )
 
 type User struct {
@@ -26,6 +30,66 @@ type User struct {
 	DisplayName string   `json:"display_name"`
 	Roles       []string `json:"roles"`
 	Permissions []string `json:"permissions"`
+}
+
+type ManagedUser struct {
+	ID               string     `json:"id"`
+	Username         string     `json:"username"`
+	DisplayName      string     `json:"display_name"`
+	Email            string     `json:"email,omitempty"`
+	IdentityProvider string     `json:"identity_provider"`
+	Enabled          bool       `json:"enabled"`
+	Roles            []string   `json:"roles"`
+	ActiveSessions   int64      `json:"active_sessions"`
+	PasswordChanged  *time.Time `json:"password_changed_at,omitempty"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type ManagedUserList struct {
+	Items      []ManagedUser `json:"items"`
+	NextCursor string        `json:"next_cursor,omitempty"`
+}
+
+type ManagedUserFilter struct {
+	Limit  int
+	Cursor string
+}
+
+type RoleView struct {
+	Name        string   `json:"name"`
+	Permissions []string `json:"permissions"`
+}
+
+type AdministrationContext struct {
+	ActorUserID   string
+	SourceAddress string
+	CorrelationID string
+}
+
+type CreateManagedUser struct {
+	Username    string
+	DisplayName string
+	Email       string
+	Role        string
+	Password    string
+	Context     AdministrationContext
+}
+
+type UpdateManagedUser struct {
+	ID                string
+	DisplayName       string
+	Email             string
+	Role              string
+	Enabled           bool
+	ExpectedUpdatedAt time.Time
+	Context           AdministrationContext
+}
+
+type ResetManagedPassword struct {
+	ID       string
+	Password string
+	Context  AdministrationContext
 }
 
 func (user User) HasPermission(permission string) bool {

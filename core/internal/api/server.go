@@ -50,6 +50,14 @@ type IntegrationManager interface {
 	Update(context.Context, monitoring.IntegrationConfigUpdate) (time.Time, error)
 }
 
+type UserAdministrator interface {
+	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
+	ManagedRoles(context.Context) ([]auth.RoleView, error)
+	CreateManagedUser(context.Context, auth.CreateManagedUser) (auth.ManagedUser, error)
+	UpdateManagedUser(context.Context, auth.UpdateManagedUser) (auth.ManagedUser, error)
+	ResetManagedUserPassword(context.Context, auth.ResetManagedPassword) error
+}
+
 type EventSource interface {
 	Subscribe(*uint64, int) *events.Subscription
 }
@@ -62,6 +70,7 @@ type Dependencies struct {
 	SecureCookies bool
 	Monitoring    MonitoringReader
 	Integrations  IntegrationManager
+	Users         UserAdministrator
 	Events        EventSource
 	SSEHeartbeat  time.Duration
 	SSEMaxClients int
@@ -99,6 +108,11 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/integrations/{id}", server.integration)
 	mux.HandleFunc("PUT /api/v1/integrations/{id}/configuration", server.updateIntegration)
 	mux.HandleFunc("GET /api/v1/audit", server.auditEvents)
+	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
+	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
+	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)
+	mux.HandleFunc("PUT /api/v1/users/{id}", server.updateManagedUser)
+	mux.HandleFunc("POST /api/v1/users/{id}/password", server.resetManagedUserPassword)
 	mux.HandleFunc("GET /api/v1/events/stream", server.eventStream)
 	return middleware(dependencies.Logger, mux)
 }

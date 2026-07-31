@@ -31,7 +31,7 @@ After login, the default destination is the **Dashboard**. The top navigation
 is present across every authenticated page in this order:
 
 ```text
-Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  |  Live  User ▾
+Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  Audit  |  User ▾
 ```
 
 - **Dashboard** summarizes health, incidents, freshness, and monitoring coverage.
@@ -42,15 +42,18 @@ Espial / UBNetDef  |  Dashboard  Alerts  Datacenter  Hypervisor  Webpages  |  Li
 - **Hypervisor** owns virtual-machine, host, cluster, and related virtualization
   views.
 - **Webpages** owns monitored-site availability, response, and certificate views.
+- **Audit** owns administrator-visible audit history and provides access to user
+  administration as a real child page.
 - **User** contains identity, role, settings made available to that role, and sign
   out. Administrative functions may live here or in a permission-gated secondary
   menu rather than becoming another permanent primary item.
 
 The canonical route targets are `/dashboard`, `/alerts`, `/datacenter`,
-`/hypervisor`, and `/webpages`. Until a section's backend phase is implemented, its
-route must show an honest unavailable, empty, or not-configured state—never
-fabricated operational content. The existing `/overview` route may redirect to
-`/dashboard` during the navigation migration.
+`/hypervisor`, `/webpages`, and permission-gated `/audit`. User administration is
+at `/audit/users`. Until a section's backend phase is implemented, its route must
+show an honest unavailable, empty, or not-configured state—never fabricated
+operational content. The existing `/overview` route may redirect to `/dashboard`
+during the navigation migration.
 
 ## Navigation
 
@@ -66,6 +69,7 @@ separate from the background. It must:
 - remain visually and structurally consistent across authenticated routes;
 - visibly identify the current section;
 - support pointer, keyboard, and touch input with visible focus;
+- navigate directly when a primary label is activated;
 - use dropdowns only for real destinations or user actions, never as decoration;
 - reveal desktop dropdowns on pointer hover and keyboard focus, while also
   supporting click/tap activation and `Escape` to close;
@@ -73,6 +77,27 @@ separate from the background. It must:
   navigation label without filling the whole item with a highlight; and
 - collapse into one clearly labeled menu on narrow screens while preserving the
   same item order and access to sign out.
+
+Normal live-stream health is not permanent navigation content. Reconnecting or
+disconnected state appears only when operator attention is useful and must not move
+or obscure the bar. The floating bar remains fixed at its padded viewport position
+while document content scrolls beneath it.
+
+## Capability evidence
+
+UI copy must not claim that an operator can manage, inspect, export, or verify
+something unless that same release exposes a discoverable path to the capability.
+Future work is explicitly labeled planned. Implemented administrative mutations
+must provide a visible success/failure receipt and a direct route to the matching
+audit evidence. Reviews verify the rendered path and authoritative API, not merely
+permissions, backend methods, roadmap text, or an unavailable placeholder.
+
+Audit and user administration are administrator-only. The UI hides their navigation
+from users without the relevant permission, while Core independently returns `403`.
+User administration must prevent accidental self-lockout and removal or disabling
+of the last enabled administrator. Role, enablement, identity, creation, and password
+reset mutations revoke sessions where authorization or credentials change and are
+committed atomically with a redacted audit event.
 
 ## Color and surfaces
 
@@ -160,5 +185,7 @@ Before a UI change is complete, verify:
 6. Relevant detailed contracts, wireframes, and visual tests were updated.
 7. Static chrome is restrained and visual emphasis is reserved for useful data,
    selection, focus, and purposeful spatial motion.
+8. Every capability claim has a working, permission-appropriate UI path and every
+   administrative mutation links to its audit receipt.
 
 Record material changes or exceptions in [UI review notes](UI_REVIEW.md).

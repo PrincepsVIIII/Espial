@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ApiFailure, requestJSON } from './client';
+import {
+  ApiFailure,
+  requestJSON,
+  requestJSONWithMetadata,
+  requestVoidWithMetadata,
+} from './client';
 
 describe('typed API client', () => {
   it('uses same-origin credentials and sends a request ID', async () => {
@@ -44,5 +49,39 @@ describe('typed API client', () => {
     await expect(requestJSON(fetcher, '/api/test')).rejects.toMatchObject({
       problem: { code: 'core_unavailable', status: 0 },
     });
+  });
+
+  it('returns mutation receipt metadata without adding it to the payload', async () => {
+    const fetcher = vi.fn(async () =>
+      Response.json(
+        { username: 'viewer' },
+        {
+          headers: {
+            'X-Request-ID': 'user-change-7',
+            ETag: '"2026-07-31T12:00:00Z"',
+          },
+        },
+      ),
+    ) as unknown as typeof fetch;
+    await expect(
+      requestJSONWithMetadata<{ username: string }>(fetcher, '/api/v1/users'),
+    ).resolves.toEqual({
+      data: { username: 'viewer' },
+      request_id: 'user-change-7',
+      etag: '"2026-07-31T12:00:00Z"',
+    });
+  });
+
+  it('returns the request ID from an empty successful mutation', async () => {
+    const fetcher = vi.fn(
+      async () =>
+        new Response(null, {
+          status: 204,
+          headers: { 'X-Request-ID': 'password-change-8' },
+        }),
+    ) as unknown as typeof fetch;
+    await expect(
+      requestVoidWithMetadata(fetcher, '/api/v1/users/user/password'),
+    ).resolves.toEqual({ request_id: 'password-change-8' });
   });
 });

@@ -13,9 +13,12 @@ const alertsPage = source('../routes/(app)/alerts/+page.svelte');
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
+const auditPage = source('../routes/(app)/audit/+page.svelte');
+const usersPage = source('../routes/(app)/audit/users/+page.svelte');
 const overviewRedirect = source('../routes/(app)/overview/+page.ts');
 const stylesheet = source('../styles.css');
 const brandLogo = source('../lib/components/BrandLogo.svelte');
+const coreUserHandler = source('../../../core/internal/api/user_handlers.go');
 
 describe('public entry contract', () => {
   it('identifies Espial and UBNetDef and keeps login at the public root', () => {
@@ -34,13 +37,14 @@ describe('public entry contract', () => {
 });
 
 describe('authenticated shell contract', () => {
-  it('keeps the five primary routes in the required order', () => {
+  it('keeps the six primary routes in the required order', () => {
     const expected = [
       '/dashboard',
       '/alerts',
       '/datacenter',
       '/hypervisor',
       '/webpages',
+      '/audit',
     ];
     const positions = expected.map((href) =>
       appShell.indexOf(`href: '${href}'`),
@@ -60,10 +64,22 @@ describe('authenticated shell contract', () => {
   it('uses the supplied brand asset and minimalist floating navigation contract', () => {
     expect(appShell).toContain('BrandLogo compact');
     expect(brandLogo).toContain('data:image/png;base64');
-    expect(stylesheet).toContain('.nav-label::after');
+    expect(stylesheet).toContain('.nav-link::after');
     expect(stylesheet).toContain('background: var(--hayes-white)');
     expect(stylesheet).toContain('.nav-dropdown');
-    expect(stylesheet).toMatch(/\.app-header\s*\{[\s\S]*?top:\s*1rem/);
+    expect(stylesheet).toMatch(
+      /\.app-header\s*\{[\s\S]*?position:\s*fixed;[\s\S]*?top:\s*1rem/,
+    );
+  });
+
+  it('makes primary labels direct links and exposes only implemented children', () => {
+    expect(appShell).toContain('class="nav-link"');
+    expect(appShell).toContain('href={item.href}');
+    expect(appShell).toContain("{ label: 'Users', href: '/audit/users' }");
+    expect(appShell).not.toMatch(
+      /Planned workflow|Planned inventory|Open section/,
+    );
+    expect(appShell).toContain('aria-label={`${item.label} sections`}');
   });
 
   it('loads the session through SvelteKit and has a Core-unavailable state', () => {
@@ -73,11 +89,43 @@ describe('authenticated shell contract', () => {
     expect(appShell).toContain('Retry connection');
   });
 
-  it('shows all required live-connection states and uses invalidation refresh', () => {
-    expect(appShell).toContain("live: 'Live'");
-    expect(appShell).toContain("reconnecting: 'Reconnecting'");
-    expect(appShell).toContain("disconnected: 'Disconnected'");
+  it('keeps normal connection state out of navigation and reports interruptions', () => {
+    expect(appShell).not.toContain("live: 'Live'");
+    expect(appShell).not.toContain('connection-status');
+    expect(appShell).toContain('Live updates interrupted');
+    expect(appShell).toContain('Live updates are disconnected');
     expect(appShell).toContain("invalidate('espial:monitoring')");
+  });
+
+  it('keeps cyan separate from semantic dashboard state colors', () => {
+    expect(stylesheet).toMatch(
+      /\.summary-introduction\s*\{[\s\S]*?border-top:\s*2px solid var\(--netdef-cyan\)/,
+    );
+    const summaryRule = stylesheet.match(
+      /\.monitoring-summary\s*\{[\s\S]*?\n\}/,
+    )?.[0];
+    expect(summaryRule).not.toContain('border-top');
+    expect(stylesheet).toMatch(
+      /\.state-counts > div\s*\{[\s\S]*?border-top:\s*3px solid currentColor/,
+    );
+  });
+});
+
+describe('administrator capability evidence', () => {
+  it('provides discoverable Audit and Users pages rather than a documentation-only claim', () => {
+    expect(auditPage).toContain('<h1>Audit</h1>');
+    expect(auditPage).toContain('name="correlation_id"');
+    expect(usersPage).toContain('<h1>Users</h1>');
+    expect(usersPage).toContain('Create local user');
+    expect(usersPage).toContain('Replace password');
+  });
+
+  it('shows mutation proof and links it to an exact audit receipt', () => {
+    expect(usersPage).toContain('Request ID:');
+    expect(usersPage).toContain('View matching audit record');
+    expect(usersPage).toContain('/audit?correlation_id=');
+    expect(coreUserHandler).toContain('self_lockout');
+    expect(coreUserHandler).toContain('last_administrator');
   });
 });
 

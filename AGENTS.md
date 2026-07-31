@@ -18,3 +18,10 @@ sparingly and a short white navigation underline; avoid decorative icons, badges
 glows, gradients, and filled hover tiles; and reserve ambitious animation for
 purposeful spatial or integration views. Desktop dropdowns must work on hover,
 focus, click/touch, and `Escape`, with an equivalent collapsed narrow-screen menu.
+
+Do not infer a user-visible capability from a permission, backend method, schema,
+plan, or placeholder. Before UI copy says an operator can perform or verify an
+action, trace and test the complete path: discoverable navigation, authoritative
+read, authorized mutation where applicable, success/error feedback, and audit
+evidence. Label incomplete work as planned or unavailable. Administrative mutations
+must expose a correlation receipt that links to the matching audit record.

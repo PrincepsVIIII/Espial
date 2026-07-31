@@ -39,7 +39,7 @@ Non-2xx JSON responses use:
     "code": "validation_failed",
     "message": "Request validation failed.",
     "request_id": "01J...",
-    "fields": [{"field": "display_name", "code": "required"}]
+    "fields": [{ "field": "display_name", "code": "required" }]
   }
 }
 ```
@@ -49,8 +49,7 @@ adapter output, or existence details that enable account enumeration.
 
 ## Collections
 
-Use cursor pagination: `?limit=50&cursor=...`, with a default of 50 and maximum of
-200. Responses include `items` and an omitted `next_cursor` when complete. Filters
+Use cursor pagination: `?limit=50&cursor=...`, with a default of 50 and maximum of 200. Responses include `items` and an omitted `next_cursor` when complete. Filters
 are explicit query parameters; repeated parameters mean OR within that field and
 AND across different fields. Stable ordering always includes `id` as a tiebreaker.
 
@@ -80,14 +79,29 @@ POST /api/v1/integrations
 PUT  /api/v1/integrations/{id}/configuration
 GET  /api/v1/events/stream
 GET  /api/v1/audit                   administrator only
+GET  /api/v1/roles                   administrator user-management metadata
+GET  /api/v1/users                   administrator only
+POST /api/v1/users                   administrator only
+PUT  /api/v1/users/{id}              administrator only; requires If-Match
+POST /api/v1/users/{id}/password     administrator only
 ```
 
 Resource filters are repeated `state`, `kind`, and `integration` values plus a
 single `stale` boolean. Integration filters are repeated `adapter_id` and
 `runtime_state` values plus a single `enabled` boolean. Audit filters are repeated
-`action`, `result`, and `target_type` values, with one `actor_user_id`, `from`, and
-`to`. `stale=true` matches the stale state only; unknown remains an explicit state
-filter. Audit windows default to the previous 24 hours and cannot exceed 31 days.
+`action`, `result`, and `target_type` values, with one `actor_user_id`, `from`, `to`,
+and `correlation_id`. `stale=true` matches the stale state only; unknown remains an
+explicit state filter. Audit windows default to the previous 24 hours and cannot
+exceed 31 days.
+
+User reads, writes, and the role metadata needed by those writes require
+`users:manage`. User collection reads use cursor pagination.
+Creation accepts a local username, display name, optional email, initial built-in
+role, and password. User replacement requires the current `ETag`, rejects stale
+writes, prevents self/last-administrator lockout, and revokes sessions after role or
+enablement changes. Password resets never return or audit credentials and revoke all
+target sessions. Successful mutation response headers provide `X-Request-ID`; audit
+events use the same value as `correlation_id`.
 
 Integration creation accepts only adapter IDs in Core's immutable trusted registry.
 Configuration replacement requires the current response `ETag` in `If-Match`;

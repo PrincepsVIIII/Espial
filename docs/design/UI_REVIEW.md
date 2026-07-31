@@ -248,3 +248,53 @@ treatment, and the updated guidance against the
   keyboard `Escape` focus return, and reduced motion.
 - Production SvelteKit SSR build and formatting checks completed successfully.
 - Documentation links passed across 51 Markdown files.
+
+## 2026-07-31 — Capability evidence and Phase 2 groundwork review
+
+### Scope
+
+Reviewed fixed navigation behavior, direct primary-route activation, Audit and
+Users discoverability, user-mutation proof, Dashboard accent boundaries, and the
+honest Phase 2 navigation contract against the
+[general UI guidance](UI_GUIDANCE.md), [design system](DESIGN_SYSTEM.md), and
+[wireframes](WIREFRAMES.md).
+
+### Material decisions
+
+- Kept the floating header detached and made it fixed, so the document scrolls
+  beneath stable navigation.
+- Made every primary label a direct route link. Only Audit exposes a child trigger,
+  and only because Users is implemented and permission-gated; speculative children
+  remain out of navigation.
+- Removed normal `Live` text from persistent chrome. Only reconnecting or
+  disconnected states create a temporary content notice.
+- Scoped the cyan Dashboard rule to the summary introduction. Semantic health
+  colors begin in the state cells without a cyan line layered above them.
+- Added administrator Audit history and local Users administration. Each successful
+  mutation presents its request ID and an exact Audit lookup link; Core commits the
+  state change and redacted audit summary atomically.
+- Added optimistic concurrency, immediate session revocation for role/access/password
+  changes, and explicit self-lockout and last-administrator rejection.
+
+### Phase 2 readiness
+
+- Alerts remains a real direct route with honest unavailable copy until its read
+  model exists.
+- The existing `incidents:operate` permission remains the authorization seam for
+  incident actions.
+- New feature navigation now has a repository-level acceptance rule: a visible
+  capability requires a route, permission boundary, backend implementation, states,
+  and verification evidence in the same change.
+
+### Verification evidence
+
+- Svelte diagnostics: zero errors and zero warnings.
+- Frontend unit/contract suite: 43 tests passed, including capability-discovery,
+  fixed-navigation, accent-boundary, and mutation-receipt regressions.
+- Chromium coverage: the 12 unaffected scenarios passed together; the three
+  corrected narrow-navigation, dropdown, and user-to-audit receipt scenarios then
+  passed in focused reruns.
+- Core unit/API suites passed. Database-backed auth and monitoring suites passed
+  under the race detector, including atomic audit evidence and session revocation.
+- OpenAPI validation, generated-type freshness, documentation links, formatting,
+  whitespace checks, and the production SvelteKit build passed.

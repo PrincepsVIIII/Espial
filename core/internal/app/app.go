@@ -55,6 +55,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
 		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
 		Integrations: monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
+		Users:        authService,
 		Events:       monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
 		SSEMaxClients: cfg.Server.SSEMaxClients,
 	})

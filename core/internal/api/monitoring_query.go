@@ -104,7 +104,7 @@ func parseIntegrationFilter(values url.Values) (monitoring.IntegrationFilter, qu
 func parseAuditFilter(values url.Values, now time.Time) (monitoring.AuditFilter, queryErrors) {
 	allowed := map[string]bool{
 		"limit": true, "cursor": true, "from": true, "to": true, "action": true,
-		"result": true, "target_type": true, "actor_user_id": true,
+		"result": true, "target_type": true, "actor_user_id": true, "correlation_id": true,
 	}
 	if fields := rejectUnknownQuery(values, allowed); len(fields) > 0 {
 		return monitoring.AuditFilter{}, fields
@@ -152,6 +152,11 @@ func parseAuditFilter(values url.Values, now time.Time) (monitoring.AuditFilter,
 		fields = append(fields, APIFieldError{Field: "actor_user_id", Code: "invalid"})
 	} else {
 		filter.ActorUserID = actor
+	}
+	if correlation, field := singleValue(values, "correlation_id", 128); field != nil {
+		fields = append(fields, *field)
+	} else {
+		filter.CorrelationID = correlation
 	}
 	return filter, fields
 }

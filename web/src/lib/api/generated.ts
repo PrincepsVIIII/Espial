@@ -172,6 +172,20 @@ export interface LiveInvalidationData {
   changed_at: string;
 }
 
+export interface ManagedUser {
+  id: string;
+  username: string;
+  display_name: string;
+  email?: string;
+  identity_provider: string;
+  enabled: boolean;
+  roles: string[];
+  active_sessions: number;
+  password_changed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface NormalizedObservation {
   id?: string;
   external_resource_id: string;
@@ -269,4 +283,9 @@ export interface NormalizedResource {
     [k: string]: unknown;
   };
   source_url?: string;
+}
+
+export interface RoleView {
+  name: string;
+  permissions: string[];
 }

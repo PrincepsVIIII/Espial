@@ -455,11 +455,12 @@ func (service *ReadService) Audit(ctx context.Context, filter AuditFilter) (Audi
 		  AND ($5 = '' OR (a.occurred_at, a.id) < ($4, NULLIF($5, '')::uuid))
 		  AND (COALESCE(cardinality($6::text[]), 0) = 0 OR a.action = ANY($6::text[]))
 		  AND (COALESCE(cardinality($7::text[]), 0) = 0 OR a.result = ANY($7::text[]))
-		  AND (COALESCE(cardinality($8::text[]), 0) = 0 OR a.target_type = ANY($8::text[]))
-		  AND ($9 = '' OR a.actor_user_id = NULLIF($9, '')::uuid)
-		ORDER BY a.occurred_at DESC, a.id DESC LIMIT $10
-	`, filter.From.UTC(), filter.To.UTC(), snapshot, nullableCursorTime(cursor), cursor.ID,
-		filter.Actions, filter.Results, filter.TargetTypes, filter.ActorUserID, filter.Limit+1)
+			  AND (COALESCE(cardinality($8::text[]), 0) = 0 OR a.target_type = ANY($8::text[]))
+			  AND ($9 = '' OR a.actor_user_id = NULLIF($9, '')::uuid)
+			  AND ($10 = '' OR a.correlation_id = $10)
+			ORDER BY a.occurred_at DESC, a.id DESC LIMIT $11
+		`, filter.From.UTC(), filter.To.UTC(), snapshot, nullableCursorTime(cursor), cursor.ID,
+		filter.Actions, filter.Results, filter.TargetTypes, filter.ActorUserID, filter.CorrelationID, filter.Limit+1)
 	if err != nil {
 		return AuditList{}, fmt.Errorf("list audit events: %w", err)
 	}
@@ -517,7 +518,8 @@ func (service *ReadService) RecordAuditRead(
 			"to":             filter.To.UTC().Format(time.RFC3339Nano),
 			"action_filters": len(filter.Actions), "result_filters": len(filter.Results),
 			"target_type_filters": len(filter.TargetTypes), "actor_filter": filter.ActorUserID != "",
-			"limit": filter.Limit,
+			"correlation_filter": filter.CorrelationID != "",
+			"limit":              filter.Limit,
 		},
 		OccurredAt: time.Now().UTC(),
 	})
@@ -579,7 +581,8 @@ func integrationFingerprint(filter IntegrationFilter) string {
 
 func auditFingerprint(filter AuditFilter) string {
 	return filterFingerprint(
-		joinSorted(filter.Actions), joinSorted(filter.Results), joinSorted(filter.TargetTypes), filter.ActorUserID,
+		joinSorted(filter.Actions), joinSorted(filter.Results), joinSorted(filter.TargetTypes),
+		filter.ActorUserID, filter.CorrelationID,
 	)
 }
 

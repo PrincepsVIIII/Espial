@@ -5,11 +5,11 @@ the required emergency access path.
 
 ## Modes and transition
 
-| Mode | Interactive providers | Intended use |
-|---|---|---|
-| `local` | Local username/password | Phase 1 development and controlled initial rollout |
-| `sso_with_local_fallback` | SSO plus deliberate local route | Eventual production default |
-| `sso` | SSO only | Optional only after operators accept the lockout risk |
+| Mode                      | Interactive providers           | Intended use                                          |
+| ------------------------- | ------------------------------- | ----------------------------------------------------- |
+| `local`                   | Local username/password         | Phase 1 development and controlled initial rollout    |
+| `sso_with_local_fallback` | SSO plus deliberate local route | Eventual production default                           |
+| `sso`                     | SSO only                        | Optional only after operators accept the lockout risk |
 
 The provider authenticates an identity. A provider-neutral Core service creates the
 session, loads roles, enforces permissions, and records audit events. Frontend code
@@ -30,6 +30,13 @@ never makes an authorization decision on behalf of Core.
 - UI: the login page clearly labels local access. Once SSO exists, local fallback is
   behind an “Emergency local access” disclosure rather than presented as equal.
 
+Administrator user management is exposed through authenticated, CSRF-protected
+Core APIs and `/audit/users`. It supports listing and creating local users, changing
+display name/email/one built-in role/account enablement, and resetting local
+passwords. Core prevents self-lockout and preserves at least one enabled
+administrator. Authorization or credential changes revoke affected sessions. Every
+mutation returns a request correlation that the UI links to immutable audit history.
+
 ## Sessions
 
 - Generate at least 256 bits of randomness; store only a SHA-256 digest server-side.
@@ -47,13 +54,13 @@ never makes an authorization decision on behalf of Core.
 
 Permissions are named actions so roles can evolve without route-specific checks.
 
-| Permission | Viewer | Operator | Administrator | Action Approver |
-|---|:---:|:---:|:---:|:---:|
-| `overview:read`, `resources:read`, `integrations:read` | Yes | Yes | Yes | Yes |
-| `audit:read` | No | No | Yes | No |
-| `incidents:operate` | No | Yes | Yes | No |
-| `integrations:manage`, `users:manage`, `roles:manage` | No | No | Yes | No |
-| `actions:approve` | No | No | No | Reserved |
+| Permission                                             | Viewer | Operator | Administrator | Action Approver |
+| ------------------------------------------------------ | :----: | :------: | :-----------: | :-------------: |
+| `overview:read`, `resources:read`, `integrations:read` |  Yes   |   Yes    |      Yes      |       Yes       |
+| `audit:read`                                           |   No   |    No    |      Yes      |       No        |
+| `incidents:operate`                                    |   No   |   Yes    |      Yes      |       No        |
+| `integrations:manage`, `users:manage`, `roles:manage`  |   No   |    No    |      Yes      |       No        |
+| `actions:approve`                                      |   No   |    No    |      No       |    Reserved     |
 
 Phase 1 implements the first row and administrator management boundaries. Incident
 and action permissions exist as reserved names until their roadmap phases.
