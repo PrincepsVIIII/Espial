@@ -122,8 +122,30 @@ These endpoints require `incidents:read`. Incident filters are repeated `severit
 `status`, `integration`, `resource`, and `owner` values plus one `active` boolean
 and bounded `from`/`to` timestamps. Collection and timeline cursors bind the stable
 snapshot and filter fingerprint so a cursor cannot be reused under different
-filters. Detail returns a version `ETag`. Slice 2.1 exposes no incident mutations;
-those require the later operate/idempotency/audit contract.
+filters. Detail returns a version `ETag`.
+
+## Phase 2 incident operator surface
+
+```text
+POST /api/v1/incidents/{id}/acknowledge
+POST /api/v1/incidents/{id}/investigate
+PUT  /api/v1/incidents/{id}/owner
+POST /api/v1/incidents/{id}/notes
+POST /api/v1/incidents/{id}/resolve
+GET  /api/v1/incident-assignees
+```
+
+Mutations require `incidents:operate`, trusted origin, CSRF, bounded strict JSON,
+the current incident `ETag` in `If-Match`, and a bounded `Idempotency-Key`. A stale
+version returns `412` with the current ETag; an exact retry returns the original
+committed receipt and does not append duplicate timeline or audit evidence. Reusing
+the same key for a different request returns `409`.
+
+Each success contains the resulting version, immutable timeline event ID, original
+request/correlation ID, and replay flag. The response includes an Audit URL only
+when the session also has `audit:read`. `incident-assignees` requires
+`incidents:operate` and returns only opaque ID and display name for enabled users
+currently authorized to operate incidents.
 
 ## Live events
 

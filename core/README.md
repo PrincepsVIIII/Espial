@@ -135,7 +135,9 @@ bootstrap and recovery procedures.
 ## Monitoring API
 
 Authenticated clients can read `/api/v1/overview`, paginated resources and
-integrations, and their detail routes. Administrators can read bounded audit
+integrations, incidents, immutable incident timelines, and their detail routes.
+Operators can acknowledge, investigate, assign, note, and resolve recovered
+incidents through `If-Match` and idempotency guarded actions. Administrators can read bounded audit
 windows at `/api/v1/audit`. Operators and administrators can create a registered
 integration and replace its configuration through an `If-Match` guarded update.
 `/api/v1/events/stream` carries invalidations only; clients always refetch REST

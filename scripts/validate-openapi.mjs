@@ -32,6 +32,12 @@ const requiredOperations = new Map([
   ["/incidents", ["get"]],
   ["/incidents/{id}", ["get"]],
   ["/incidents/{id}/timeline", ["get"]],
+  ["/incidents/{id}/acknowledge", ["post"]],
+  ["/incidents/{id}/investigate", ["post"]],
+  ["/incidents/{id}/owner", ["put"]],
+  ["/incidents/{id}/notes", ["post"]],
+  ["/incidents/{id}/resolve", ["post"]],
+  ["/incident-assignees", ["get"]],
   ["/events/stream", ["get"]],
 ]);
 

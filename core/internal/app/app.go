@@ -52,13 +52,15 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("listen on %s: %w", cfg.Server.ListenAddress, err)
 	}
 
+	incidentWorkflow := incidents.NewWorkflow(pool, monitoringRuntime.Hub(), nil)
 	handler := api.New(api.Dependencies{
 		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
 		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
-		Incidents:    incidents.NewReader(pool),
-		Integrations: monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
-		Users:        authService,
-		Events:       monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
+		Incidents:        incidents.NewReader(pool),
+		IncidentWorkflow: incidentWorkflow,
+		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
+		Users:            authService,
+		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
 		SSEMaxClients: cfg.Server.SSEMaxClients,
 	})
 	server := &http.Server{

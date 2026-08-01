@@ -1,0 +1,6 @@
+{
+  "schema": "incident-action-request",
+  "data": {
+    "note": "Replaced the failed uplink and verified stable health."
+  }
+}

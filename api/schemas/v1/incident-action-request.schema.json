@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-action-request.schema.json",
+  "title": "Incident operator action request",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "owner_user_id": { "type": "string", "format": "uuid" },
+    "note": { "type": "string", "minLength": 1, "maxLength": 2000 }
+  }
+}

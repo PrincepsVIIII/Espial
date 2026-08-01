@@ -336,3 +336,43 @@ Reviewed Dashboard active-incident additions and Alerts active/history/detail at
 - Keyboard navigation, direct routes, URL-backed filters, menu `Escape` focus,
   reduced motion, SSE reconnect/resync refetch, permission denial, Core failure,
   and the fixed floating shell remain covered by the complete browser suite.
+
+## 2026-07-31 — Slice 2.2 operator incident workflow review
+
+### Scope
+
+Reviewed incident lifecycle actions, assignment, append-only notes, recovered-only
+resolution, Viewer read-only treatment, success receipts, and stale-version
+recovery at 1440×900, 1280×800, and 500×900 against the
+[general UI guidance](UI_GUIDANCE.md), [design system](DESIGN_SYSTEM.md), and Phase
+2 implementation contract.
+
+### Material decisions
+
+- Kept workflow controls within one flat bordered operational section. Thin
+  dividers and compact forms provide hierarchy without cards, decorative icons,
+  badges, filled hover tiles, gradients, glows, or animation.
+- Show only lifecycle actions valid for the authoritative current status. Assignment
+  is sourced from Core's restricted eligible-user read; recovered-only resolution
+  always requires a note.
+- Present notes as bounded plain text with an explicit immutable-evidence warning.
+  Timeline note output remains text interpolation and does not enable Markdown or
+  HTML rendering.
+- Keep one visible pending action at a time. Validation, denial, Core failure, and
+  `412` conflict use existing inline operational feedback. Conflict refetches and
+  explicitly requires review rather than resubmitting against newer state.
+- Every success shows the committed request ID. Only administrators receive the
+  exact filtered Audit link. Viewer detail replaces all controls with an honest
+  read-only explanation.
+- At narrow width, action forms become one column while current state and immutable
+  timeline remain ahead of any need for a spatial or decorative treatment.
+
+### Verification evidence
+
+- Svelte diagnostics report zero errors and zero warnings.
+- Chromium proves Operator receipt plus one audit record, Viewer control omission,
+  and stale-action refetch/review behavior. The complete view suite captures the
+  incident at 1440px, 1280px, and 500px and checks serious/critical accessibility
+  findings.
+- Backend integration evidence proves the controls correspond to authorized,
+  atomic, idempotent Core mutations rather than client-side capability claims.

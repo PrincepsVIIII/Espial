@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-mutation-result.schema.json",
+  "title": "Incident mutation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "status",
+    "version",
+    "timeline_event_id",
+    "request_id",
+    "replayed"
+  ],
+  "properties": {
+    "incident_id": { "type": "string", "format": "uuid" },
+    "status": {
+      "enum": ["open", "acknowledged", "investigating", "recovered", "resolved"]
+    },
+    "version": { "type": "integer", "minimum": 1 },
+    "timeline_event_id": { "type": "string", "format": "uuid" },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "replayed": { "type": "boolean" },
+    "audit_url": { "type": "string", "pattern": "^/audit\\?correlation_id=" }
+  }
+}

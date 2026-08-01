@@ -92,6 +92,16 @@ export interface EspialEvent {
   };
 }
 
+export interface IncidentOperatorActionRequest {
+  owner_user_id?: string;
+  note?: string;
+}
+
+export interface EligibleIncidentAssignee {
+  id: string;
+  display_name: string;
+}
+
 export type IncidentAPIDetail = IncidentAPISummary & {
   fingerprint: string;
   [k: string]: unknown;
@@ -120,6 +130,16 @@ export interface IncidentAPISummary {
   version: number;
   updated_at: string;
   fingerprint?: string;
+}
+
+export interface IncidentMutationReceipt {
+  incident_id: string;
+  status: "open" | "acknowledged" | "investigating" | "recovered" | "resolved";
+  version: number;
+  timeline_event_id: string;
+  request_id: string;
+  replayed: boolean;
+  audit_url?: string;
 }
 
 export interface IncidentRuleAPIView {
@@ -180,6 +200,8 @@ export interface IncidentTimelineEvent {
   signal_id?: string;
   actor_user_id?: string;
   actor_name?: string;
+  subject_user_id?: string;
+  subject_name?: string;
   kind:
     | "detected"
     | "severity_changed"

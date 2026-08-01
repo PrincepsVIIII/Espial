@@ -158,6 +158,7 @@ erDiagram
     INCIDENT_RULES ||--o{ INCIDENTS : opens
     RESOURCES ||--o{ INCIDENTS : affects
     INCIDENTS ||--o{ INCIDENT_TIMELINE : records
+    INCIDENTS ||--o{ INCIDENT_ACTION_IDEMPOTENCY : receipts
     MONITORING_SIGNALS ||--o| INCIDENT_TIMELINE : explains
 ```
 
@@ -170,7 +171,12 @@ erDiagram
 - A partial unique index permits at most one non-resolved incident for a stable
   `(rule_id, resource_id, check_type)` fingerprint.
 - `incident_timeline` is append-only through database triggers. Detection,
-  meaningful severity change, recurrence, and recovery create immutable evidence.
+  meaningful severity change, recurrence, recovery, Operator actions, assignment,
+  and notes create immutable evidence. Operator and assignment-subject display text
+  is copied into the event so later identity changes do not rewrite history.
+- `incident_action_idempotency` binds actor, incident, action, and key to the
+  request hash and original result/timeline/correlation receipt. It is written in
+  the same transaction as the incident, timeline, and redacted audit event.
 - Incident and timeline rows are retained; later retention policy must not remove
   evidence earlier than the audit retention boundary.
 

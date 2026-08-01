@@ -1,0 +1,7 @@
+{
+  "schema": "incident-assignee",
+  "data": {
+    "id": "not-an-id",
+    "display_name": ""
+  }
+}

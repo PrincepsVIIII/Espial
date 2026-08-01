@@ -1,0 +1,7 @@
+{
+  "schema": "incident-action-request",
+  "data": {
+    "note": "",
+    "html": "<script>not accepted</script>"
+  }
+}

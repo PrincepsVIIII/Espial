@@ -4,6 +4,8 @@
     "id": "91000000-0000-4000-8000-000000000001",
     "incident_id": "90000000-0000-4000-8000-000000000001",
     "signal_id": "80000000-0000-4000-8000-000000000001",
+    "actor_user_id": "70000000-0000-4000-8000-000000000001",
+    "actor_name": "NOC Administrator",
     "kind": "detected",
     "to_status": "open",
     "to_severity": "critical",

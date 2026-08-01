@@ -4,6 +4,8 @@ import type {
   IncidentTimelineEvent,
 } from '$lib/api/generated';
 
+export type { EligibleIncidentAssignee } from '$lib/api/generated';
+
 export type IncidentListResponse = {
   items: IncidentAPISummary[];
   next_cursor?: string;

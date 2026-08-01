@@ -123,6 +123,62 @@ for (const viewport of [
   });
 }
 
+test('operator action returns a visible receipt and exactly one audit record', async ({
+  page,
+  request,
+}) => {
+  await page.goto(`/alerts/${'80000000-0000-4000-8000-000000000021'}`);
+  await waitForHydration(page);
+  await expect(page.getByRole('heading', { name: 'Workflow' })).toBeVisible();
+  await page.getByRole('button', { name: 'Acknowledge' }).click();
+  const receipt = page.locator('.mutation-receipt');
+  await expect(receipt).toContainText('Incident acknowledged.');
+  await expect(receipt).toContainText('Request ID:');
+  await expect(
+    receipt.getByRole('link', { name: 'View matching audit record' }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('Acknowledged', { exact: true }).first(),
+  ).toBeVisible();
+  await expect
+    .poll(async () => {
+      const response = await request.get(`${mockCore}/__test/state`);
+      return (await response.json()).incidentAuditCount;
+    })
+    .toBe(1);
+});
+
+test('viewer sees read-only evidence without operator controls', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?session=viewer`);
+  await page.goto(`/alerts/${'80000000-0000-4000-8000-000000000021'}`);
+  await waitForHydration(page);
+  await expect(
+    page.getByRole('heading', { name: 'Read-only incident record' }),
+  ).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Workflow' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Acknowledge' })).toHaveCount(
+    0,
+  );
+});
+
+test('stale operator action reloads and asks for review', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?api=conflict-once`);
+  await page.goto(`/alerts/${'80000000-0000-4000-8000-000000000021'}`);
+  await waitForHydration(page);
+  await page.getByRole('button', { name: 'Acknowledge' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'The current state has been reloaded; review it before submitting again.',
+  );
+  const state = await (await request.get(`${mockCore}/__test/state`)).json();
+  expect(state.incidentAuditCount).toBe(0);
+});
+
 test('filters are URL-backed and keep stale distinct from unknown', async ({
   page,
 }) => {

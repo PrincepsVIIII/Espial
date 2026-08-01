@@ -11,6 +11,8 @@
     "signal_id": { "type": "string", "format": "uuid" },
     "actor_user_id": { "type": "string", "format": "uuid" },
     "actor_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "subject_user_id": { "type": "string", "format": "uuid" },
+    "subject_name": { "type": "string", "minLength": 1, "maxLength": 128 },
     "kind": {
       "enum": [
         "detected",

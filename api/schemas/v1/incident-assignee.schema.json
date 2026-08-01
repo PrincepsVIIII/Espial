@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-assignee.schema.json",
+  "title": "Eligible incident assignee",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "display_name"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 }
+  }
+}

@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 9 {
+	if migrationCount != 10 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -82,6 +82,19 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	}
 	if !collectionRunsExists {
 		t.Fatal("integration collection runs table is missing")
+	}
+
+	var workflowTablesExist bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.incident_action_idempotency') IS NOT NULL
+			AND EXISTS (
+				SELECT 1 FROM information_schema.columns
+				WHERE table_schema = current_schema()
+				  AND table_name = 'incident_timeline'
+				  AND column_name = 'actor_display_name'
+			)
+	`).Scan(&workflowTablesExist); err != nil || !workflowTablesExist {
+		t.Fatalf("incident workflow migration = %v, %v", workflowTablesExist, err)
 	}
 
 	var roleCount int
@@ -153,7 +166,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (10, '000010_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (11, '000011_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

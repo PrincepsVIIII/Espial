@@ -126,12 +126,16 @@ func (reader *Reader) Timeline(ctx context.Context, incidentID string, filter Ti
 	rows, err := reader.pool.Query(ctx, `
 		SELECT timeline.id::text, timeline.incident_id::text,
 			COALESCE(timeline.signal_id::text, ''),
-			COALESCE(timeline.actor_user_id::text, ''), COALESCE(actor.display_name, ''),
+			COALESCE(timeline.actor_user_id::text, ''),
+			COALESCE(timeline.actor_display_name, actor.display_name, ''),
+			COALESCE(timeline.subject_user_id::text, ''),
+			COALESCE(timeline.subject_display_name, subject.display_name, ''),
 			timeline.kind, COALESCE(timeline.from_status, ''), COALESCE(timeline.to_status, ''),
 			COALESCE(timeline.from_severity, ''), COALESCE(timeline.to_severity, ''),
 			timeline.summary, timeline.occurred_at
 		FROM incident_timeline timeline
 		LEFT JOIN users actor ON actor.id = timeline.actor_user_id
+		LEFT JOIN users subject ON subject.id = timeline.subject_user_id
 		WHERE timeline.incident_id = $1 AND timeline.created_at <= $2
 		  AND ($4 = '' OR (timeline.occurred_at, timeline.id) < ($3, NULLIF($4, '')::uuid))
 		ORDER BY timeline.occurred_at DESC, timeline.id DESC LIMIT $5
@@ -145,7 +149,8 @@ func (reader *Reader) Timeline(ctx context.Context, incidentID string, filter Ti
 		var item TimelineEvent
 		if err := rows.Scan(
 			&item.ID, &item.IncidentID, &item.SignalID, &item.ActorUserID,
-			&item.ActorName, &item.Kind, &item.FromStatus, &item.ToStatus,
+			&item.ActorName, &item.SubjectUserID, &item.SubjectName,
+			&item.Kind, &item.FromStatus, &item.ToStatus,
 			&item.FromSeverity, &item.ToSeverity, &item.Summary, &item.OccurredAt,
 		); err != nil {
 			return Timeline{}, fmt.Errorf("scan incident timeline: %w", err)

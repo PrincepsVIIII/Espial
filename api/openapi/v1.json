@@ -604,6 +604,213 @@
         }
       }
     },
+    "/incidents/{id}/acknowledge": {
+      "post": {
+        "operationId": "acknowledgeIncident",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-action-request.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/IncidentMutated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/incidents/{id}/investigate": {
+      "post": {
+        "operationId": "investigateIncident",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-action-request.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/IncidentMutated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/incidents/{id}/owner": {
+      "put": {
+        "operationId": "assignIncidentOwner",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-action-request.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/IncidentMutated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/incidents/{id}/notes": {
+      "post": {
+        "operationId": "addIncidentNote",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-action-request.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/IncidentMutated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/incidents/{id}/resolve": {
+      "post": {
+        "operationId": "resolveIncident",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-action-request.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/IncidentMutated" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
+    "/incident-assignees": {
+      "get": {
+        "operationId": "listIncidentAssignees",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enabled users authorized to operate incidents.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IncidentAssigneeList"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
     "/roles": {
       "get": {
         "operationId": "listManagedRoles",
@@ -821,6 +1028,12 @@
         "required": true,
         "schema": { "type": "string" }
       },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "minLength": 1, "maxLength": 128 }
+      },
       "LastEventID": {
         "name": "Last-Event-ID",
         "in": "header",
@@ -860,6 +1073,15 @@
       "IncidentDetail": { "$ref": "../schemas/v1/incident-detail.schema.json" },
       "IncidentTimelineEvent": {
         "$ref": "../schemas/v1/incident-timeline-event.schema.json"
+      },
+      "IncidentActionRequest": {
+        "$ref": "../schemas/v1/incident-action-request.schema.json"
+      },
+      "IncidentMutationResult": {
+        "$ref": "../schemas/v1/incident-mutation-result.schema.json"
+      },
+      "IncidentAssignee": {
+        "$ref": "../schemas/v1/incident-assignee.schema.json"
       },
       "ResourceList": {
         "type": "object",
@@ -926,6 +1148,19 @@
             "items": {
               "$ref": "../schemas/v1/incident-timeline-event.schema.json"
             }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "IncidentAssigneeList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/incident-assignee.schema.json" }
           },
           "next_cursor": { "type": "string", "maxLength": 2048 }
         }
@@ -1048,6 +1283,20 @@
       }
     },
     "responses": {
+      "IncidentMutated": {
+        "description": "Incident mutation committed with an immutable timeline event and redacted audit record.",
+        "headers": {
+          "ETag": { "schema": { "type": "string" } },
+          "X-Request-ID": { "schema": { "type": "string" } }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../schemas/v1/incident-mutation-result.schema.json"
+            }
+          }
+        }
+      },
       "Status": {
         "description": "Service status.",
         "content": {

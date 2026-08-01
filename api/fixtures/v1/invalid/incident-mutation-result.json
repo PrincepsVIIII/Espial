@@ -1,0 +1,11 @@
+{
+  "schema": "incident-mutation-result",
+  "data": {
+    "incident_id": "bad",
+    "status": "closed",
+    "version": 0,
+    "timeline_event_id": "bad",
+    "request_id": "",
+    "replayed": "no"
+  }
+}

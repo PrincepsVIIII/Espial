@@ -57,6 +57,11 @@ type IncidentReader interface {
 	Timeline(context.Context, string, incidents.TimelineFilter) (incidents.Timeline, error)
 }
 
+type IncidentWorkflow interface {
+	Assignees(context.Context, int, string) (incidents.AssigneeList, error)
+	Mutate(context.Context, incidents.Mutation) (incidents.MutationResult, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -70,19 +75,20 @@ type EventSource interface {
 }
 
 type Dependencies struct {
-	Logger        *slog.Logger
-	Ready         Readiness
-	Auth          AuthService
-	PublicURL     *url.URL
-	SecureCookies bool
-	Monitoring    MonitoringReader
-	Incidents     IncidentReader
-	Integrations  IntegrationManager
-	Users         UserAdministrator
-	Events        EventSource
-	SSEHeartbeat  time.Duration
-	SSEMaxClients int
-	Now           func() time.Time
+	Logger           *slog.Logger
+	Ready            Readiness
+	Auth             AuthService
+	PublicURL        *url.URL
+	SecureCookies    bool
+	Monitoring       MonitoringReader
+	Incidents        IncidentReader
+	IncidentWorkflow IncidentWorkflow
+	Integrations     IntegrationManager
+	Users            UserAdministrator
+	Events           EventSource
+	SSEHeartbeat     time.Duration
+	SSEMaxClients    int
+	Now              func() time.Time
 }
 
 // New creates the Phase 1 HTTP handler.
@@ -119,6 +125,12 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/incidents", server.incidentList)
 	mux.HandleFunc("GET /api/v1/incidents/{id}", server.incidentDetail)
 	mux.HandleFunc("GET /api/v1/incidents/{id}/timeline", server.incidentTimeline)
+	mux.HandleFunc("POST /api/v1/incidents/{id}/acknowledge", server.acknowledgeIncident)
+	mux.HandleFunc("POST /api/v1/incidents/{id}/investigate", server.investigateIncident)
+	mux.HandleFunc("PUT /api/v1/incidents/{id}/owner", server.assignIncident)
+	mux.HandleFunc("POST /api/v1/incidents/{id}/notes", server.addIncidentNote)
+	mux.HandleFunc("POST /api/v1/incidents/{id}/resolve", server.resolveIncident)
+	mux.HandleFunc("GET /api/v1/incident-assignees", server.incidentAssignees)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

@@ -1,0 +1,12 @@
+{
+  "schema": "incident-mutation-result",
+  "data": {
+    "incident_id": "80000000-0000-4000-8000-000000000021",
+    "status": "acknowledged",
+    "version": 2,
+    "timeline_event_id": "81000000-0000-4000-8000-000000000021",
+    "request_id": "incident-request-42",
+    "replayed": false,
+    "audit_url": "/audit?correlation_id=incident-request-42"
+  }
+}

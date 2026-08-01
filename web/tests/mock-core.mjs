@@ -7,10 +7,13 @@ let sessionMode = 'ok';
 let streamConnections = 0;
 let monitoringReads = 0;
 let eventID = 0;
+let incidentStatus = 'open';
+let incidentVersion = 1;
 
 const now = '2026-07-31T12:00:00Z';
 const integrationID = '60000000-0000-4000-8000-000000000001';
 const incidentID = '80000000-0000-4000-8000-000000000021';
+let incidentTimeline = initialIncidentTimeline();
 let users = initialUsers();
 let auditEvents = initialAuditEvents();
 const resources = [
@@ -61,6 +64,9 @@ const server = http.createServer((request, response) => {
       streamConnections = 0;
       monitoringReads = 0;
       eventID = 0;
+      incidentStatus = 'open';
+      incidentVersion = 1;
+      incidentTimeline = initialIncidentTimeline();
       users = initialUsers();
       auditEvents = initialAuditEvents();
     }
@@ -83,8 +89,9 @@ const server = http.createServer((request, response) => {
           'resources:read',
           'integrations:read',
           'incidents:read',
-          'audit:read',
-          'users:manage',
+          ...(sessionMode === 'viewer'
+            ? []
+            : ['incidents:operate', 'audit:read', 'users:manage']),
         ],
       },
       expires_at: '2026-07-31T18:00:00Z',
@@ -207,6 +214,23 @@ const server = http.createServer((request, response) => {
       ),
     });
   }
+  if (url.pathname === '/api/v1/incident-assignees') {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to perform this action.',
+      );
+    return json(response, 200, {
+      items: [
+        {
+          id: '70000000-0000-4000-8000-000000000001',
+          display_name: 'NOC Administrator',
+        },
+      ],
+    });
+  }
   if (url.pathname === `/api/v1/incidents/${incidentID}`) {
     return json(
       response,
@@ -216,22 +240,87 @@ const server = http.createServer((request, response) => {
         fingerprint: 'default:compute-node-2:availability',
       },
       'browser-incident-detail',
-      '"v1"',
+      `"v${incidentVersion.toString(16)}"`,
     );
   }
   if (url.pathname === `/api/v1/incidents/${incidentID}/timeline`) {
     return json(response, 200, {
-      items: [
+      items: incidentTimeline,
+    });
+  }
+  const incidentAction = url.pathname.match(
+    new RegExp(
+      `^/api/v1/incidents/${incidentID}/(acknowledge|investigate|notes|resolve)$`,
+    ),
+  );
+  const ownerAction =
+    url.pathname === `/api/v1/incidents/${incidentID}/owner` &&
+    request.method === 'PUT';
+  if (incidentAction || ownerAction) {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to perform this action.',
+      );
+    if (apiMode === 'conflict-once') {
+      apiMode = 'ok';
+      return apiError(
+        response,
+        412,
+        'precondition_failed',
+        'The incident changed; fetch it and review the current state before retrying.',
+      );
+    }
+    return readJSON(request).then((body) => {
+      const requestID =
+        request.headers['x-request-id'] ?? 'browser-incident-action';
+      const action = ownerAction ? 'owner' : incidentAction[1];
+      if (action === 'acknowledge') incidentStatus = 'acknowledged';
+      if (action === 'investigate') incidentStatus = 'investigating';
+      if (action === 'resolve') incidentStatus = 'resolved';
+      incidentVersion += 1;
+      const kind =
+        action === 'acknowledge'
+          ? 'acknowledged'
+          : action === 'investigate'
+            ? 'investigating'
+            : action === 'owner'
+              ? 'assigned'
+              : action === 'notes'
+                ? 'note'
+                : 'resolved';
+      const timelineID = `81000000-0000-4000-8000-${String(incidentTimeline.length + 22).padStart(12, '0')}`;
+      incidentTimeline.unshift({
+        id: timelineID,
+        incident_id: incidentID,
+        actor_user_id: '70000000-0000-4000-8000-000000000001',
+        actor_name: 'NOC Administrator',
+        kind,
+        summary:
+          body.note ??
+          (action === 'owner'
+            ? 'Assigned to NOC Administrator.'
+            : `${kind.charAt(0).toUpperCase()}${kind.slice(1)} by NOC Administrator.`),
+        occurred_at: now,
+      });
+      auditEvents.unshift(incidentAudit(requestID, action));
+      return json(
+        response,
+        200,
         {
-          id: '81000000-0000-4000-8000-000000000021',
           incident_id: incidentID,
-          kind: 'detected',
-          to_status: 'open',
-          to_severity: 'critical',
-          summary: 'Incident detected: host unreachable',
-          occurred_at: '2026-07-31T11:55:00Z',
+          status: incidentStatus,
+          version: incidentVersion,
+          timeline_event_id: timelineID,
+          request_id: requestID,
+          replayed: false,
+          audit_url: `/audit?correlation_id=${encodeURIComponent(requestID)}`,
         },
-      ],
+        requestID,
+        `"v${incidentVersion.toString(16)}"`,
+      );
     });
   }
   if (url.pathname === '/api/v1/audit' && request.method === 'GET') {
@@ -384,10 +473,10 @@ function incidentSummary() {
     title: 'Compute node 2: availability',
     summary: 'Host unreachable.',
     severity: 'critical',
-    status: 'open',
+    status: incidentStatus,
     detected_at: '2026-07-31T11:55:00Z',
     latest_signal_at: now,
-    version: 1,
+    version: incidentVersion,
     updated_at: now,
   };
 }
@@ -413,6 +502,11 @@ function state() {
     streamConnections,
     monitoringReads,
     eventID,
+    incidentStatus,
+    incidentVersion,
+    incidentAuditCount: auditEvents.filter(
+      (event) => event.target_type === 'incident',
+    ).length,
   };
 }
 
@@ -490,6 +584,35 @@ function initialAuditEvents() {
       occurred_at: '2026-07-30T12:00:00Z',
     },
   ];
+}
+
+function initialIncidentTimeline() {
+  return [
+    {
+      id: '81000000-0000-4000-8000-000000000021',
+      incident_id: incidentID,
+      kind: 'detected',
+      to_status: 'open',
+      to_severity: 'critical',
+      summary: 'Incident detected: host unreachable',
+      occurred_at: '2026-07-31T11:55:00Z',
+    },
+  ];
+}
+
+function incidentAudit(correlationID, action) {
+  return {
+    id: `80000000-0000-4000-8000-${String(auditEvents.length + 1).padStart(12, '0')}`,
+    actor_user_id: '70000000-0000-4000-8000-000000000001',
+    actor_username: 'admin',
+    action: `incident.${action}`,
+    target_type: 'incident',
+    target_id: incidentID,
+    result: 'succeeded',
+    correlation_id: correlationID,
+    after_summary: { status: incidentStatus, version: incidentVersion },
+    occurred_at: now,
+  };
 }
 
 function userAudit(correlationID, action, user) {
