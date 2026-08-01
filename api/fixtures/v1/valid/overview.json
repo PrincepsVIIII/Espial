@@ -6,6 +6,7 @@
     "integration_counts": [{ "state": "healthy", "count": 1 }],
     "stale_count": 0,
     "unknown_count": 0,
+    "certificate_warnings": { "warning": 1, "critical": 0, "unknown": 0 },
     "active_incident_counts": [{ "severity": "critical", "count": 1 }],
     "active_incidents": [
       {

@@ -14,15 +14,18 @@ import (
 
 func Manifest() adapters.Manifest {
 	properties := map[string]any{
-		"url":                      map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
-		"allowed_statuses":         map[string]any{"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": map[string]any{"type": "integer", "minimum": 100, "maximum": 599}},
-		"timeout_ms":               map[string]any{"type": "integer", "minimum": 100, "maximum": 60000},
-		"warning_latency_ms":       map[string]any{"type": "integer", "minimum": 0, "maximum": 59999},
-		"content_match":            map[string]any{"type": "string", "maxLength": MaxContentBytes},
-		"follow_redirects":         map[string]any{"type": "boolean"},
-		"max_redirects":            map[string]any{"type": "integer", "minimum": 0, "maximum": 5},
-		"expected_refresh_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": 86400},
-		"header_names":             map[string]any{"type": "array", "maxItems": MaxSecretHeaders, "uniqueItems": true, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 64}},
+		"url":                         map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
+		"allowed_statuses":            map[string]any{"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": map[string]any{"type": "integer", "minimum": 100, "maximum": 599}},
+		"timeout_ms":                  map[string]any{"type": "integer", "minimum": 100, "maximum": 60000},
+		"warning_latency_ms":          map[string]any{"type": "integer", "minimum": 0, "maximum": 59999},
+		"content_match":               map[string]any{"type": "string", "maxLength": MaxContentBytes},
+		"follow_redirects":            map[string]any{"type": "boolean"},
+		"max_redirects":               map[string]any{"type": "integer", "minimum": 0, "maximum": 5},
+		"expected_refresh_seconds":    map[string]any{"type": "integer", "minimum": 1, "maximum": 86400},
+		"certificate_warning_days":    map[string]any{"type": "integer", "minimum": 1, "maximum": 3650},
+		"certificate_critical_days":   map[string]any{"type": "integer", "minimum": 1, "maximum": 3649},
+		"certificate_escalation_days": map[string]any{"type": "integer", "minimum": 1, "maximum": 3648},
+		"header_names":                map[string]any{"type": "array", "maxItems": MaxSecretHeaders, "uniqueItems": true, "items": map[string]any{"type": "string", "minLength": 1, "maxLength": 64}},
 	}
 	secretFields := make([]string, MaxSecretHeaders)
 	for index := 0; index < MaxSecretHeaders; index++ {
@@ -33,7 +36,7 @@ func Manifest() adapters.Manifest {
 	return adapters.Manifest{
 		AdapterID: AdapterID, DisplayName: "Espial website availability", AdapterVersion: "0.1.0",
 		ProtocolVersions: []string{adapters.ProtocolV1}, IntegrationCategory: "website",
-		ResourceTypes: []string{ResourceKind}, CheckTypes: []string{CheckType},
+		ResourceTypes: []string{ResourceKind, CertificateResourceKind}, CheckTypes: []string{CheckType, CertificateCheckType},
 		Capabilities: []string{"collect"}, ReadOnly: true, SecretFields: secretFields,
 		ConfigSchema: map[string]any{"type": "object", "additionalProperties": false,
 			"required":   []string{"url", "allowed_statuses", "timeout_ms", "follow_redirects", "max_redirects", "expected_refresh_seconds"},
@@ -95,6 +98,7 @@ func Run(input io.Reader, output io.Writer, checker *Checker) error {
 			checkContext, cancel := envelopeContext(request)
 			result := checker.Check(checkContext, config)
 			cancel()
+			config = WithCertificateDefaults(config)
 			payload := adapters.CollectionPayload{
 				Resources: []adapters.CollectionResource{{ExternalID: config.URL, Kind: ResourceKind,
 					DisplayName: displayName(config.URL), ObservedAt: result.ObservedAt,
@@ -103,6 +107,35 @@ func Run(input io.Reader, output io.Writer, checker *Checker) error {
 					State: result.State, Summary: result.Summary, ObservedAt: result.ObservedAt,
 					ExpectedRefreshSeconds: config.ExpectedRefreshSeconds,
 					Measurements:           result.Measurements, Metadata: result.Metadata}},
+			}
+			if result.Certificate != nil {
+				certificate := result.Certificate
+				externalID := "certificate:" + certificate.Endpoint
+				payload.Resources = append(payload.Resources, adapters.CollectionResource{ExternalID: externalID,
+					Kind: CertificateResourceKind, DisplayName: certificate.Endpoint, ObservedAt: result.ObservedAt,
+					Attributes: map[string]any{"endpoint": certificate.Endpoint, "source": "webcheck"}, SourceURL: config.URL})
+				metadata := map[string]any{"reason_code": certificate.ReasonCode, "endpoint": certificate.Endpoint,
+					"subject": certificate.Subject, "san_summary": certificate.SANSummary, "issuer": certificate.Issuer,
+					"serial_number": certificate.SerialNumber, "fingerprint_sha256": certificate.FingerprintSHA256}
+				if certificate.NotBefore != nil {
+					metadata["not_before"] = certificate.NotBefore.Format(time.RFC3339Nano)
+				}
+				if certificate.NotAfter != nil {
+					metadata["not_after"] = certificate.NotAfter.Format(time.RFC3339Nano)
+				}
+				if certificate.HostnameValid != nil {
+					metadata["hostname_valid"] = *certificate.HostnameValid
+				}
+				if certificate.ChainValid != nil {
+					metadata["chain_valid"] = *certificate.ChainValid
+				}
+				measurements := map[string]any{"warning_days": config.CertificateWarningDays, "critical_days": config.CertificateCriticalDays, "escalation_days": config.CertificateEscalationDays}
+				if certificate.DaysRemaining != nil {
+					measurements["days_remaining"] = *certificate.DaysRemaining
+				}
+				payload.Observations = append(payload.Observations, adapters.CollectionObservation{ExternalResourceID: externalID,
+					CheckType: CertificateCheckType, State: certificate.State, Summary: certificate.Summary, ObservedAt: result.ObservedAt,
+					ExpectedRefreshSeconds: config.ExpectedRefreshSeconds, Measurements: measurements, Metadata: metadata})
 			}
 			if err := respond(codec, request, payload); err != nil {
 				return err

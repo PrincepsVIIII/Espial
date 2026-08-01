@@ -17,6 +17,7 @@
       "enum": [
         "detected",
         "severity_changed",
+        "condition_changed",
         "recurrence",
         "recovered",
         "acknowledged",

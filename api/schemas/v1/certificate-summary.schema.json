@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/certificate-summary.schema.json",
+  "title": "Certificate summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "monitor_id",
+    "endpoint",
+    "state",
+    "raw_state",
+    "certificate_state",
+    "reason",
+    "reason_code",
+    "updated_at",
+    "source",
+    "freshness"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "monitor_id": { "type": "string", "format": "uuid" },
+    "endpoint": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "raw_state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "certificate_state": {
+      "enum": ["healthy", "warning", "critical", "unknown"]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "reason_code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "not_after": { "type": "string", "format": "date-time" },
+    "days_remaining": {
+      "type": "integer",
+      "minimum": -36500,
+      "maximum": 36500
+    },
+    "issuer": { "type": "string", "maxLength": 512 },
+    "hostname_valid": { "type": "boolean" },
+    "chain_valid": { "type": "boolean" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source": { "const": "webcheck" },
+    "freshness": { "enum": ["fresh", "stale", "unknown", "maintenance"] },
+    "active_incident_id": { "type": "string", "format": "uuid" }
+  }
+}

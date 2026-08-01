@@ -46,6 +46,7 @@
   </header>
   <nav class="section-navigation" aria-label="Webpage views">
     <a href="/webpages">Availability</a>
+    <a href="/webpages/certificates">Certificates</a>
   </nav>
   <section class="admin-section" aria-labelledby="current-evidence-title">
     <div class="operational-section-heading">

@@ -7,14 +7,25 @@
   "required": ["candidates", "explanation"],
   "properties": {
     "winner": { "$ref": "#/$defs/candidate" },
-    "candidates": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/candidate" } },
+    "candidates": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
     "explanation": { "type": "string", "minLength": 1, "maxLength": 1024 }
   },
   "$defs": {
     "candidate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "name", "priority", "specificity", "winner", "explanation"],
+      "required": [
+        "id",
+        "name",
+        "priority",
+        "specificity",
+        "winner",
+        "explanation"
+      ],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "name": { "type": "string", "minLength": 1, "maxLength": 128 },

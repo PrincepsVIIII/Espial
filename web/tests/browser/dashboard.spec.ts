@@ -73,6 +73,7 @@ for (const viewport of [
         'Datacenter',
         'Hypervisor',
         'Webpages',
+        'Certificates',
         'Monitors',
         'Audit',
         'Users',
@@ -83,6 +84,44 @@ for (const viewport of [
     }
     await page.screenshot({
       path: testInfo.outputPath(`dashboard-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  });
+}
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`Certificates preserve identity and expiry evidence at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/webpages/certificates');
+    await waitForHydration(page);
+    await expect(
+      page.getByRole('heading', { name: 'Certificates', exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole('link', { name: 'status.example.invalid:443' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Validity and identity' }),
+    ).toBeVisible();
+    await expect(page.getByText('30 days', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'Open incident' }),
+    ).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`certificates-${viewport.name}.png`),
       fullPage: true,
       animations: 'disabled',
     });

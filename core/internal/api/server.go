@@ -17,6 +17,7 @@ import (
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adminops"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
+	"github.com/PrincepsVIIII/Espial/core/internal/certificates"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
@@ -106,6 +107,11 @@ type WebsiteManager interface {
 	Webpage(context.Context, string) (webpages.Detail, error)
 }
 
+type CertificateReader interface {
+	Certificates(context.Context, certificates.Filter) (certificates.List, error)
+	Certificate(context.Context, string) (certificates.Detail, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -131,6 +137,7 @@ type Dependencies struct {
 	Suppressions     SuppressionManager
 	Notifications    NotificationManager
 	Websites         WebsiteManager
+	Certificates     CertificateReader
 	Integrations     IntegrationManager
 	Users            UserAdministrator
 	Events           EventSource
@@ -208,6 +215,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/website-monitors/{id}/check", server.checkWebsiteMonitor)
 	mux.HandleFunc("GET /api/v1/webpages", server.webpageList)
 	mux.HandleFunc("GET /api/v1/webpages/{id}", server.webpageDetail)
+	mux.HandleFunc("GET /api/v1/certificates", server.certificateList)
+	mux.HandleFunc("GET /api/v1/certificates/{id}", server.certificateDetail)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

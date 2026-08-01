@@ -42,15 +42,22 @@ type ActiveIncidentSummary struct {
 	UpdatedAt       time.Time `json:"updated_at"`
 }
 
+type CertificateWarningSummary struct {
+	Warning  int64 `json:"warning"`
+	Critical int64 `json:"critical"`
+	Unknown  int64 `json:"unknown"`
+}
+
 type Overview struct {
-	GeneratedAt          time.Time               `json:"generated_at"`
-	ResourceCounts       []StateCount            `json:"resource_counts"`
-	IntegrationCounts    []IntegrationStateCount `json:"integration_counts"`
-	StaleCount           int64                   `json:"stale_count"`
-	UnknownCount         int64                   `json:"unknown_count"`
-	RecentChanges        []RecentStateChange     `json:"recent_state_changes"`
-	ActiveIncidentCounts []ActiveIncidentCount   `json:"active_incident_counts"`
-	ActiveIncidents      []ActiveIncidentSummary `json:"active_incidents"`
+	GeneratedAt          time.Time                 `json:"generated_at"`
+	ResourceCounts       []StateCount              `json:"resource_counts"`
+	IntegrationCounts    []IntegrationStateCount   `json:"integration_counts"`
+	StaleCount           int64                     `json:"stale_count"`
+	UnknownCount         int64                     `json:"unknown_count"`
+	RecentChanges        []RecentStateChange       `json:"recent_state_changes"`
+	ActiveIncidentCounts []ActiveIncidentCount     `json:"active_incident_counts"`
+	ActiveIncidents      []ActiveIncidentSummary   `json:"active_incidents"`
+	CertificateWarnings  CertificateWarningSummary `json:"certificate_warnings"`
 }
 
 type CurrentHealthView struct {

@@ -2,7 +2,13 @@ package webcheck
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"crypto/x509/pkix"
 	"errors"
+	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -17,6 +23,10 @@ import (
 )
 
 type resolverFunc func(context.Context, string, string) ([]netip.Addr, error)
+
+type fixedWebcheckClock struct{ now time.Time }
+
+func (clock fixedWebcheckClock) Now() time.Time { return clock.now }
 
 func (resolve resolverFunc) LookupNetIP(ctx context.Context, network, host string) ([]netip.Addr, error) {
 	return resolve(ctx, network, host)
@@ -156,7 +166,7 @@ func TestCheckerRejectsDNSAndTLSFailuresSafely(t *testing.T) {
 	defer tlsServer.Close()
 	checker, config := localChecker(t, tlsServer.URL, 64)
 	result = checker.Check(context.Background(), config)
-	if result.ReasonCode != "tls_failed" {
+	if result.ReasonCode != "tls_certificate_untrusted_chain" || result.Certificate == nil || result.Certificate.ReasonCode != "certificate_untrusted_chain" {
 		t.Fatalf("result=%#v", result)
 	}
 }
@@ -175,9 +185,85 @@ func TestConfigRejectsSecretBearingAndAmbiguousTargets(t *testing.T) {
 		t.Fatal("accepted header injection")
 	}
 	manifest := Manifest()
-	if manifest.AdapterID != AdapterID || len(manifest.CheckTypes) != 1 || manifest.CheckTypes[0] != CheckType || !manifest.ReadOnly {
+	if manifest.AdapterID != AdapterID || len(manifest.CheckTypes) != 2 || manifest.CheckTypes[0] != CheckType || manifest.CheckTypes[1] != CertificateCheckType || !manifest.ReadOnly {
 		t.Fatalf("manifest=%#v", manifest)
 	}
+}
+
+func TestCertificateThresholdsAndValidationUseInjectedClock(t *testing.T) {
+	now := time.Date(2026, 8, 1, 12, 0, 0, 0, time.UTC)
+	root, rootKey := testCertificateAuthority(t, now)
+	roots := x509.NewCertPool()
+	roots.AddCert(root)
+	tests := []struct {
+		name       string
+		notBefore  time.Time
+		notAfter   time.Time
+		host       string
+		roots      *x509.CertPool
+		wantState  health.State
+		wantReason string
+	}{
+		{"valid", now.Add(-time.Hour), now.Add(31 * 24 * time.Hour), "status.test", roots, health.Healthy, "certificate_valid"},
+		{"30 day boundary", now.Add(-time.Hour), now.Add(30 * 24 * time.Hour), "status.test", roots, health.Warning, "certificate_approaching_expiry"},
+		{"14 day boundary", now.Add(-time.Hour), now.Add(14 * 24 * time.Hour), "status.test", roots, health.Critical, "certificate_expiring"},
+		{"7 day boundary", now.Add(-time.Hour), now.Add(7 * 24 * time.Hour), "status.test", roots, health.Critical, "certificate_expiry_escalated"},
+		{"expired", now.Add(-48 * time.Hour), now.Add(-time.Second), "status.test", roots, health.Critical, "certificate_expired"},
+		{"not yet valid", now.Add(time.Second), now.Add(60 * 24 * time.Hour), "status.test", roots, health.Critical, "certificate_not_yet_valid"},
+		{"wrong hostname", now.Add(-time.Hour), now.Add(60 * 24 * time.Hour), "wrong.test", roots, health.Critical, "certificate_hostname_mismatch"},
+		{"untrusted", now.Add(-time.Hour), now.Add(60 * 24 * time.Hour), "status.test", x509.NewCertPool(), health.Critical, "certificate_untrusted_chain"},
+	}
+	for index, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			leaf := testLeafCertificate(t, root, rootKey, now, test.notBefore, test.notAfter, int64(index+10))
+			checker := &Checker{clock: fixedWebcheckClock{now: now}, rootCAs: test.roots}
+			target, _ := url.Parse("https://" + test.host + "/")
+			result := checker.inspectCertificate(target, tls.ConnectionState{PeerCertificates: []*x509.Certificate{leaf}}, WithCertificateDefaults(Config{}))
+			if result.State != test.wantState || result.ReasonCode != test.wantReason {
+				t.Fatalf("result=%#v", result)
+			}
+			if result.FingerprintSHA256 == "" || result.NotAfter == nil || result.HostnameValid == nil || result.ChainValid == nil {
+				t.Fatalf("bounded identity evidence missing: %#v", result)
+			}
+		})
+	}
+}
+
+func testCertificateAuthority(t *testing.T, now time.Time) (*x509.Certificate, *rsa.PrivateKey) {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Test CA"}, NotBefore: now.Add(-365 * 24 * time.Hour), NotAfter: now.Add(365 * 24 * time.Hour), IsCA: true, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature}
+	der, err := x509.CreateCertificate(rand.Reader, template, template, &key.PublicKey, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return certificate, key
+}
+
+func testLeafCertificate(t *testing.T, root *x509.Certificate, rootKey *rsa.PrivateKey, now, notBefore, notAfter time.Time, serial int64) *x509.Certificate {
+	t.Helper()
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	template := &x509.Certificate{SerialNumber: big.NewInt(serial), Subject: pkix.Name{CommonName: "status.test"}, DNSNames: []string{"status.test"}, NotBefore: notBefore, NotAfter: notAfter, BasicConstraintsValid: true, KeyUsage: x509.KeyUsageDigitalSignature, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}}
+	der, err := x509.CreateCertificate(rand.Reader, template, root, &key.PublicKey, rootKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	certificate, err := x509.ParseCertificate(der)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = now
+	return certificate
 }
 
 func localChecker(t *testing.T, rawURL string, bodyLimit int64) (*Checker, Config) {

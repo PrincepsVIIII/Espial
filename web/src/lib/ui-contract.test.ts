@@ -22,6 +22,12 @@ const alertNotificationsPage = source(
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
+const certificatesPage = source(
+  '../routes/(app)/webpages/certificates/+page.svelte',
+);
+const certificateDetailPage = source(
+  '../routes/(app)/webpages/certificates/[id]/+page.svelte',
+);
 const auditPage = source('../routes/(app)/audit/+page.svelte');
 const usersPage = source('../routes/(app)/audit/users/+page.svelte');
 const overviewRedirect = source('../routes/(app)/overview/+page.ts');
@@ -206,5 +212,14 @@ describe('primary route skeletons', () => {
     expect(webpagesPage).toContain('/webpages/${webpage.id}');
     expect(webpagesPage).toContain('No website observations yet.');
     expect(webpagesPage).not.toContain('UnavailableSection');
+    expect(appShell).toContain("href: '/webpages/certificates'");
+    expect(certificatesPage).toContain('<h1>Certificates</h1>');
+    expect(certificatesPage).toContain('No certificate observations match.');
+    expect(certificatesPage).toContain(
+      '/webpages/certificates/${certificate.id}',
+    );
+    expect(certificateDetailPage).toContain('Validity and identity');
+    expect(certificateDetailPage).toContain('Not reported');
+    expect(certificateDetailPage).not.toMatch(/private.key|secret_header/i);
   });
 });

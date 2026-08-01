@@ -111,9 +111,14 @@ func (service *Service) Monitor(ctx context.Context, id string) (Monitor, error)
 	if json.Unmarshal(config, &stored) != nil || json.Unmarshal(references, &refs) != nil {
 		return Monitor{}, errors.New("decode website monitor")
 	}
+	defaults := webcheck.WithCertificateDefaults(webcheck.Config{CertificateWarningDays: stored.CertificateWarningDays, CertificateCriticalDays: stored.CertificateCriticalDays, CertificateEscalationDays: stored.CertificateEscalationDays})
+	stored.CertificateWarningDays, stored.CertificateCriticalDays, stored.CertificateEscalationDays = defaults.CertificateWarningDays, defaults.CertificateCriticalDays, defaults.CertificateEscalationDays
 	item.URL = stored.URL
 	item.TimeoutMS = stored.TimeoutMS
 	item.WarningLatencyMS = stored.WarningLatencyMS
+	item.CertificateWarningDays = stored.CertificateWarningDays
+	item.CertificateCriticalDays = stored.CertificateCriticalDays
+	item.CertificateEscalationDays = stored.CertificateEscalationDays
 	item.AllowedStatuses = append([]int(nil), stored.AllowedStatuses...)
 	item.ContentMatchConfigured = stored.ContentMatch != ""
 	item.FollowRedirects = stored.FollowRedirects
@@ -185,7 +190,7 @@ func (service *Service) mutate(ctx context.Context, operation, id string, defini
 		return adminops.Receipt{}, fmt.Errorf("save website monitor: %w", err)
 	}
 	receipt := adminops.Receipt{ID: id, Version: now.UnixMicro(), RequestID: metadata.CorrelationID}
-	after := map[string]any{"display_name": strings.TrimSpace(definition.DisplayName), "enabled": definition.Enabled, "interval_seconds": definition.IntervalSeconds, "url_host": mustURL(definition.URL).Hostname(), "secret_header_names": headerNames(definition.SecretHeaders), "content_match_configured": definition.ContentMatch != ""}
+	after := map[string]any{"display_name": strings.TrimSpace(definition.DisplayName), "enabled": definition.Enabled, "interval_seconds": definition.IntervalSeconds, "url_host": mustURL(definition.URL).Hostname(), "secret_header_names": headerNames(definition.SecretHeaders), "content_match_configured": definition.ContentMatch != "", "certificate_warning_days": stored.CertificateWarningDays, "certificate_critical_days": stored.CertificateCriticalDays, "certificate_escalation_days": stored.CertificateEscalationDays}
 	if err := audit.Append(ctx, tx, audit.Event{ActorUserID: metadata.ActorUserID, Action: "website_monitor." + operation, TargetType: "website_monitor", TargetID: id, Result: "succeeded", SourceAddress: metadata.SourceAddress, CorrelationID: metadata.CorrelationID, BeforeSummary: before, AfterSummary: after, OccurredAt: now}); err != nil {
 		return adminops.Receipt{}, err
 	}
@@ -336,19 +341,31 @@ func (service *Service) Webpage(ctx context.Context, id string) (Detail, error) 
 }
 
 type storedConfig struct {
-	URL                    string   `json:"url"`
-	AllowedStatuses        []int    `json:"allowed_statuses"`
-	TimeoutMS              int      `json:"timeout_ms"`
-	WarningLatencyMS       int      `json:"warning_latency_ms,omitempty"`
-	ContentMatch           string   `json:"content_match,omitempty"`
-	FollowRedirects        bool     `json:"follow_redirects"`
-	MaxRedirects           int      `json:"max_redirects"`
-	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
-	HeaderNames            []string `json:"header_names,omitempty"`
+	URL                       string   `json:"url"`
+	AllowedStatuses           []int    `json:"allowed_statuses"`
+	TimeoutMS                 int      `json:"timeout_ms"`
+	WarningLatencyMS          int      `json:"warning_latency_ms,omitempty"`
+	CertificateWarningDays    int      `json:"certificate_warning_days,omitempty"`
+	CertificateCriticalDays   int      `json:"certificate_critical_days,omitempty"`
+	CertificateEscalationDays int      `json:"certificate_escalation_days,omitempty"`
+	ContentMatch              string   `json:"content_match,omitempty"`
+	FollowRedirects           bool     `json:"follow_redirects"`
+	MaxRedirects              int      `json:"max_redirects"`
+	ExpectedRefreshSeconds    int      `json:"expected_refresh_seconds"`
+	HeaderNames               []string `json:"header_names,omitempty"`
 }
 
 func (service *Service) validate(definition MonitorDefinition) (storedConfig, map[string]string, error) {
 	definition.DisplayName = strings.TrimSpace(definition.DisplayName)
+	if definition.CertificateWarningDays == 0 {
+		definition.CertificateWarningDays = webcheck.DefaultWarningDays
+	}
+	if definition.CertificateCriticalDays == 0 {
+		definition.CertificateCriticalDays = webcheck.DefaultCriticalDays
+	}
+	if definition.CertificateEscalationDays == 0 {
+		definition.CertificateEscalationDays = webcheck.DefaultEscalationDays
+	}
 	if definition.DisplayName == "" || utf8.RuneCountInString(definition.DisplayName) > 128 || definition.IntervalSeconds < 1 || definition.IntervalSeconds > 86400 {
 		return storedConfig{}, nil, ErrInvalid
 	}
@@ -373,7 +390,7 @@ func (service *Service) validate(definition MonitorDefinition) (storedConfig, ma
 		refs[key] = item.SecretReference
 		dummy[index] = "redacted"
 	}
-	config := webcheck.Config{URL: definition.URL, AllowedStatuses: definition.AllowedStatuses, TimeoutMS: definition.TimeoutMS, WarningLatencyMS: definition.WarningLatencyMS, ContentMatch: definition.ContentMatch, FollowRedirects: definition.FollowRedirects, MaxRedirects: definition.MaxRedirects, ExpectedRefreshSeconds: definition.IntervalSeconds, HeaderNames: headerNames, HeaderValue1: dummy[0], HeaderValue2: dummy[1], HeaderValue3: dummy[2], HeaderValue4: dummy[3]}
+	config := webcheck.Config{URL: definition.URL, AllowedStatuses: definition.AllowedStatuses, TimeoutMS: definition.TimeoutMS, WarningLatencyMS: definition.WarningLatencyMS, CertificateWarningDays: definition.CertificateWarningDays, CertificateCriticalDays: definition.CertificateCriticalDays, CertificateEscalationDays: definition.CertificateEscalationDays, ContentMatch: definition.ContentMatch, FollowRedirects: definition.FollowRedirects, MaxRedirects: definition.MaxRedirects, ExpectedRefreshSeconds: definition.IntervalSeconds, HeaderNames: headerNames, HeaderValue1: dummy[0], HeaderValue2: dummy[1], HeaderValue3: dummy[2], HeaderValue4: dummy[3]}
 	if webcheck.ValidateConfig(config) != nil {
 		return storedConfig{}, nil, ErrInvalid
 	}
@@ -394,7 +411,7 @@ func (service *Service) validate(definition MonitorDefinition) (storedConfig, ma
 	}
 	statuses := append([]int(nil), definition.AllowedStatuses...)
 	sort.Ints(statuses)
-	return storedConfig{URL: definition.URL, AllowedStatuses: statuses, TimeoutMS: definition.TimeoutMS, WarningLatencyMS: definition.WarningLatencyMS, ContentMatch: definition.ContentMatch, FollowRedirects: definition.FollowRedirects, MaxRedirects: definition.MaxRedirects, ExpectedRefreshSeconds: definition.IntervalSeconds, HeaderNames: headerNames}, refs, nil
+	return storedConfig{URL: definition.URL, AllowedStatuses: statuses, TimeoutMS: definition.TimeoutMS, WarningLatencyMS: definition.WarningLatencyMS, CertificateWarningDays: definition.CertificateWarningDays, CertificateCriticalDays: definition.CertificateCriticalDays, CertificateEscalationDays: definition.CertificateEscalationDays, ContentMatch: definition.ContentMatch, FollowRedirects: definition.FollowRedirects, MaxRedirects: definition.MaxRedirects, ExpectedRefreshSeconds: definition.IntervalSeconds, HeaderNames: headerNames}, refs, nil
 }
 
 func headerNames(headers []SecretHeaderDefinition) []string {

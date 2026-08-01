@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
+	"github.com/PrincepsVIIII/Espial/core/internal/certificateprojection"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
 	"github.com/PrincepsVIIII/Espial/core/internal/observations"
@@ -60,6 +61,11 @@ func (collector *Collector) Collect(ctx context.Context, integration adapters.In
 	}
 	result, err := collector.ingestor.IngestWithCommit(ctx, integration.ID, batch,
 		func(hookContext context.Context, tx pgx.Tx, result observations.Result) error {
+			if integration.AdapterID == "org.ubnetdef.espial.webcheck" {
+				if err := certificateprojection.ProjectBatch(hookContext, tx, integration.ID, batch); err != nil {
+					return err
+				}
+			}
 			attempt.CompletedAt = collector.nowAfter(startedAt)
 			return collector.store.RecordCommitted(hookContext, tx, attempt, result)
 		})
@@ -96,6 +102,8 @@ func (collector *Collector) publishAttempt(attempt Attempt, adapterID string) {
 	// completed or failed collection attempt.
 	if adapterID == "org.ubnetdef.espial.webcheck" {
 		collector.hub.Publish(events.Event{Kind: events.WebpageChanged, MonitorID: attempt.IntegrationID,
+			IntegrationID: attempt.IntegrationID, Result: attempt.Result, ChangedAt: attempt.CompletedAt})
+		collector.hub.Publish(events.Event{Kind: events.CertificateChanged, MonitorID: attempt.IntegrationID,
 			IntegrationID: attempt.IntegrationID, Result: attempt.Result, ChangedAt: attempt.CompletedAt})
 	}
 }

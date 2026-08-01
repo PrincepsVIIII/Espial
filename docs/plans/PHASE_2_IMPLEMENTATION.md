@@ -22,7 +22,7 @@ does not make a slice complete.
 | 2.3 Rules, maintenance windows, and silences | Implemented | [Slice 2.3 record](SLICE_2_3_RULES_AND_SUPPRESSIONS.md) |
 | 2.4 Notification routing and Mattermost delivery | Implemented | [Slice 2.4 record](SLICE_2_4_NOTIFICATION_ROUTING.md) and [ADR 0008](../adr/0008-durable-notification-outbox.md) |
 | 2.5 Website availability monitoring | Implemented (2026-08-01) | [Slice 2.5 record](SLICE_2_5_WEBSITE_AVAILABILITY.md) and [ADR 0009](../adr/0009-website-monitor-integration-projection.md) |
-| 2.6 Certificate monitoring and Webpages experience | Planned | — |
+| 2.6 Certificate monitoring and Webpages experience | Implemented (2026-08-01) | [Slice 2.6 record](SLICE_2_6_CERTIFICATE_MONITORING.md) and [ADR 0010](../adr/0010-certificate-resource-projection.md) |
 | 2.7 Phase integration, hardening, and acceptance | Planned | — |
 
 ## 1. Outcome

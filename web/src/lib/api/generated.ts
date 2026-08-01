@@ -85,6 +85,57 @@ export interface RedactedAuditEventView {
   occurred_at: string;
 }
 
+export interface CertificateDetail {
+  id: string;
+  monitor_id: string;
+  endpoint: string;
+  state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  raw_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  certificate_state: "healthy" | "warning" | "critical" | "unknown";
+  reason: string;
+  reason_code: string;
+  not_after?: string;
+  days_remaining?: number;
+  issuer?: string;
+  hostname_valid?: boolean;
+  chain_valid?: boolean;
+  observed_at?: string;
+  updated_at: string;
+  source: "webcheck";
+  freshness: "fresh" | "stale" | "unknown" | "maintenance";
+  active_incident_id?: string;
+  subject?: string;
+  san_summary?: string;
+  serial_number?: string;
+  fingerprint_sha256?: string;
+  not_before?: string;
+  fingerprint_changed: boolean;
+  issuer_changed: boolean;
+  first_seen_at: string;
+  last_seen_at: string;
+}
+
+export interface CertificateSummary {
+  id: string;
+  monitor_id: string;
+  endpoint: string;
+  state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  raw_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  certificate_state: "healthy" | "warning" | "critical" | "unknown";
+  reason: string;
+  reason_code: string;
+  not_after?: string;
+  days_remaining?: number;
+  issuer?: string;
+  hostname_valid?: boolean;
+  chain_valid?: boolean;
+  observed_at?: string;
+  updated_at: string;
+  source: "webcheck";
+  freshness: "fresh" | "stale" | "unknown" | "maintenance";
+  active_incident_id?: string;
+}
+
 export interface EspialEvent {
   schema_version: "1.0";
   event_id: string;
@@ -255,6 +306,7 @@ export interface IncidentTimelineEvent {
   kind:
     | "detected"
     | "severity_changed"
+    | "condition_changed"
     | "recurrence"
     | "recovered"
     | "acknowledged"
@@ -349,6 +401,7 @@ export interface LiveInvalidationData {
   incident_id?: string;
   delivery_id?: string;
   monitor_id?: string;
+  certificate_id?: string;
   state?: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
   result?: string;
   changed_at: string;
@@ -415,7 +468,7 @@ export interface NotificationDeliveryEvidence {
   destination_id: string;
   destination_name: string;
   destination_type: "mattermost";
-  event_kind: "detected" | "severity_changed" | "recurrence" | "recovered" | "test";
+  event_kind: "detected" | "severity_changed" | "condition_changed" | "recurrence" | "recovered" | "test";
   test: boolean;
   state: "queued" | "attempting" | "delivered" | "retry_wait" | "failed" | "dead_letter" | "suppressed";
   attempt_count: number;
@@ -484,6 +537,11 @@ export interface MonitoringOverview {
   }[];
   stale_count: number;
   unknown_count: number;
+  certificate_warnings: {
+    warning: number;
+    critical: number;
+    unknown: number;
+  };
   /**
    * @maxItems 2
    */
@@ -668,6 +726,9 @@ export interface WebsiteMonitorReplacement {
   interval_seconds: number;
   timeout_ms: number;
   warning_latency_ms: number;
+  certificate_warning_days: number;
+  certificate_critical_days: number;
+  certificate_escalation_days: number;
   /**
    * @minItems 1
    * @maxItems 100
@@ -693,6 +754,9 @@ export interface RedactedWebsiteMonitorAPIView {
   interval_seconds: number;
   timeout_ms: number;
   warning_latency_ms?: number;
+  certificate_warning_days: number;
+  certificate_critical_days: number;
+  certificate_escalation_days: number;
   /**
    * @minItems 1
    * @maxItems 100

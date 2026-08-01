@@ -15,6 +15,7 @@ const integrationID = '60000000-0000-4000-8000-000000000001';
 const incidentID = '80000000-0000-4000-8000-000000000021';
 const websiteMonitorID = '70000000-0000-4000-8000-000000000025';
 const webpageID = '71000000-0000-4000-8000-000000000025';
+const certificateID = '72000000-0000-4000-8000-000000000026';
 let incidentTimeline = initialIncidentTimeline();
 let users = initialUsers();
 let auditEvents = initialAuditEvents();
@@ -150,6 +151,7 @@ const server = http.createServer((request, response) => {
       integration_counts: [{ state: 'healthy', count: 1 }],
       stale_count: 1,
       unknown_count: 1,
+      certificate_warnings: { warning: 1, critical: 0, unknown: 0 },
       active_incident_counts: [
         { severity: 'critical', count: 1 },
         { severity: 'warning', count: 0 },
@@ -303,6 +305,24 @@ const server = http.createServer((request, response) => {
     return json(response, 200, {
       ...webpageSummary(),
       first_seen_at: '2026-07-31T10:00:00Z',
+      last_seen_at: now,
+    });
+  }
+  if (url.pathname === '/api/v1/certificates') {
+    return json(response, 200, { items: [certificateSummary()] });
+  }
+  if (url.pathname === `/api/v1/certificates/${certificateID}`) {
+    return json(response, 200, {
+      ...certificateSummary(),
+      subject: 'CN=status.example.invalid',
+      san_summary: 'status.example.invalid',
+      serial_number: '42',
+      fingerprint_sha256:
+        'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      not_before: '2026-07-01T12:00:00Z',
+      fingerprint_changed: false,
+      issuer_changed: false,
+      first_seen_at: '2026-07-01T12:00:00Z',
       last_seen_at: now,
     });
   }
@@ -778,6 +798,9 @@ function websiteMonitor() {
     interval_seconds: 60,
     timeout_ms: 5000,
     warning_latency_ms: 1000,
+    certificate_warning_days: 30,
+    certificate_critical_days: 14,
+    certificate_escalation_days: 7,
     allowed_statuses: [200],
     content_match_configured: true,
     follow_redirects: false,
@@ -813,6 +836,29 @@ function webpageSummary() {
       body_bytes: 5,
       redirects: 0,
     },
+  };
+}
+
+function certificateSummary() {
+  return {
+    id: certificateID,
+    monitor_id: websiteMonitorID,
+    endpoint: 'status.example.invalid:443',
+    state: 'warning',
+    raw_state: 'warning',
+    certificate_state: 'warning',
+    reason: 'Certificate expires within the configured warning threshold.',
+    reason_code: 'certificate_approaching_expiry',
+    not_after: '2026-08-31T12:00:00Z',
+    days_remaining: 30,
+    issuer: 'CN=UBNetDef Test CA',
+    hostname_valid: true,
+    chain_valid: true,
+    observed_at: now,
+    updated_at: now,
+    source: 'webcheck',
+    freshness: 'fresh',
+    active_incident_id: incidentID,
   };
 }
 

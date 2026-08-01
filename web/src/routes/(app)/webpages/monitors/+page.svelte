@@ -35,6 +35,13 @@
       interval_seconds: Number(values.get('interval_seconds')),
       timeout_ms: Number(values.get('timeout_ms')),
       warning_latency_ms: Number(values.get('warning_latency_ms')),
+      certificate_warning_days: Number(values.get('certificate_warning_days')),
+      certificate_critical_days: Number(
+        values.get('certificate_critical_days'),
+      ),
+      certificate_escalation_days: Number(
+        values.get('certificate_escalation_days'),
+      ),
       allowed_statuses: String(values.get('allowed_statuses') ?? '')
         .split(',')
         .map((item) => Number(item.trim()))
@@ -100,11 +107,9 @@
   </div>
 </header>
 <nav class="section-navigation" aria-label="Webpage views">
-  <a href="/webpages">Availability</a><a
-    class="active"
-    aria-current="page"
-    href="/webpages/monitors">Monitors</a
-  >
+  <a href="/webpages">Availability</a><a href="/webpages/certificates"
+    >Certificates</a
+  ><a class="active" aria-current="page" href="/webpages/monitors">Monitors</a>
 </nav>
 {#if problem ?? data.problem}{@const currentProblem = problem ?? data.problem}
   <div class="inline-problem" role="alert">
@@ -246,6 +251,37 @@
               max="59999"
               required
               value={selected?.warning_latency_ms ?? 1000}
+            /></label
+          >
+          <div class="compact-fields">
+            <label
+              >Certificate warning days<input
+                name="certificate_warning_days"
+                type="number"
+                min="3"
+                max="3650"
+                required
+                value={selected?.certificate_warning_days ?? 30}
+              /></label
+            ><label
+              >Certificate critical days<input
+                name="certificate_critical_days"
+                type="number"
+                min="2"
+                max="3649"
+                required
+                value={selected?.certificate_critical_days ?? 14}
+              /></label
+            >
+          </div>
+          <label
+            >Certificate escalation days<input
+              name="certificate_escalation_days"
+              type="number"
+              min="1"
+              max="3648"
+              required
+              value={selected?.certificate_escalation_days ?? 7}
             /></label
           ><label
             >Allowed HTTP statuses<input

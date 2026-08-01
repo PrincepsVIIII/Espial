@@ -244,6 +244,44 @@ func TestWebsiteAvailabilityOutageCreatesOneIncidentAndRecovers(t *testing.T) {
 	}
 }
 
+func TestCertificateThresholdCrossingsPreserveOneIncidentAndMeaningfulUpdates(t *testing.T) {
+	pool := incidentTestPool(t)
+	ctx := context.Background()
+	start := time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond)
+	clock := &testClock{now: start}
+	if _, err := pool.Exec(ctx, `INSERT INTO integrations (id,adapter_id,display_name,enabled,interval_seconds) VALUES ($1,'org.ubnetdef.espial.webcheck','Certificate monitor',true,60)`, websiteIncidentIntegrationID); err != nil {
+		t.Fatal(err)
+	}
+	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
+	intents := &recordingIntentWriter{}
+	evaluator := NewEvaluator(pool, nil, Options{Clock: clock, Intents: intents})
+	steps := []struct {
+		state  health.State
+		reason string
+	}{{health.Warning, "certificate_approaching_expiry"}, {health.Critical, "certificate_expiring"}, {health.Critical, "certificate_expiry_escalated"}, {health.Critical, "certificate_expiry_escalated"}}
+	for index, step := range steps {
+		clock.Set(start.Add(time.Duration(index) * time.Minute))
+		if _, err := ingestor.Ingest(ctx, websiteIncidentIntegrationID, certificateObservationBatch(fmt.Sprintf("certificate-%d", index), step.state, step.reason, clock.Now(), index == 0)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := evaluator.ProcessOnce(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	const externalID = "certificate:status.example.test:443"
+	if count := incidentCount(t, pool, externalID); count != 1 {
+		t.Fatalf("certificate incident count=%d", count)
+	}
+	incident := singleIncident(t, pool, externalID)
+	if incident.Severity != SeverityCritical {
+		t.Fatalf("certificate severity=%#v", incident)
+	}
+	assertTimelineKinds(t, pool, incident.ID, "detected", "severity_changed", "condition_changed")
+	if kinds := fmt.Sprint(intents.eventKinds()); kinds != "[detected severity_changed condition_changed]" {
+		t.Fatalf("certificate notifications=%s", kinds)
+	}
+}
+
 func TestWarningDebouncePersistsAcrossEvaluatorRestart(t *testing.T) {
 	pool := incidentTestPool(t)
 	start := time.Now().UTC().Add(-10 * time.Minute).Truncate(time.Microsecond)
@@ -482,6 +520,15 @@ func websiteObservationBatch(observationID string, state health.State, reasonCod
 			ExternalID: target, Kind: "webpage", DisplayName: "Status endpoint",
 			ObservedAt: observedAt, Attributes: map[string]any{}, SourceURL: target,
 		}}
+	}
+	return batch
+}
+
+func certificateObservationBatch(observationID string, state health.State, reasonCode string, observedAt time.Time, includeResource bool) observations.Batch {
+	const target = "certificate:status.example.test:443"
+	batch := observations.Batch{Observations: []observations.ObservationInput{{ID: stableObservationID(observationID), ExternalResourceID: target, CheckType: "certificate.validity", State: state, Summary: "Certificate validity changed.", ObservedAt: observedAt, ExpectedRefreshSeconds: 60, Measurements: map[string]any{}, Metadata: map[string]any{"reason_code": reasonCode}}}}
+	if includeResource {
+		batch.Resources = []observations.ResourceInput{{ExternalID: target, Kind: "certificate", DisplayName: "status.example.test:443", ObservedAt: observedAt, Attributes: map[string]any{}, SourceURL: "https://status.example.test/"}}
 	}
 	return batch
 }

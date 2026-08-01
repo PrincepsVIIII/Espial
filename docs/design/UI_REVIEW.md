@@ -483,3 +483,41 @@ permission-gated Monitors child. All three Webpages list/detail scenarios have z
 serious/critical axe findings. The 32-scenario Chromium suite, 48 frontend unit
 tests, generated-contract checks, and zero-error/zero-warning Svelte diagnostics
 pass.
+
+## 2026-08-01 — Slice 2.6 certificate monitoring review
+
+### Scope and material decisions
+
+Reviewed `/webpages/certificates`, direct certificate detail, per-monitor expiry
+thresholds, Dashboard certificate attention, live refetch, filters, and unknown/
+error states against the general guidance, design system, and Phase 2 contract.
+
+- Added Certificates as a real Webpages child for every `webpages:read` session
+  only after the authoritative list/detail endpoints, filters, incident linkage,
+  and bounded certificate projection existed. Monitors remains independently
+  permission-gated.
+- Used the established flat table, definition list, thin dividers, text-first
+  status, and compact filter controls. No decorative icons, badges, gradients,
+  glow, filled hover tiles, or ornamental motion were introduced.
+- Presented endpoint, semantic status, exact expiry timestamp, remaining days,
+  issuer, subject/SAN summary, hostname and chain validity, last check, source,
+  freshness, replacement evidence, and active incident link only from Core's read
+  model. Missing values say `Unknown` or `Not reported`; the UI does not substitute
+  zero or evaluate trust locally.
+- Added the Dashboard summary only inside a successful authoritative overview.
+  Core-unavailable behavior continues to omit counts and show the existing explicit
+  error state.
+- The narrow layout retains the same navigation order and filter/action source
+  order. Static certificate views add no motion; the shared shell continues to
+  honor reduced motion and live disconnect notices.
+
+### Viewport and verification evidence
+
+At 1440×900 and 1280×800 the filters and seven-column certificate table remain in
+the bounded table frame; at 500×900 the shared responsive table treatment and
+collapsed menu keep all direct links reachable. The 35-scenario Chromium suite
+checks list/detail and axe results at all three sizes with zero serious/critical
+findings. Svelte diagnostics report zero errors and warnings, all 48 unit tests
+pass, and generated contracts remain current. PostgreSQL/race evidence proves that
+the rendered threshold, replacement, and incident claims come from authoritative
+Core state.

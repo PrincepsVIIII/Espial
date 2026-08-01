@@ -94,8 +94,8 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-**Status:** In progress. Slices 2.0 through 2.5 are implemented; certificate and
-phase-acceptance slices remain planned.
+**Status:** In progress. Slices 2.0 through 2.6 are implemented; the phase
+integration, hardening, and acceptance slice remains planned.
 
 **Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
 
@@ -121,6 +121,9 @@ Implemented Phase 2 groundwork, incident workflow, and suppression controls:
   response-size, and deadline policy; authoritative Webpages list/detail and
   administrator monitor controls expose partial-stage evidence, incident links, and
   audit-linked mutation receipts;
+- supervised HTTPS checks project bounded certificate identity, trust, hostname,
+  validity, replacement, and 30/14/7-day expiry evidence into authoritative
+  Certificate and Dashboard views with one threshold-stable incident fingerprint;
 - administrator Audit and Users routes provide inspectable request-correlated
   evidence for access changes; and
 - the shell accepts only implemented dropdown children, so Phase 2 destinations

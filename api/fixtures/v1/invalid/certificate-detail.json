@@ -1,0 +1,21 @@
+{
+  "schema": "certificate-detail",
+  "data": {
+    "id": "72000000-0000-4000-8000-000000000026",
+    "monitor_id": "70000000-0000-4000-8000-000000000001",
+    "endpoint": "status.example.invalid:443",
+    "state": "healthy",
+    "raw_state": "healthy",
+    "certificate_state": "healthy",
+    "reason": "Valid",
+    "reason_code": "certificate_valid",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "source": "webcheck",
+    "freshness": "fresh",
+    "fingerprint_sha256": "private-key-material",
+    "fingerprint_changed": false,
+    "issuer_changed": false,
+    "first_seen_at": "invalid",
+    "last_seen_at": "2026-08-01T12:00:00Z"
+  }
+}

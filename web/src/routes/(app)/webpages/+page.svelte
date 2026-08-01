@@ -21,6 +21,7 @@
 </header>
 <nav class="section-navigation" aria-label="Webpage views">
   <a class="active" aria-current="page" href="/webpages">Availability</a>
+  <a href="/webpages/certificates">Certificates</a>
   {#if data.canManage}<a href="/webpages/monitors">Monitors</a>{/if}
 </nav>
 

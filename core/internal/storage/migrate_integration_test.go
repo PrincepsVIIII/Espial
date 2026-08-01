@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 12 {
+	if migrationCount != 14 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -91,6 +91,14 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	}
 	if !collectionRunsExists {
 		t.Fatal("integration collection runs table is missing")
+	}
+
+	var certificateProjectionExists bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.certificate_observations') IS NOT NULL
+			AND to_regclass(current_schema() || '.certificate_observations_expiry_idx') IS NOT NULL
+	`).Scan(&certificateProjectionExists); err != nil || !certificateProjectionExists {
+		t.Fatalf("certificate projection migration = %v, %v", certificateProjectionExists, err)
 	}
 
 	var workflowTablesExist bool
@@ -175,7 +183,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (13, '000013_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (15, '000015_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

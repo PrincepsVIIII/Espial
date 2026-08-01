@@ -173,10 +173,38 @@ Incident delivery reads require only `incidents:read`, verify the incident, and
 return status, time, attempt count, and a categorized safe error. Tokens, complete
 webhook URLs, response bodies, and claim tokens are not API fields.
 
+## Phase 2 website and certificate surface
+
+```text
+GET  /api/v1/website-monitors
+POST /api/v1/website-monitors
+GET  /api/v1/website-monitors/{id}
+PUT  /api/v1/website-monitors/{id}
+POST /api/v1/website-monitors/{id}/check
+GET  /api/v1/webpages
+GET  /api/v1/webpages/{id}
+GET  /api/v1/certificates
+GET  /api/v1/certificates/{id}
+```
+
+Webpage and certificate reads require `webpages:read`; monitor administration and
+manual checks require `website_monitors:manage`. Certificate collection filters
+accept repeated `state` plus one `hostname_valid` boolean and one bounded
+`expiry_days` window. Stable cursors order newest certificate observation then
+opaque resource ID.
+
+Monitor writes carry validated warning/critical/escalation day thresholds with
+30/14/7 defaults. Read models expose bounded endpoint, certificate identity,
+validity, hostname/chain state, freshness, source, and active incident linkage.
+Missing identity or validity values are omitted; clients render them as `Unknown`
+or `Not reported`. Private keys, full chains, trust material, protected headers,
+response content, and raw TLS errors are never API fields.
+
 ## Live events
 
 SSE messages have `id`, `event`, and a JSON `data` object with `schema_version`,
-`resource_id`, `integration_id`, `incident_id`, or `delivery_id`, and `changed_at`.
+`resource_id`, `integration_id`, `incident_id`, `delivery_id`, `monitor_id`, or
+`certificate_id`, and `changed_at`.
 They are invalidations, not a second source of truth. Send a heartbeat comment every 15 seconds. Honor
 `Last-Event-ID` within a bounded replay window; otherwise emit `resync_required`.
 The heartbeat also revalidates the session and `overview:read` permission. A lost or

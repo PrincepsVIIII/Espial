@@ -21,6 +21,7 @@ type liveInvalidation struct {
 	IncidentID    string       `json:"incident_id,omitempty"`
 	DeliveryID    string       `json:"delivery_id,omitempty"`
 	MonitorID     string       `json:"monitor_id,omitempty"`
+	CertificateID string       `json:"certificate_id,omitempty"`
 	State         health.State `json:"state,omitempty"`
 	Result        string       `json:"result,omitempty"`
 	ChangedAt     time.Time    `json:"changed_at"`
@@ -127,7 +128,8 @@ func writeSSEEvent(w http.ResponseWriter, event events.Event) error {
 		SchemaVersion: event.SchemaVersion, ResourceID: event.ResourceID,
 		IntegrationID: event.IntegrationID, IncidentID: event.IncidentID,
 		DeliveryID: event.DeliveryID, MonitorID: event.MonitorID,
-		State: event.State, Result: event.Result,
+		CertificateID: event.CertificateID,
+		State:         event.State, Result: event.Result,
 		ChangedAt: event.ChangedAt.UTC(),
 	})
 	if err != nil {

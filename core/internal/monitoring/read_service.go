@@ -198,6 +198,18 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 		return Overview{}, fmt.Errorf("read active incidents: %w", err)
 	}
 	rows.Close()
+
+	if err := tx.QueryRow(ctx, `
+		WITH latest AS (
+			SELECT DISTINCT ON (resource_id) resource_id,certificate_state
+			FROM certificate_observations ORDER BY resource_id,observed_at DESC,observation_id DESC
+		)
+		SELECT count(*) FILTER (WHERE certificate_state='warning'),
+			count(*) FILTER (WHERE certificate_state='critical'),
+			count(*) FILTER (WHERE certificate_state='unknown') FROM latest
+	`).Scan(&result.CertificateWarnings.Warning, &result.CertificateWarnings.Critical, &result.CertificateWarnings.Unknown); err != nil {
+		return Overview{}, fmt.Errorf("read certificate warning summary: %w", err)
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return Overview{}, fmt.Errorf("commit overview read: %w", err)
 	}

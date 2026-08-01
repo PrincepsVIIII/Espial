@@ -4,7 +4,17 @@
   "title": "Maintenance window",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "reason", "starts_at", "ends_at", "enabled", "created_by_name", "version", "created_at", "updated_at"],
+  "required": [
+    "id",
+    "reason",
+    "starts_at",
+    "ends_at",
+    "enabled",
+    "created_by_name",
+    "version",
+    "created_at",
+    "updated_at"
+  ],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
     "reason": { "type": "string", "minLength": 1, "maxLength": 512 },

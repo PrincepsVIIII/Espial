@@ -72,17 +72,20 @@ func (server *server) mutateWebsiteMonitor(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var body struct {
-		DisplayName      string                            `json:"display_name"`
-		Enabled          *bool                             `json:"enabled"`
-		URL              string                            `json:"url"`
-		IntervalSeconds  int                               `json:"interval_seconds"`
-		TimeoutMS        int                               `json:"timeout_ms"`
-		WarningLatencyMS int                               `json:"warning_latency_ms"`
-		AllowedStatuses  []int                             `json:"allowed_statuses"`
-		ContentMatch     string                            `json:"content_match"`
-		FollowRedirects  *bool                             `json:"follow_redirects"`
-		MaxRedirects     int                               `json:"max_redirects"`
-		SecretHeaders    []webpages.SecretHeaderDefinition `json:"secret_headers"`
+		DisplayName               string                            `json:"display_name"`
+		Enabled                   *bool                             `json:"enabled"`
+		URL                       string                            `json:"url"`
+		IntervalSeconds           int                               `json:"interval_seconds"`
+		TimeoutMS                 int                               `json:"timeout_ms"`
+		WarningLatencyMS          int                               `json:"warning_latency_ms"`
+		CertificateWarningDays    int                               `json:"certificate_warning_days"`
+		CertificateCriticalDays   int                               `json:"certificate_critical_days"`
+		CertificateEscalationDays int                               `json:"certificate_escalation_days"`
+		AllowedStatuses           []int                             `json:"allowed_statuses"`
+		ContentMatch              string                            `json:"content_match"`
+		FollowRedirects           *bool                             `json:"follow_redirects"`
+		MaxRedirects              int                               `json:"max_redirects"`
+		SecretHeaders             []webpages.SecretHeaderDefinition `json:"secret_headers"`
 	}
 	if err := decodeJSONLimit(w, r, &body, 16*1024); err != nil {
 		server.decodeError(w, r, err)
@@ -92,7 +95,7 @@ func (server *server) mutateWebsiteMonitor(w http.ResponseWriter, r *http.Reques
 		server.validationError(w, r, []APIFieldError{{Field: "body", Code: "required_fields"}})
 		return
 	}
-	definition := webpages.MonitorDefinition{DisplayName: body.DisplayName, Enabled: *body.Enabled, URL: body.URL, IntervalSeconds: body.IntervalSeconds, TimeoutMS: body.TimeoutMS, WarningLatencyMS: body.WarningLatencyMS, AllowedStatuses: body.AllowedStatuses, ContentMatch: body.ContentMatch, FollowRedirects: *body.FollowRedirects, MaxRedirects: body.MaxRedirects, SecretHeaders: body.SecretHeaders}
+	definition := webpages.MonitorDefinition{DisplayName: body.DisplayName, Enabled: *body.Enabled, URL: body.URL, IntervalSeconds: body.IntervalSeconds, TimeoutMS: body.TimeoutMS, WarningLatencyMS: body.WarningLatencyMS, CertificateWarningDays: body.CertificateWarningDays, CertificateCriticalDays: body.CertificateCriticalDays, CertificateEscalationDays: body.CertificateEscalationDays, AllowedStatuses: body.AllowedStatuses, ContentMatch: body.ContentMatch, FollowRedirects: *body.FollowRedirects, MaxRedirects: body.MaxRedirects, SecretHeaders: body.SecretHeaders}
 	metadata := websiteMetadata(session.User.ID, session.User.DisplayName, sourceAddress(r), requestID(r), key, version)
 	var receipt adminops.Receipt
 	var err error

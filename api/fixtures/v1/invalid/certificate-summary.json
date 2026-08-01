@@ -1,0 +1,16 @@
+{
+  "schema": "certificate-summary",
+  "data": {
+    "id": "not-a-uuid",
+    "monitor_id": "70000000-0000-4000-8000-000000000001",
+    "endpoint": "",
+    "state": "healthy",
+    "raw_state": "healthy",
+    "certificate_state": "healthy",
+    "reason": "Valid",
+    "reason_code": "certificate_valid",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "source": "webcheck",
+    "freshness": "fresh"
+  }
+}

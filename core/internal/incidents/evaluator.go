@@ -137,6 +137,7 @@ type ruleState struct {
 	LastSignalAt        *time.Time
 	LastState           health.State
 	LastReason          string
+	LastReasonCode      string
 	MatchingSince       *time.Time
 	MatchingOccurrences int
 	RecoverySince       *time.Time
@@ -229,6 +230,7 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 	state.LastSignalAt = &occurredAt
 	state.LastState = signal.State
 	state.LastReason = signal.Reason
+	state.LastReasonCode = signal.ReasonCode
 	if err := saveRuleState(ctx, tx, rule.ID, signal.ResourceID, signal.CheckType, state, now); err != nil {
 		return incidentChange{}, err
 	}
@@ -373,17 +375,17 @@ func lockRuleState(ctx context.Context, tx pgx.Tx, ruleID, resourceID, checkType
 		return ruleState{}, fmt.Errorf("initialize incident rule state: %w", err)
 	}
 	var result ruleState
-	var activeID, lastSignalID, lastState, lastReason pgtype.Text
+	var activeID, lastSignalID, lastState, lastReason, lastReasonCode pgtype.Text
 	var lastSignalAt, matchingSince, recoverySince, deadlineAt pgtype.Timestamptz
 	if err := tx.QueryRow(ctx, `
 		SELECT active_incident_id::text, last_signal_id::text, last_signal_at,
-			last_state, last_reason, matching_since, matching_occurrences,
+			last_state, last_reason, last_reason_code, matching_since, matching_occurrences,
 			recovery_since, recovery_occurrences, deadline_at
 		FROM incident_rule_states
 		WHERE rule_id = $1 AND resource_id = $2 AND check_type = $3
 		FOR UPDATE
 	`, ruleID, resourceID, checkType).Scan(
-		&activeID, &lastSignalID, &lastSignalAt, &lastState, &lastReason,
+		&activeID, &lastSignalID, &lastSignalAt, &lastState, &lastReason, &lastReasonCode,
 		&matchingSince, &result.MatchingOccurrences, &recoverySince,
 		&result.RecoveryOccurrences, &deadlineAt,
 	); err != nil {
@@ -394,6 +396,7 @@ func lockRuleState(ctx context.Context, tx pgx.Tx, ruleID, resourceID, checkType
 	result.LastSignalAt = timestamp(lastSignalAt)
 	result.LastState = health.State(lastState.String)
 	result.LastReason = lastReason.String
+	result.LastReasonCode = lastReasonCode.String
 	result.MatchingSince = timestamp(matchingSince)
 	result.RecoverySince = timestamp(recoverySince)
 	result.DeadlineAt = timestamp(deadlineAt)
@@ -539,6 +542,23 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 		}
 		return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: Status(status), ChangedAt: now, Changed: true}, nil
 	}
+	if signal.CheckType == "certificate.validity" && signal.ReasonCode != "" && state.LastReasonCode != "" && signal.ReasonCode != state.LastReasonCode {
+		if _, err := tx.Exec(ctx, `
+			UPDATE incidents SET summary = $2,
+				latest_signal_at = GREATEST(latest_signal_at, $3),
+				version = version + 1, updated_at = $4 WHERE id = $1
+		`, state.ActiveIncidentID, signal.Reason, signal.OccurredAt.UTC(), now); err != nil {
+			return change, err
+		}
+		timelineID, err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "condition_changed", Status(status), Status(status), Severity(severity), Severity(severity), "Certificate condition changed: "+signal.Reason, signal.OccurredAt)
+		if err != nil {
+			return change, err
+		}
+		if err := enqueueNotification(ctx, tx, intents, NotificationEvent{TimelineEventID: timelineID, IncidentID: state.ActiveIncidentID, RuleID: rule.ID, ResourceID: signal.ResourceID, Kind: "condition_changed", Title: boundedText(resourceName+": "+signal.CheckType, 256), Summary: signal.Reason, Severity: Severity(severity), Status: Status(status), OccurredAt: signal.OccurredAt, CreatedAt: now}); err != nil {
+			return change, err
+		}
+		return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: Status(status), ChangedAt: now, Changed: true}, nil
+	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE incidents SET summary = $2,
 			latest_signal_at = GREATEST(latest_signal_at, $3),
@@ -612,12 +632,12 @@ func saveRuleState(ctx context.Context, tx pgx.Tx, ruleID, resourceID, checkType
 			active_incident_id = NULLIF($4, '')::uuid,
 			last_signal_id = NULLIF($5, '')::uuid, last_signal_at = $6,
 			last_state = NULLIF($7, ''), last_reason = NULLIF($8, ''),
-			matching_since = $9, matching_occurrences = $10,
-			recovery_since = $11, recovery_occurrences = $12,
-			deadline_at = $13, updated_at = $14
+			last_reason_code = NULLIF($9, ''), matching_since = $10, matching_occurrences = $11,
+			recovery_since = $12, recovery_occurrences = $13,
+			deadline_at = $14, updated_at = $15
 		WHERE rule_id = $1 AND resource_id = $2 AND check_type = $3
 	`, ruleID, resourceID, checkType, state.ActiveIncidentID, state.LastSignalID,
-		state.LastSignalAt, state.LastState, state.LastReason, state.MatchingSince,
+		state.LastSignalAt, state.LastState, state.LastReason, state.LastReasonCode, state.MatchingSince,
 		state.MatchingOccurrences, state.RecoverySince, state.RecoveryOccurrences,
 		state.DeadlineAt, now)
 	if err != nil {

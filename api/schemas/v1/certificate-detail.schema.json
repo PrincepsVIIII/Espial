@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/certificate-detail.schema.json",
+  "title": "Certificate detail",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "monitor_id",
+    "endpoint",
+    "state",
+    "raw_state",
+    "certificate_state",
+    "reason",
+    "reason_code",
+    "updated_at",
+    "source",
+    "freshness",
+    "fingerprint_changed",
+    "issuer_changed",
+    "first_seen_at",
+    "last_seen_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "monitor_id": { "type": "string", "format": "uuid" },
+    "endpoint": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "raw_state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "certificate_state": {
+      "enum": ["healthy", "warning", "critical", "unknown"]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+    },
+    "not_after": { "type": "string", "format": "date-time" },
+    "days_remaining": {
+      "type": "integer",
+      "minimum": -36500,
+      "maximum": 36500
+    },
+    "issuer": { "type": "string", "maxLength": 512 },
+    "hostname_valid": { "type": "boolean" },
+    "chain_valid": { "type": "boolean" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "source": { "const": "webcheck" },
+    "freshness": {
+      "enum": ["fresh", "stale", "unknown", "maintenance"]
+    },
+    "active_incident_id": { "type": "string", "format": "uuid" },
+    "subject": { "type": "string", "maxLength": 512 },
+    "san_summary": { "type": "string", "maxLength": 1024 },
+    "serial_number": { "type": "string", "maxLength": 128 },
+    "fingerprint_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "not_before": { "type": "string", "format": "date-time" },
+    "fingerprint_changed": { "type": "boolean" },
+    "issuer_changed": { "type": "boolean" },
+    "first_seen_at": { "type": "string", "format": "date-time" },
+    "last_seen_at": { "type": "string", "format": "date-time" }
+  }
+}

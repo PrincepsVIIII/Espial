@@ -15,6 +15,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
 	"github.com/PrincepsVIIII/Espial/core/internal/api"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
+	"github.com/PrincepsVIIII/Espial/core/internal/certificates"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
@@ -96,6 +97,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Suppressions:     monitoringRuntime.Suppressions(),
 		Notifications:    notificationService,
 		Websites:         websiteService,
+		Certificates:     certificates.NewService(pool),
 		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,

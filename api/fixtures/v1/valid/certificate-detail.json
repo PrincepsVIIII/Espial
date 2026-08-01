@@ -1,0 +1,31 @@
+{
+  "schema": "certificate-detail",
+  "data": {
+    "id": "72000000-0000-4000-8000-000000000026",
+    "monitor_id": "70000000-0000-4000-8000-000000000001",
+    "endpoint": "status.example.invalid:443",
+    "state": "warning",
+    "raw_state": "warning",
+    "certificate_state": "warning",
+    "reason": "Certificate expires within the configured warning threshold.",
+    "reason_code": "certificate_approaching_expiry",
+    "not_after": "2026-08-31T12:00:00Z",
+    "days_remaining": 30,
+    "issuer": "CN=UBNetDef Test CA",
+    "hostname_valid": true,
+    "chain_valid": true,
+    "observed_at": "2026-08-01T12:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "source": "webcheck",
+    "freshness": "fresh",
+    "subject": "CN=status.example.invalid",
+    "san_summary": "status.example.invalid",
+    "serial_number": "42",
+    "fingerprint_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "not_before": "2026-07-01T12:00:00Z",
+    "fingerprint_changed": false,
+    "issuer_changed": false,
+    "first_seen_at": "2026-07-01T12:00:00Z",
+    "last_seen_at": "2026-08-01T12:00:00Z"
+  }
+}

@@ -3,8 +3,8 @@
 PostgreSQL is authoritative for identity, configuration, current health, normalized
 observations, audit history, the Phase 2 monitoring-signal journal, incidents, and
 notification evidence. The first diagram preserves the Phase 1 foundation;
-certificate, dependency, and physical inventory tables arrive in later roadmap
-slices.
+the Phase 2 addendum includes the certificate projection, while dependency and
+physical inventory tables arrive in later roadmap slices.
 
 ```mermaid
 erDiagram
@@ -173,6 +173,8 @@ erDiagram
     NOTIFICATION_DESTINATIONS ||--o{ NOTIFICATION_INTENTS : targets
     NOTIFICATION_INTENTS ||--o{ NOTIFICATION_ATTEMPTS : records
     SILENCES ||--o{ NOTIFICATION_INTENTS : suppresses
+    OBSERVATIONS ||--o| CERTIFICATE_OBSERVATIONS : projects
+    RESOURCES ||--o{ CERTIFICATE_OBSERVATIONS : identifies
 ```
 
 - `monitoring_signals.source_key` is unique and is committed atomically with its
@@ -206,6 +208,11 @@ erDiagram
 - `notification_attempts` is append-only and unique by intent/attempt number.
   Terminal intent state and notification timeline entries remain the explanatory
   evidence; remote response bodies are never stored.
+- `certificate_observations` is the bounded, indexed projection of trusted
+  `certificate.validity` observations. It retains endpoint, subject/SAN and issuer
+  summaries, serial/fingerprint, validity bounds, hostname/chain results, remaining
+  days, and replacement/issuer-change booleans. Private keys, full chains, raw TLS
+  errors, response bodies, and protected headers are not projection fields.
 - `administrative_mutation_idempotency` binds actor, target type, operation, and
   key to a request hash and original version/correlation receipt for rule and
   suppression mutations.
@@ -231,6 +238,9 @@ erDiagram
   event; they do not update old events.
 - Secrets are references, never values, in integrations, notification destinations,
   read models, and audit summaries.
+- Each HTTPS monitor emits a distinct `certificate` resource so its current health
+  cannot overwrite the webpage availability resource. Threshold crossings reuse
+  one `(rule_id, resource_id, certificate.validity)` active fingerprint.
 - Adapter-instance restart counters and deadlines are persisted so restarting Core
   cannot erase a failing adapter's backoff. Host-local process IDs are not stored.
 

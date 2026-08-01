@@ -49,7 +49,15 @@
         },
         "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "raw_state": {
-          "enum": ["healthy", "warning", "critical", "unknown", "stale", "maintenance", "disabled"]
+          "enum": [
+            "healthy",
+            "warning",
+            "critical",
+            "unknown",
+            "stale",
+            "maintenance",
+            "disabled"
+          ]
         },
         "raw_reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
         "maintenance": {

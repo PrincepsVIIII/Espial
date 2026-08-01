@@ -1811,6 +1811,71 @@
         }
       }
     },
+    "/certificates": {
+      "get": {
+        "operationId": "listCertificates",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "state",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": { "enum": ["healthy", "warning", "critical", "unknown"] }
+            }
+          },
+          {
+            "name": "hostname_valid",
+            "in": "query",
+            "schema": { "type": "boolean" }
+          },
+          {
+            "name": "expiry_days",
+            "in": "query",
+            "schema": { "type": "integer", "minimum": 0, "maximum": 3650 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authoritative bounded certificate summaries.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CertificateList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/certificates/{id}": {
+      "get": {
+        "operationId": "getCertificate",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Authoritative bounded certificate identity and validity detail.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/v1/certificate-detail.schema.json"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/events/stream": {
       "get": {
         "operationId": "streamEvents",
@@ -1944,6 +2009,19 @@
             "type": "array",
             "maxItems": 200,
             "items": { "$ref": "../schemas/v1/webpage-summary.schema.json" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "CertificateList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/certificate-summary.schema.json" }
           },
           "next_cursor": { "type": "string", "maxLength": 2048 }
         }

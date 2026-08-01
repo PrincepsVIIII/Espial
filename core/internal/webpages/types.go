@@ -28,36 +28,42 @@ type SecretHeaderDefinition struct {
 }
 
 type MonitorDefinition struct {
-	DisplayName      string                   `json:"display_name"`
-	Enabled          bool                     `json:"enabled"`
-	URL              string                   `json:"url"`
-	IntervalSeconds  int                      `json:"interval_seconds"`
-	TimeoutMS        int                      `json:"timeout_ms"`
-	WarningLatencyMS int                      `json:"warning_latency_ms,omitempty"`
-	AllowedStatuses  []int                    `json:"allowed_statuses"`
-	ContentMatch     string                   `json:"content_match,omitempty"`
-	FollowRedirects  bool                     `json:"follow_redirects"`
-	MaxRedirects     int                      `json:"max_redirects"`
-	SecretHeaders    []SecretHeaderDefinition `json:"secret_headers,omitempty"`
+	DisplayName               string                   `json:"display_name"`
+	Enabled                   bool                     `json:"enabled"`
+	URL                       string                   `json:"url"`
+	IntervalSeconds           int                      `json:"interval_seconds"`
+	TimeoutMS                 int                      `json:"timeout_ms"`
+	WarningLatencyMS          int                      `json:"warning_latency_ms,omitempty"`
+	CertificateWarningDays    int                      `json:"certificate_warning_days"`
+	CertificateCriticalDays   int                      `json:"certificate_critical_days"`
+	CertificateEscalationDays int                      `json:"certificate_escalation_days"`
+	AllowedStatuses           []int                    `json:"allowed_statuses"`
+	ContentMatch              string                   `json:"content_match,omitempty"`
+	FollowRedirects           bool                     `json:"follow_redirects"`
+	MaxRedirects              int                      `json:"max_redirects"`
+	SecretHeaders             []SecretHeaderDefinition `json:"secret_headers,omitempty"`
 }
 
 type Monitor struct {
-	ID                     string    `json:"id"`
-	DisplayName            string    `json:"display_name"`
-	Enabled                bool      `json:"enabled"`
-	URL                    string    `json:"url"`
-	IntervalSeconds        int       `json:"interval_seconds"`
-	TimeoutMS              int       `json:"timeout_ms"`
-	WarningLatencyMS       int       `json:"warning_latency_ms,omitempty"`
-	AllowedStatuses        []int     `json:"allowed_statuses"`
-	ContentMatchConfigured bool      `json:"content_match_configured"`
-	FollowRedirects        bool      `json:"follow_redirects"`
-	MaxRedirects           int       `json:"max_redirects"`
-	SecretHeaderNames      []string  `json:"secret_header_names"`
-	RuntimeState           string    `json:"runtime_state"`
-	Version                int64     `json:"version"`
-	CreatedAt              time.Time `json:"created_at"`
-	UpdatedAt              time.Time `json:"updated_at"`
+	ID                        string    `json:"id"`
+	DisplayName               string    `json:"display_name"`
+	Enabled                   bool      `json:"enabled"`
+	URL                       string    `json:"url"`
+	IntervalSeconds           int       `json:"interval_seconds"`
+	TimeoutMS                 int       `json:"timeout_ms"`
+	WarningLatencyMS          int       `json:"warning_latency_ms,omitempty"`
+	CertificateWarningDays    int       `json:"certificate_warning_days"`
+	CertificateCriticalDays   int       `json:"certificate_critical_days"`
+	CertificateEscalationDays int       `json:"certificate_escalation_days"`
+	AllowedStatuses           []int     `json:"allowed_statuses"`
+	ContentMatchConfigured    bool      `json:"content_match_configured"`
+	FollowRedirects           bool      `json:"follow_redirects"`
+	MaxRedirects              int       `json:"max_redirects"`
+	SecretHeaderNames         []string  `json:"secret_header_names"`
+	RuntimeState              string    `json:"runtime_state"`
+	Version                   int64     `json:"version"`
+	CreatedAt                 time.Time `json:"created_at"`
+	UpdatedAt                 time.Time `json:"updated_at"`
 }
 
 type MonitorList struct {

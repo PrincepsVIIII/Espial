@@ -19,6 +19,7 @@ const overview: MonitoringOverview = {
   integration_counts: [{ state: 'healthy', count: 1 }],
   stale_count: 1,
   unknown_count: 0,
+  certificate_warnings: { warning: 0, critical: 0, unknown: 0 },
   recent_state_changes: [],
 };
 

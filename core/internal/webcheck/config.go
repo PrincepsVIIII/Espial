@@ -10,29 +10,37 @@ import (
 )
 
 const (
-	AdapterID          = "org.ubnetdef.espial.webcheck"
-	CheckType          = "website.availability"
-	ResourceKind       = "webpage"
-	MaxSecretHeaders   = 4
-	MaxContentBytes    = 4096
-	DefaultBodyLimit   = 262144
-	DefaultHeaderLimit = 32768
+	AdapterID               = "org.ubnetdef.espial.webcheck"
+	CheckType               = "website.availability"
+	CertificateCheckType    = "certificate.validity"
+	ResourceKind            = "webpage"
+	CertificateResourceKind = "certificate"
+	MaxSecretHeaders        = 4
+	MaxContentBytes         = 4096
+	DefaultBodyLimit        = 262144
+	DefaultHeaderLimit      = 32768
+	DefaultWarningDays      = 30
+	DefaultCriticalDays     = 14
+	DefaultEscalationDays   = 7
 )
 
 type Config struct {
-	URL                    string   `json:"url"`
-	AllowedStatuses        []int    `json:"allowed_statuses"`
-	TimeoutMS              int      `json:"timeout_ms"`
-	WarningLatencyMS       int      `json:"warning_latency_ms,omitempty"`
-	ContentMatch           string   `json:"content_match,omitempty"`
-	FollowRedirects        bool     `json:"follow_redirects"`
-	MaxRedirects           int      `json:"max_redirects"`
-	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
-	HeaderNames            []string `json:"header_names,omitempty"`
-	HeaderValue1           string   `json:"header_value_1,omitempty"`
-	HeaderValue2           string   `json:"header_value_2,omitempty"`
-	HeaderValue3           string   `json:"header_value_3,omitempty"`
-	HeaderValue4           string   `json:"header_value_4,omitempty"`
+	URL                       string   `json:"url"`
+	AllowedStatuses           []int    `json:"allowed_statuses"`
+	TimeoutMS                 int      `json:"timeout_ms"`
+	WarningLatencyMS          int      `json:"warning_latency_ms,omitempty"`
+	ContentMatch              string   `json:"content_match,omitempty"`
+	FollowRedirects           bool     `json:"follow_redirects"`
+	MaxRedirects              int      `json:"max_redirects"`
+	ExpectedRefreshSeconds    int      `json:"expected_refresh_seconds"`
+	CertificateWarningDays    int      `json:"certificate_warning_days,omitempty"`
+	CertificateCriticalDays   int      `json:"certificate_critical_days,omitempty"`
+	CertificateEscalationDays int      `json:"certificate_escalation_days,omitempty"`
+	HeaderNames               []string `json:"header_names,omitempty"`
+	HeaderValue1              string   `json:"header_value_1,omitempty"`
+	HeaderValue2              string   `json:"header_value_2,omitempty"`
+	HeaderValue3              string   `json:"header_value_3,omitempty"`
+	HeaderValue4              string   `json:"header_value_4,omitempty"`
 }
 
 func DecodeConfig(value json.RawMessage) (Config, error) {
@@ -50,6 +58,7 @@ func DecodeConfig(value json.RawMessage) (Config, error) {
 	if err := decoder.Decode(&result); err != nil {
 		return Config{}, errors.New("invalid webcheck config")
 	}
+	result = WithCertificateDefaults(result)
 	if err := ValidateConfig(result); err != nil {
 		return Config{}, err
 	}
@@ -57,6 +66,7 @@ func DecodeConfig(value json.RawMessage) (Config, error) {
 }
 
 func ValidateConfig(config Config) error {
+	config = WithCertificateDefaults(config)
 	parsed, err := url.Parse(config.URL)
 	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") ||
 		parsed.User != nil || parsed.Fragment != "" || len(config.URL) > 2048 {
@@ -76,6 +86,9 @@ func ValidateConfig(config Config) error {
 		len(config.ContentMatch) > MaxContentBytes ||
 		config.ExpectedRefreshSeconds < 1 || config.ExpectedRefreshSeconds > 86400 ||
 		config.MaxRedirects < 0 || config.MaxRedirects > 5 ||
+		config.CertificateWarningDays < 1 || config.CertificateWarningDays > 3650 ||
+		config.CertificateCriticalDays < 1 || config.CertificateCriticalDays >= config.CertificateWarningDays ||
+		config.CertificateEscalationDays < 1 || config.CertificateEscalationDays >= config.CertificateCriticalDays ||
 		(!config.FollowRedirects && config.MaxRedirects != 0) || len(config.HeaderNames) > MaxSecretHeaders {
 		return errors.New("webcheck config is outside safe bounds")
 	}
@@ -107,6 +120,19 @@ func ValidateConfig(config Config) error {
 		}
 	}
 	return nil
+}
+
+func WithCertificateDefaults(config Config) Config {
+	if config.CertificateWarningDays == 0 {
+		config.CertificateWarningDays = DefaultWarningDays
+	}
+	if config.CertificateCriticalDays == 0 {
+		config.CertificateCriticalDays = DefaultCriticalDays
+	}
+	if config.CertificateEscalationDays == 0 {
+		config.CertificateEscalationDays = DefaultEscalationDays
+	}
+	return config
 }
 
 func (config Config) HeaderValues() []string {

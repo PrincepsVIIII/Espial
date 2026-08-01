@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -14,6 +16,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
@@ -37,6 +40,24 @@ type Result struct {
 	ObservedAt   time.Time
 	Measurements map[string]any
 	Metadata     map[string]any
+	Certificate  *CertificateEvidence
+}
+
+type CertificateEvidence struct {
+	State             health.State
+	Summary           string
+	ReasonCode        string
+	Endpoint          string
+	Subject           string
+	SANSummary        string
+	Issuer            string
+	SerialNumber      string
+	FingerprintSHA256 string
+	NotBefore         *time.Time
+	NotAfter          *time.Time
+	HostnameValid     *bool
+	ChainValid        *bool
+	DaysRemaining     *int
 }
 
 type Checker struct {
@@ -65,6 +86,7 @@ type stageEvidence struct {
 }
 
 func (checker *Checker) Check(ctx context.Context, config Config) Result {
+	config = WithCertificateDefaults(config)
 	started := checker.clock.Now().UTC()
 	checkContext, cancel := context.WithTimeout(ctx, time.Duration(config.TimeoutMS)*time.Millisecond)
 	defer cancel()
@@ -155,14 +177,26 @@ func (checker *Checker) request(ctx context.Context, target *url.URL, config Con
 	stream := connection
 	if target.Scheme == "https" {
 		tlsStarted := checker.clock.Now()
-		secure := tls.Client(connection, &tls.Config{MinVersion: tls.VersionTLS12, ServerName: target.Hostname(), RootCAs: checker.rootCAs})
+		// Verification is performed immediately below with the injected clock and
+		// approved roots so failure evidence can be retained. HTTP is never sent
+		// unless both chain and hostname verification succeed.
+		secure := tls.Client(connection, &tls.Config{MinVersion: tls.VersionTLS12, ServerName: target.Hostname(), InsecureSkipVerify: true}) // #nosec G402 -- manually verified before use
 		if err := secure.HandshakeContext(ctx); err != nil {
 			evidence.tlsMS += elapsedMS(tlsStarted, checker.clock.Now())
-			return nil, nil, "", failed("tls_failed", "Website TLS negotiation or certificate verification failed.")
+			result := failed("tls_no_certificate", "Website TLS negotiation did not provide a verifiable certificate.")
+			result.Certificate = noCertificateEvidence(target)
+			return nil, nil, "", result
 		}
 		evidence.tlsMS += elapsedMS(tlsStarted, checker.clock.Now())
 		evidence.completed = appendUnique(evidence.completed, "tls")
+		certificate := checker.inspectCertificate(target, secure.ConnectionState(), config)
+		if certificate.State != health.Healthy && certificate.State != health.Warning {
+			result := failed("tls_"+certificate.ReasonCode, certificate.Summary)
+			result.Certificate = &certificate
+			return nil, nil, "", result
+		}
 		stream = secure
+		defer func() { _ = secure.Close() }()
 	}
 
 	httpStarted := checker.clock.Now()
@@ -217,6 +251,80 @@ func (checker *Checker) request(ctx context.Context, target *url.URL, config Con
 	}
 	evidence.completed = appendUnique(evidence.completed, "body")
 	return response, body, location, Result{}
+}
+
+func (checker *Checker) inspectCertificate(target *url.URL, state tls.ConnectionState, config Config) CertificateEvidence {
+	if len(state.PeerCertificates) == 0 {
+		return *noCertificateEvidence(target)
+	}
+	now := checker.clock.Now().UTC()
+	leaf := state.PeerCertificates[0]
+	result := CertificateEvidence{
+		State: health.Healthy, ReasonCode: "certificate_valid", Summary: "Certificate is valid and outside configured expiry thresholds.",
+		Endpoint: certificateEndpoint(target), Subject: boundedCertificateText(leaf.Subject.String(), 512),
+		SANSummary: boundedSANs(leaf.DNSNames), Issuer: boundedCertificateText(leaf.Issuer.String(), 512),
+		SerialNumber: boundedCertificateText(leaf.SerialNumber.Text(16), 128),
+	}
+	fingerprint := sha256.Sum256(leaf.Raw)
+	result.FingerprintSHA256 = hex.EncodeToString(fingerprint[:])
+	notBefore, notAfter := leaf.NotBefore.UTC(), leaf.NotAfter.UTC()
+	result.NotBefore, result.NotAfter = &notBefore, &notAfter
+	hostnameValid := leaf.VerifyHostname(target.Hostname()) == nil
+	result.HostnameValid = &hostnameValid
+	intermediates := x509.NewCertPool()
+	for _, certificate := range state.PeerCertificates[1:] {
+		intermediates.AddCert(certificate)
+	}
+	_, verifyErr := leaf.Verify(x509.VerifyOptions{Roots: checker.rootCAs, Intermediates: intermediates, CurrentTime: now})
+	chainValid := verifyErr == nil
+	result.ChainValid = &chainValid
+	seconds := int64(notAfter.Sub(now).Seconds())
+	days := int(seconds / int64(24*time.Hour/time.Second))
+	if seconds > 0 && seconds%int64(24*time.Hour/time.Second) != 0 {
+		days++
+	}
+	result.DaysRemaining = &days
+	switch {
+	case !now.Before(notAfter):
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_expired", "Certificate has expired."
+	case now.Before(notBefore):
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_not_yet_valid", "Certificate is not yet valid."
+	case !chainValid:
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_untrusted_chain", "Certificate chain is not trusted by the approved roots."
+	case !hostnameValid:
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_hostname_mismatch", "Certificate does not match the configured hostname."
+	case !notAfter.After(now.Add(time.Duration(config.CertificateEscalationDays) * 24 * time.Hour)):
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_expiry_escalated", "Certificate expires within the configured escalation threshold."
+	case !notAfter.After(now.Add(time.Duration(config.CertificateCriticalDays) * 24 * time.Hour)):
+		result.State, result.ReasonCode, result.Summary = health.Critical, "certificate_expiring", "Certificate expires within the configured critical threshold."
+	case !notAfter.After(now.Add(time.Duration(config.CertificateWarningDays) * 24 * time.Hour)):
+		result.State, result.ReasonCode, result.Summary = health.Warning, "certificate_approaching_expiry", "Certificate expires within the configured warning threshold."
+	}
+	return result
+}
+
+func noCertificateEvidence(target *url.URL) *CertificateEvidence {
+	return &CertificateEvidence{State: health.Critical, ReasonCode: "certificate_not_reported", Summary: "TLS peer did not report a certificate.", Endpoint: certificateEndpoint(target)}
+}
+
+func certificateEndpoint(target *url.URL) string {
+	port, _ := targetPort(target.Scheme, target.Port())
+	return net.JoinHostPort(target.Hostname(), strconv.Itoa(port))
+}
+
+func boundedSANs(values []string) string {
+	if len(values) > 20 {
+		values = values[:20]
+	}
+	return boundedCertificateText(strings.Join(values, ", "), 1024)
+}
+
+func boundedCertificateText(value string, limit int) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= limit {
+		return value
+	}
+	return value[:limit]
 }
 
 func (checker *Checker) dial(ctx context.Context, addresses []netip.Addr, port int) (net.Conn, error) {

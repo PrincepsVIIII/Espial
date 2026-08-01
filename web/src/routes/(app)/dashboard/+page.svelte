@@ -107,6 +107,41 @@
 {#if data.overview}
   <section
     class="dashboard-incidents"
+    aria-labelledby="dashboard-certificates-title"
+  >
+    <div class="operational-section-heading">
+      <div>
+        <p class="eyebrow">Approved endpoint identity</p>
+        <h2 id="dashboard-certificates-title">Certificate attention</h2>
+      </div>
+      <a class="text-link" href="/webpages/certificates">Inspect certificates</a
+      >
+    </div>
+    <div class="incident-counts" aria-label="Certificate warning summary">
+      <span
+        ><strong>{data.overview.certificate_warnings.critical}</strong> critical</span
+      >
+      <span
+        ><strong>{data.overview.certificate_warnings.warning}</strong> warning</span
+      >
+      <span
+        ><strong>{data.overview.certificate_warnings.unknown}</strong> unknown</span
+      >
+    </div>
+    {#if data.overview.certificate_warnings.critical + data.overview.certificate_warnings.warning + data.overview.certificate_warnings.unknown === 0}
+      <div class="empty-state compact">
+        <strong>No certificate conditions need attention.</strong><span
+          >The authoritative certificate projection reports no warning,
+          critical, or unknown observations.</span
+        >
+      </div>
+    {/if}
+  </section>
+{/if}
+
+{#if data.overview}
+  <section
+    class="dashboard-incidents"
     aria-labelledby="dashboard-incidents-title"
   >
     <div class="operational-section-heading">
