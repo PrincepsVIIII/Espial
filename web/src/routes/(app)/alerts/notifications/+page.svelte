@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidate } from '$app/navigation';
+  import AlertNavigation from '$lib/components/AlertNavigation.svelte';
   import { administrativeMutation } from '$lib/administration';
   import { problemFrom } from '$lib/api/client';
   import Timestamp from '$lib/components/Timestamp.svelte';
@@ -95,7 +96,6 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Durable delivery evidence</p>
     <h1>Alert notifications</h1>
     <p class="page-description">
       Configure approved Mattermost destinations and inspect bounded delivery,
@@ -103,15 +103,7 @@
     </p>
   </div>
 </header>
-<nav class="section-navigation" aria-label="Alert views">
-  <a href="/alerts">Active</a><a href="/alerts/history">History</a><a
-    href="/alerts/rules">Rules</a
-  ><a href="/alerts/suppressions">Suppressions</a><a
-    class="active"
-    aria-current="page"
-    href="/alerts/notifications">Notifications</a
-  >
-</nav>
+<AlertNavigation permissions={data.session?.user.permissions ?? []} />
 
 {#if problem ?? data.problem}
   {@const currentProblem = problem ?? data.problem}
@@ -137,7 +129,6 @@
     <section class="admin-section" aria-labelledby="destination-title">
       <div class="operational-section-heading">
         <div>
-          <p class="eyebrow">Redacted configuration</p>
           <h2 id="destination-title">Mattermost destinations</h2>
         </div>
         <span class="section-count">{data.destinations.length} configured</span>
@@ -198,9 +189,6 @@
     <section class="admin-section" aria-labelledby="destination-editor-title">
       <div class="editor-heading">
         <div>
-          <p class="eyebrow">
-            {selected ? 'Full replacement' : 'New destination'}
-          </p>
           <h2 id="destination-editor-title">
             {selected?.display_name ?? 'Create destination'}
           </h2>
@@ -286,7 +274,6 @@
   >
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Newest first · safe failure reasons</p>
         <h2 id="delivery-title">Delivery history</h2>
       </div>
       <span class="section-count">{data.deliveries.length} shown</span>

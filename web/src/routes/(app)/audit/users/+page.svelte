@@ -177,7 +177,6 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Local access administration</p>
     <h1>Users</h1>
     <p class="page-description">
       Create accounts, assign one role, control access, and replace passwords.
@@ -223,7 +222,6 @@
     <section class="admin-section" aria-labelledby="user-list-title">
       <div class="operational-section-heading">
         <div>
-          <p class="eyebrow">Current access</p>
           <h2 id="user-list-title">Accounts</h2>
         </div>
         <span class="section-count">{data.users.length} shown</span>
@@ -294,7 +292,6 @@
       aria-labelledby="create-user-title"
     >
       <div>
-        <p class="eyebrow">New access</p>
         <h2 id="create-user-title">Create local user</h2>
       </div>
       <form class="admin-form" onsubmit={createUser}>
@@ -352,7 +349,6 @@
     <section class="user-editor" aria-labelledby="edit-user-title">
       <div class="editor-heading">
         <div>
-          <p class="eyebrow">Selected account</p>
           <h2 id="edit-user-title">Manage {selected.username}</h2>
         </div>
         <button

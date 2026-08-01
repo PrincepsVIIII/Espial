@@ -13,10 +13,11 @@
 >
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="certificate-detail-problem">
-    <p class="eyebrow">
-      {data.problem.status === 404 ? 'Not found' : 'Core unavailable'}
-    </p>
-    <h1 id="certificate-detail-problem">Certificate detail is unavailable.</h1>
+    <h1 id="certificate-detail-problem">
+      {data.problem.status === 404
+        ? 'Certificate detail was not found.'
+        : 'Certificate detail is unavailable.'}
+    </h1>
     <p>{data.problem.message}</p>
     <a class="text-link" href="/webpages/certificates">Return to Certificates</a
     >
@@ -24,7 +25,6 @@
 {:else if data.certificate}
   <header class="page-header">
     <div>
-      <p class="eyebrow">Certificate detail</p>
       <h1>{data.certificate.endpoint}</h1>
       <p class="page-description">
         Source: {data.certificate.source} · Freshness: {data.certificate
@@ -43,7 +43,6 @@
   <section class="admin-section" aria-labelledby="certificate-status-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Current bounded evidence</p>
         <h2 id="certificate-status-title">Validity and identity</h2>
       </div>
       {#if data.certificate.observed_at}<Timestamp

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidate } from '$app/navigation';
+  import AlertNavigation from '$lib/components/AlertNavigation.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import { administrativeMutation } from '$lib/administration';
   import { problemFrom } from '$lib/api/client';
@@ -128,7 +129,6 @@
 <svelte:head><title>Alert suppressions · Espial</title></svelte:head>
 <header class="page-header">
   <div>
-    <p class="eyebrow">Time-bounded controls</p>
     <h1>Suppressions</h1>
     <p class="page-description">
       Maintenance changes effective health while preserving raw failures.
@@ -137,13 +137,7 @@
     </p>
   </div>
 </header>
-<nav class="section-navigation" aria-label="Alert views">
-  <a href="/alerts">Active</a><a href="/alerts/history">History</a><a
-    href="/alerts/rules">Rules</a
-  ><a class="active" aria-current="page" href="/alerts/suppressions"
-    >Suppressions</a
-  >
-</nav>
+<AlertNavigation permissions={data.session?.user.permissions ?? []} />
 
 {#if problem ?? data.problem}{@const currentProblem = problem ?? data.problem}
   <div class="inline-problem" role="alert">
@@ -164,7 +158,6 @@
   <section class="admin-section" aria-labelledby="maintenance-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Effective health control</p>
         <h2 id="maintenance-title">Maintenance windows</h2>
       </div>
       <span class="section-count">{data.windows.length} shown</span>
@@ -226,9 +219,6 @@
   <section class="admin-section" aria-labelledby="window-editor-title">
     <div class="editor-heading">
       <div>
-        <p class="eyebrow">
-          {selectedWindow ? 'Replace control' : 'New control'}
-        </p>
         <h2 id="window-editor-title">
           {selectedWindow ? 'Edit maintenance window' : 'Schedule maintenance'}
         </h2>
@@ -309,7 +299,6 @@
   <section class="admin-section" aria-labelledby="silence-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Notification decision control</p>
         <h2 id="silence-title">Silences</h2>
       </div>
       <span class="section-count">{data.silences.length} shown</span>
@@ -363,9 +352,6 @@
   <section class="admin-section" aria-labelledby="silence-editor-title">
     <div class="editor-heading">
       <div>
-        <p class="eyebrow">
-          {selectedSilence ? 'Replace control' : 'New control'}
-        </p>
         <h2 id="silence-editor-title">
           {selectedSilence ? 'Edit silence' : 'Create silence'}
         </h2>

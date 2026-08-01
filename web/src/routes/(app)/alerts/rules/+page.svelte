@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invalidate } from '$app/navigation';
+  import AlertNavigation from '$lib/components/AlertNavigation.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import { administrativeMutation } from '$lib/administration';
   import { problemFrom, requestJSON } from '$lib/api/client';
@@ -140,7 +141,6 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Deterministic evaluation</p>
     <h1>Alert rules</h1>
     <p class="page-description">
       Create, replace, enable, and explain the exact rule applied to a
@@ -148,13 +148,7 @@
     </p>
   </div>
 </header>
-<nav class="section-navigation" aria-label="Alert views">
-  <a href="/alerts">Active</a><a href="/alerts/history">History</a><a
-    class="active"
-    aria-current="page"
-    href="/alerts/rules">Rules</a
-  ><a href="/alerts/suppressions">Suppressions</a>
-</nav>
+<AlertNavigation permissions={data.session?.user.permissions ?? []} />
 
 {#if problem ?? data.problem}{@const currentProblem = problem ?? data.problem}
   <div class="inline-problem" role="alert">
@@ -175,7 +169,6 @@
     <section class="admin-section" aria-labelledby="rule-list-title">
       <div class="operational-section-heading">
         <div>
-          <p class="eyebrow">Precedence order</p>
           <h2 id="rule-list-title">Current rules</h2>
         </div>
         <span class="section-count">{data.rules.length} shown</span>
@@ -223,7 +216,6 @@
     <section class="admin-section" aria-labelledby="rule-editor-title">
       <div class="editor-heading">
         <div>
-          <p class="eyebrow">{selected ? 'Replace rule' : 'New rule'}</p>
           <h2 id="rule-editor-title">{selected?.name ?? 'Create rule'}</h2>
         </div>
         {#if selected}<button
@@ -401,7 +393,6 @@
     class="admin-section preview-section"
     aria-labelledby="preview-title"
   >
-    <p class="eyebrow">Overlap preview</p>
     <h2 id="preview-title">Explain rule precedence</h2>
     <form class="admin-form compact-admin-form" onsubmit={previewRules}>
       <label

@@ -218,6 +218,68 @@ for (const viewport of [
   });
 }
 
+test('every Alerts page shows the same permitted section tabs', async ({
+  page,
+}) => {
+  const expected = [
+    'Active',
+    'History',
+    'Rules',
+    'Suppressions',
+    'Notifications',
+  ];
+  for (const pathname of [
+    '/alerts',
+    '/alerts/history',
+    `/alerts/${'80000000-0000-4000-8000-000000000021'}`,
+    '/alerts/rules',
+    '/alerts/suppressions',
+    '/alerts/notifications',
+  ]) {
+    await page.goto(pathname);
+    await waitForHydration(page);
+    const tabs = page.getByRole('navigation', { name: 'Alert views' });
+    await expect(tabs.getByRole('link')).toHaveText(expected);
+  }
+});
+
+test('all page families use structural cyan without eyebrow copy', async ({
+  page,
+}) => {
+  for (const pathname of [
+    '/',
+    '/login',
+    '/dashboard',
+    '/alerts',
+    '/alerts/history',
+    '/alerts/rules',
+    '/alerts/suppressions',
+    '/alerts/notifications',
+    '/datacenter',
+    '/hypervisor',
+    '/webpages',
+    '/webpages/monitors',
+    '/webpages/certificates',
+    '/audit',
+    '/audit/users',
+  ]) {
+    await page.goto(pathname);
+    if (pathname === '/' || pathname === '/login') {
+      await page.waitForFunction(() => document.readyState === 'complete');
+    } else {
+      await waitForHydration(page);
+    }
+    await expect(page.locator('.eyebrow')).toHaveCount(0);
+  }
+
+  await page.goto('/dashboard');
+  await waitForHydration(page);
+  const dividerAccent = await page
+    .locator('.page-header')
+    .evaluate((header) => getComputedStyle(header, '::after').backgroundColor);
+  expect(dividerAccent).toBe('rgb(85, 214, 226)');
+});
+
 test('operator action returns a visible receipt and exactly one audit record', async ({
   page,
   request,
@@ -610,7 +672,11 @@ test('permission and Core failures retain shell context without stale rows', asy
 }) => {
   await request.get(`${mockCore}/__test/control?api=forbidden`);
   await page.goto('/dashboard');
-  await expect(page.getByText('Permission denied')).toBeVisible();
+  await expect(
+    page.getByRole('heading', {
+      name: 'Monitoring summary is permission restricted.',
+    }),
+  ).toBeVisible();
   await expect(page.getByText('Resource access denied')).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Primary' })).toBeVisible();
 

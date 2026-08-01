@@ -46,7 +46,6 @@
 
 <header class="page-header dashboard-header">
   <div>
-    <p class="eyebrow">UBNetDef infrastructure operations</p>
     <h1>Dashboard</h1>
     {#if data.overview}
       <p class="generated-at">
@@ -66,7 +65,6 @@
 {#if data.overview}
   <section class="monitoring-summary" aria-labelledby="summary-title">
     <div class="summary-introduction">
-      <p class="eyebrow">Current resource state</p>
       <h2 id="summary-title">Monitoring coverage</h2>
       <p>
         {total}
@@ -87,12 +85,11 @@
   </section>
 {:else}
   <section class="problem-panel" aria-labelledby="overview-problem-title">
-    <p class="eyebrow">
+    <h2 id="overview-problem-title">
       {data.problems.overview?.status === 403
-        ? 'Permission denied'
-        : 'Core unavailable'}
-    </p>
-    <h2 id="overview-problem-title">Monitoring summary is unavailable.</h2>
+        ? 'Monitoring summary is permission restricted.'
+        : 'Monitoring summary is unavailable.'}
+    </h2>
     <p>
       {data.problems.overview?.message ?? 'The overview could not be loaded.'}
     </p>
@@ -111,7 +108,6 @@
   >
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Approved endpoint identity</p>
         <h2 id="dashboard-certificates-title">Certificate attention</h2>
       </div>
       <a class="text-link" href="/webpages/certificates">Inspect certificates</a
@@ -146,7 +142,6 @@
   >
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Current operational attention</p>
         <h2 id="dashboard-incidents-title">Active incidents</h2>
       </div>
       <a class="text-link" href="/alerts">View all active incidents</a>
@@ -197,7 +192,6 @@
 <section class="resource-section" aria-labelledby="resources-title">
   <div class="operational-section-heading">
     <div>
-      <p class="eyebrow">Authoritative resource health</p>
       <h2 id="resources-title">Resources</h2>
     </div>
     <span class="section-count">{data.resources?.items.length ?? 0} shown</span>
@@ -333,7 +327,6 @@
 <section class="integration-section" aria-labelledby="integrations-title">
   <div class="operational-section-heading">
     <div>
-      <p class="eyebrow">Collection coverage</p>
       <h2 id="integrations-title">Integrations</h2>
     </div>
     <span class="section-count"

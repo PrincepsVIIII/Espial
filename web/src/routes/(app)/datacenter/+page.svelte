@@ -5,7 +5,6 @@
 <svelte:head><title>Datacenter · Espial</title></svelte:head>
 
 <UnavailableSection
-  eyebrow="Physical infrastructure"
   title="Datacenter"
   phase="Phases 5–7"
   description="Room and hardware inventory are not configured. The spatial view will remain empty until Core can provide authoritative rooms, racks, devices, and drive locations."

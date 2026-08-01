@@ -5,7 +5,6 @@
 <svelte:head><title>Hypervisor · Espial</title></svelte:head>
 
 <UnavailableSection
-  eyebrow="Virtual infrastructure"
   title="Hypervisor"
   phase="Phase 3"
   description="No hypervisor adapter is configured. Hosts, clusters, and virtual machines will appear only after an integration reports authoritative state."

@@ -8,7 +8,6 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Authoritative DNS, TCP, TLS, and HTTP evidence</p>
     <h1>Webpages</h1>
     <p class="page-description">
       Availability reflects completed supervised checks. Response bodies and
@@ -27,10 +26,11 @@
 
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="webpages-problem-title">
-    <p class="eyebrow">
-      {data.problem.status === 403 ? 'Permission denied' : 'Core unavailable'}
-    </p>
-    <h2 id="webpages-problem-title">Website availability is unavailable.</h2>
+    <h2 id="webpages-problem-title">
+      {data.problem.status === 403
+        ? 'Website availability is permission restricted.'
+        : 'Website availability is unavailable.'}
+    </h2>
     <p>{data.problem.message}</p>
     {#if data.problem.request_id}<p class="request-reference">
         Request ID: <code>{data.problem.request_id}</code>
@@ -52,7 +52,6 @@
   <section class="admin-section" aria-labelledby="availability-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Newest evidence first</p>
         <h2 id="availability-title">Availability</h2>
       </div>
       <span class="section-count">{data.webpages.length} observed</span>

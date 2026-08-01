@@ -152,6 +152,18 @@ geometry, factual labels, useful tables, direct status language, and monospaced
 technical values where appropriate. Public-page copy may be more explanatory, but
 it must remain factual and restrained.
 
+Headings begin with the heading itself. Do not place an eyebrow, kicker, overline,
+category label, or decorative context line above page, section, card, form, or state
+headings in public, login, authenticated, loading, empty, or error views. Do not
+preserve redundant eyebrow copy by renaming its class. Omit it, or move genuinely
+useful explanation into ordinary description copy below the heading. Put meaningful
+state in the heading, body copy, or an established status component.
+
+Keep the logo-derived cyan accent without turning it into decorative text. A short
+cyan edge may attach to a standalone heading, or a short cyan segment may meet a
+real section divider. These marks remain structural, restrained, and consistent;
+they do not introduce extra words or compete with semantic status color.
+
 ## Datacenter interaction
 
 The Datacenter view follows the

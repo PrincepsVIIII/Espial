@@ -4,6 +4,7 @@
   import { onDestroy, onMount } from 'svelte';
   import { readCookie } from '$lib/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
+  import { alertNavigationItems } from '$lib/navigation';
   import {
     liveConnection,
     startLiveInvalidations,
@@ -29,20 +30,9 @@
     {
       label: 'Alerts',
       href: '/alerts',
-      children: [
-        { label: 'History', href: '/alerts/history' },
-        ...(data.session?.user.permissions.includes('incident_rules:manage')
-          ? [{ label: 'Rules', href: '/alerts/rules' }]
-          : []),
-        ...(data.session?.user.permissions.includes('suppressions:manage')
-          ? [{ label: 'Suppressions', href: '/alerts/suppressions' }]
-          : []),
-        ...(data.session?.user.permissions.includes(
-          'notification_destinations:manage',
-        )
-          ? [{ label: 'Notifications', href: '/alerts/notifications' }]
-          : []),
-      ],
+      children: alertNavigationItems(
+        data.session?.user.permissions ?? [],
+      ).slice(1),
     },
     {
       label: 'Datacenter',
@@ -172,7 +162,6 @@
 
 {#if data.loadError}
   <main class="system-state" aria-live="assertive">
-    <p class="eyebrow">Core unavailable</p>
     <h1>Espial cannot verify this session.</h1>
     <p>{data.loadError}</p>
     <div class="system-actions">

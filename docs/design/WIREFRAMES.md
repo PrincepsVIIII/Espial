@@ -12,9 +12,9 @@ physical sequence is governed by the
 │ Espial / UBNetDef                                      About   [ Sign in ] │
 ├────────────────────────────────────────────────────────────────────────────┤
 │                                                                            │
-│  INFRASTRUCTURE OPERATIONS, MADE VISIBLE                                   │
-│  Espial brings health, inventory, incidents, and physical location into    │
-│  one operator view.                                                        │
+│  ┃ Understand system health and locate the hardware behind it.             │
+│    Espial brings health, inventory, incidents, and physical location into  │
+│    one operator view.                                                      │
 │                                                                            │
 │  Monitor current health  │  Understand impact  │  Locate affected hardware │
 │                                                                            │
@@ -24,7 +24,8 @@ physical sequence is governed by the
 
 The root page is informational, not a public status page. It must not reveal
 hostnames, locations, integrations, health counts, incidents, or environment
-metadata. The top-right sign-in action remains visible at supported widths.
+metadata. The top-right sign-in action remains visible at supported widths. The
+short cyan heading edge shown above is structural; it is not an eyebrow or label.
 
 ## Local login and SSO-ready state
 

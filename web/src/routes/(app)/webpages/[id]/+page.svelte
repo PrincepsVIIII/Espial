@@ -24,21 +24,19 @@
 
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="webpage-problem-title">
-    <p class="eyebrow">
+    <h1 id="webpage-problem-title">
       {data.problem.status === 404
-        ? 'Not found'
+        ? 'Webpage detail was not found.'
         : data.problem.status === 403
-          ? 'Permission denied'
-          : 'Core unavailable'}
-    </p>
-    <h1 id="webpage-problem-title">Webpage detail is unavailable.</h1>
+          ? 'Webpage detail is permission restricted.'
+          : 'Webpage detail is unavailable.'}
+    </h1>
     <p>{data.problem.message}</p>
     <a class="text-link" href="/webpages">Return to Webpages</a>
   </section>
 {:else if data.webpage}
   <header class="page-header">
     <div>
-      <p class="eyebrow">Availability detail</p>
       <h1>{data.webpage.display_name}</h1>
       <p class="page-description"><code>{data.webpage.url}</code></p>
     </div>
@@ -51,7 +49,6 @@
   <section class="admin-section" aria-labelledby="current-evidence-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Core read model</p>
         <h2 id="current-evidence-title">Current evidence</h2>
       </div>
       {#if data.webpage.observed_at}<Timestamp
@@ -103,7 +100,6 @@
   >
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Partial failures preserve completed stages</p>
         <h2 id="stage-title">Check stages</h2>
       </div>
     </div>

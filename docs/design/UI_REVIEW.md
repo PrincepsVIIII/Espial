@@ -562,3 +562,41 @@ tests, all 37 Chromium scenarios, and the production SvelteKit build.
 The independent human touch/zoom/runbook dry run remains a production acceptance
 record rather than something repository automation can self-certify; see the Phase
 2 acceptance runbook.
+
+## 2026-08-01 — Direct page titles and consistent Alerts tabs
+
+Removed eyebrow copy above authenticated page titles so each page begins directly
+with its `h1` and places useful explanation below it. Public presentation copy and
+meaningful lower-level section context remain separate from this page-header rule.
+
+The Alerts section now derives its primary dropdown children and on-page tabs from
+one permission-aware destination list. Active, History, Rules, Suppressions, and
+Notifications therefore appear consistently on every Alerts route for an
+Administrator; Viewer sessions retain only the Active and History destinations they
+can actually use. The active tab is URL-derived and the same row remains available
+on incident detail pages.
+
+Visual inspection at 1440×900, 1280×800, and 500×900 confirmed that the direct
+titles and five-tab Administrator row remain readable without page-level overflow.
+Svelte diagnostics reported zero errors and warnings; all 50 unit tests, 39 Chromium
+scenarios, and the production build passed.
+
+## 2026-08-01 — Site-wide removal of text eyebrows
+
+Removed eyebrow, kicker, overline, and decorative category copy from every public,
+login, authenticated, unavailable, denial, not-found, and Core-error view. Redundant
+copy was deleted rather than restyled. Useful failure distinctions now appear in the
+actual state heading, and unavailable-section phase information moved into its
+established planned-status label.
+
+The cyan accent now belongs to structure: standalone public, login, form, and state
+headings use a short cyan edge; authenticated page and operational-section dividers
+use a short cyan segment. This keeps the UBNetDef color present without creating a
+second line of decorative text or competing with semantic status colors.
+
+Visual inspection of public, login, Dashboard, Alerts, Webpages, Certificates,
+rules, suppressions, and notification-administration captures at 1440×900,
+1280×800, and 500×900 confirmed consistent hierarchy and reflow. Svelte diagnostics
+reported zero errors and warnings; all 50 unit tests, all 39 Chromium scenarios,
+and the production SvelteKit build passed. A source-wide contract test scans every
+Svelte view and rejects any future eyebrow class or copy pattern.

@@ -174,15 +174,6 @@ button:disabled {
   text-transform: uppercase;
 }
 
-.eyebrow {
-  margin-bottom: 0.65rem;
-  color: var(--netdef-cyan);
-  font-size: 0.72rem;
-  font-weight: 750;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
-}
-
 .muted {
   color: var(--text-muted);
   line-height: 1.6;
@@ -275,6 +266,8 @@ button:disabled {
 .public-intro h1 {
   max-width: 22ch;
   margin-bottom: 1.25rem;
+  padding-left: 0.8rem;
+  border-left: 3px solid var(--netdef-cyan);
   color: var(--hayes-white);
   font-size: clamp(2.25rem, 5vw, 4.6rem);
   font-weight: 720;
@@ -282,7 +275,7 @@ button:disabled {
   line-height: 0.98;
 }
 
-.public-intro p:not(.eyebrow) {
+.public-intro > p {
   max-width: 46rem;
   margin-bottom: 1.5rem;
   color: #c2d3e3;
@@ -303,6 +296,8 @@ button:disabled {
 .public-access h2,
 .state-panel h2 {
   margin-bottom: 0.65rem;
+  padding-left: 0.7rem;
+  border-left: 3px solid var(--netdef-cyan);
   font-size: clamp(1.2rem, 2vw, 1.55rem);
   font-weight: 680;
   letter-spacing: -0.025em;
@@ -419,6 +414,8 @@ button:disabled {
 .login-context h1 {
   max-width: 17ch;
   margin-bottom: 1.25rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--netdef-cyan);
   color: var(--hayes-white);
   font-size: clamp(1.85rem, 3vw, 2.65rem);
   font-weight: 720;
@@ -448,6 +445,8 @@ button:disabled {
 
 .login-card h2 {
   margin-bottom: 0.75rem;
+  padding-left: 0.65rem;
+  border-left: 3px solid var(--netdef-cyan);
   font-size: 1.7rem;
   font-weight: 700;
   letter-spacing: -0.025em;
@@ -795,6 +794,7 @@ textarea:focus {
 }
 
 .page-header {
+  position: relative;
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -802,6 +802,16 @@ textarea:focus {
   margin-bottom: 2rem;
   padding-bottom: 1.2rem;
   border-bottom: 1px solid var(--border);
+}
+
+.page-header::after {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 2.5rem;
+  height: 2px;
+  background: var(--netdef-cyan);
+  content: '';
 }
 
 .page-header h1 {
@@ -1061,6 +1071,14 @@ textarea:focus {
   justify-content: space-between;
   gap: 1rem;
   margin-bottom: 1rem;
+}
+
+.editor-heading h2,
+.create-user > div > h2,
+.preview-section > h2,
+.incident-readonly h2 {
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--netdef-cyan);
 }
 
 .editor-grid {
@@ -1437,7 +1455,7 @@ textarea:focus {
   background: var(--critical-surface);
 }
 
-.problem-panel > p:not(.eyebrow) {
+.problem-panel > p {
   margin-bottom: 0;
   color: #dfc6c8;
   line-height: 1.5;
@@ -1740,6 +1758,7 @@ textarea:focus {
 }
 
 .operational-section-heading {
+  position: relative;
   display: flex;
   align-items: end;
   justify-content: space-between;
@@ -1749,13 +1768,18 @@ textarea:focus {
   border-bottom: 1px solid var(--border);
 }
 
-.operational-section-heading .eyebrow,
 .operational-section-heading h2 {
   margin-bottom: 0;
 }
 
-.operational-section-heading .eyebrow {
-  margin-bottom: 0.35rem;
+.operational-section-heading::after {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 2.25rem;
+  height: 2px;
+  background: var(--netdef-cyan);
+  content: '';
 }
 
 .section-count {
@@ -2143,11 +2167,13 @@ textarea:focus {
 .system-state h1 {
   max-width: 24ch;
   margin-bottom: 0.8rem;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--netdef-cyan);
   font-size: clamp(1.75rem, 4vw, 2.8rem);
   letter-spacing: -0.04em;
 }
 
-.system-state > p:not(.eyebrow) {
+.system-state > p {
   max-width: 40rem;
   color: var(--text-muted);
   line-height: 1.6;

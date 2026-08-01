@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 function source(path: string): string {
@@ -19,6 +19,8 @@ const alertSuppressionsPage = source(
 const alertNotificationsPage = source(
   '../routes/(app)/alerts/notifications/+page.svelte',
 );
+const alertNavigation = source('../lib/components/AlertNavigation.svelte');
+const navigation = source('../lib/navigation.ts');
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
@@ -34,6 +36,16 @@ const overviewRedirect = source('../routes/(app)/overview/+page.ts');
 const stylesheet = source('../styles.css');
 const brandLogo = source('../lib/components/BrandLogo.svelte');
 const coreUserHandler = source('../../../core/internal/api/user_handlers.go');
+const srcRoot = new URL('../', import.meta.url);
+const svelteViews = readdirSync(srcRoot, {
+  encoding: 'utf8',
+  recursive: true,
+})
+  .filter((path) => path.endsWith('.svelte'))
+  .map((path) => ({
+    path,
+    contents: readFileSync(new URL(path, srcRoot), 'utf8'),
+  }));
 
 describe('public entry contract', () => {
   it('identifies Espial and UBNetDef and keeps login at the public root', () => {
@@ -43,7 +55,9 @@ describe('public entry contract', () => {
   });
 
   it('describes the product without embedding operational fixtures', () => {
-    expect(publicPage).toContain('What Espial does');
+    expect(publicPage).toContain(
+      'One operational path from status to equipment.',
+    );
     expect(publicPage).toMatch(
       /contains no live status or environment\s+details/,
     );
@@ -91,27 +105,69 @@ describe('authenticated shell contract', () => {
     expect(appShell).toContain('class="nav-link"');
     expect(appShell).toContain('href={item.href}');
     expect(appShell).toContain("{ label: 'Users', href: '/audit/users' }");
-    expect(appShell).toContain("{ label: 'History', href: '/alerts/history' }");
-    expect(appShell).toContain("{ label: 'Rules', href: '/alerts/rules' }");
-    expect(appShell).toContain(
+    expect(navigation).toContain(
+      "{ label: 'History', href: '/alerts/history' }",
+    );
+    expect(navigation).toContain("{ label: 'Rules', href: '/alerts/rules' }");
+    expect(navigation).toContain(
       "{ label: 'Suppressions', href: '/alerts/suppressions' }",
     );
-    expect(appShell).toContain(
+    expect(navigation).toContain(
       "{ label: 'Notifications', href: '/alerts/notifications' }",
     );
-    expect(appShell).toContain("permissions.includes('incident_rules:manage')");
-    expect(appShell).toContain("permissions.includes('suppressions:manage')");
-    expect(appShell).toContain("'notification_destinations:manage',");
+    expect(navigation).toContain(
+      "permissions.includes('incident_rules:manage')",
+    );
+    expect(navigation).toContain("permissions.includes('suppressions:manage')");
+    expect(navigation).toContain(
+      "permissions.includes('notification_destinations:manage')",
+    );
+    expect(appShell).toContain('alertNavigationItems(');
     expect(appShell).not.toMatch(
       /Planned workflow|Planned inventory|Open section/,
     );
     expect(appShell).toContain('aria-label={`${item.label} sections`}');
   });
 
+  it('uses one permission-aware tab set on every Alerts page', () => {
+    for (const alertPage of [
+      alertsPage,
+      alertHistoryPage,
+      alertDetailPage,
+      alertRulesPage,
+      alertSuppressionsPage,
+      alertNotificationsPage,
+    ]) {
+      expect(alertPage).toContain('AlertNavigation');
+    }
+    expect(alertNavigation).toContain('alertNavigationItems(permissions)');
+    expect(alertNavigation).toContain('aria-label="Alert views"');
+  });
+
+  it('uses structural cyan accents without text eyebrows in any Svelte view', () => {
+    const decorativeLabelPattern =
+      /\b(?:eyebrow|kicker|overline|pretitle|pre-title)\b/i;
+    expect(
+      svelteViews
+        .filter(({ contents }) => decorativeLabelPattern.test(contents))
+        .map(({ path }) => path),
+    ).toEqual([]);
+    expect(stylesheet).not.toMatch(
+      /\.(?:eyebrow|kicker|overline|pretitle|pre-title)\b/i,
+    );
+    expect(stylesheet).toMatch(
+      /\.page-header::after\s*\{[\s\S]*?background:\s*var\(--netdef-cyan\)/,
+    );
+    expect(stylesheet).toMatch(
+      /\.operational-section-heading::after\s*\{[\s\S]*?background:\s*var\(--netdef-cyan\)/,
+    );
+  });
+
   it('loads the session through SvelteKit and has a Core-unavailable state', () => {
     expect(appLoader).toContain("'/api/v1/auth/session'");
     expect(appLoader).toContain('redirect(303');
-    expect(appShell).toContain('Core unavailable');
+    expect(appShell).toContain('Espial cannot verify this session.');
+    expect(appShell).toContain('data.loadError');
     expect(appShell).toContain('Retry connection');
   });
 
@@ -164,7 +220,8 @@ describe('administrator capability evidence', () => {
     );
     expect(alertNotificationsPage).toContain('Waiting to retry');
     expect(alertNotificationsPage).toContain('View matching audit record');
-    expect(alertDetailPage).toContain('Destination delivery evidence');
+    expect(alertDetailPage).toContain('id="incident-delivery-title"');
+    expect(alertDetailPage).toContain('data.deliveries');
   });
 
   it('shows mutation proof and links it to an exact audit receipt', () => {
@@ -180,8 +237,8 @@ describe('primary route skeletons', () => {
   it('makes Dashboard the canonical replacement for Overview', () => {
     expect(dashboardPage).toContain('<h1>Dashboard</h1>');
     expect(dashboardPage).toContain('Monitoring coverage');
-    expect(dashboardPage).toContain('Authoritative resource health');
-    expect(dashboardPage).toContain('Collection coverage');
+    expect(dashboardPage).toContain('id="resources-title">Resources');
+    expect(dashboardPage).toContain('id="integrations-title">Integrations');
     expect(dashboardPage).toContain('Active incidents');
     expect(dashboardPage).toContain('/alerts/${incident.id}');
     expect(overviewRedirect).toContain("redirect(308, '/dashboard')");
@@ -191,7 +248,8 @@ describe('primary route skeletons', () => {
     expect(alertsPage).toContain('<h1>Alerts</h1>');
     expect(alertsPage).toContain('history={false}');
     expect(alertHistoryPage).toContain('<h1>Alert history</h1>');
-    expect(alertDetailPage).toContain('Immutable lifecycle record');
+    expect(alertDetailPage).toContain('id="incident-timeline-title">Timeline');
+    expect(alertDetailPage).toContain('data.timeline');
     expect(alertDetailPage).toContain('Read-only');
     expect(alertsPage).not.toContain('UnavailableSection');
   });
@@ -206,9 +264,6 @@ describe('primary route skeletons', () => {
 
   it('exposes authoritative website availability without retaining protected content', () => {
     expect(webpagesPage).toContain('<h1>Webpages</h1>');
-    expect(webpagesPage).toContain(
-      'Authoritative DNS, TCP, TLS, and HTTP evidence',
-    );
     expect(webpagesPage).toContain('/webpages/${webpage.id}');
     expect(webpagesPage).toContain('No website observations yet.');
     expect(webpagesPage).not.toContain('UnavailableSection');

@@ -21,7 +21,6 @@
 
   <main id="main-content" class="public-main">
     <section class="public-intro" aria-labelledby="public-title">
-      <p class="eyebrow">Infrastructure operations, made visible</p>
       <h1 id="public-title">
         Understand system health and locate the hardware behind it.
       </h1>
@@ -40,7 +39,6 @@
       aria-labelledby="capability-title"
     >
       <div class="section-heading">
-        <p class="eyebrow">What Espial does</p>
         <h2 id="capability-title">
           One operational path from status to equipment.
         </h2>
@@ -71,7 +69,6 @@
 
     <section class="public-access" aria-labelledby="access-title">
       <div>
-        <p class="eyebrow">Controlled access</p>
         <h2 id="access-title">
           Operational details stay behind authentication.
         </h2>

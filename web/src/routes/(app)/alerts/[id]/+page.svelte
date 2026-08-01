@@ -7,6 +7,7 @@
     type ClientProblem,
   } from '$lib/api/client';
   import type { IncidentMutationReceipt } from '$lib/api/generated';
+  import AlertNavigation from '$lib/components/AlertNavigation.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import { incidentStatusLabel, timelineKindLabel } from '$lib/incidents';
   let { data } = $props();
@@ -101,14 +102,13 @@
 
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="incident-problem-title">
-    <p class="eyebrow">
+    <h1 id="incident-problem-title">
       {data.problem.status === 404
-        ? 'Not found'
+        ? 'Incident was not found.'
         : data.problem.status === 403
-          ? 'Permission denied'
-          : 'Core unavailable'}
-    </p>
-    <h1 id="incident-problem-title">Incident detail is unavailable.</h1>
+          ? 'Incident detail is permission restricted.'
+          : 'Incident detail is unavailable.'}
+    </h1>
     <p>{data.problem.message}</p>
     {#if data.problem.request_id}<p class="request-reference">
         Request ID: <code>{data.problem.request_id}</code>
@@ -118,9 +118,6 @@
 {:else if data.incident}
   <header class="page-header incident-detail-header">
     <div>
-      <p class="eyebrow">
-        Incident detail · {data.canOperate ? 'Operator workflow' : 'Read-only'}
-      </p>
       <h1>{data.incident.title}</h1>
       <p class="page-description">{data.incident.summary}</p>
     </div>
@@ -128,9 +125,7 @@
       >{data.incident.severity}</span
     >
   </header>
-  <nav class="section-navigation" aria-label="Alert views">
-    <a href="/alerts">Active</a><a href="/alerts/history">History</a>
-  </nav>
+  <AlertNavigation permissions={data.session?.user.permissions ?? []} />
 
   {#if actionProblem}
     <div class="inline-problem" role="alert">
@@ -167,7 +162,6 @@
     >
       <div class="operational-section-heading">
         <div>
-          <p class="eyebrow">Authorized operator actions</p>
           <h2 id="incident-workflow-title">Workflow</h2>
         </div>
         <span class="section-count">Version {data.incident.version}</span>
@@ -329,7 +323,6 @@
       class="incident-readonly"
       aria-labelledby="incident-readonly-title"
     >
-      <p class="eyebrow">Viewer access</p>
       <h2 id="incident-readonly-title">Read-only incident record</h2>
       <p>
         Your role can inspect current state and immutable evidence. Operator
@@ -379,7 +372,6 @@
   <section class="admin-section" aria-labelledby="incident-delivery-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Destination delivery evidence</p>
         <h2 id="incident-delivery-title">Notifications</h2>
       </div>
       <span class="section-count">{data.deliveries.length} records</span>
@@ -428,7 +420,6 @@
   <section class="incident-timeline" aria-labelledby="incident-timeline-title">
     <div class="operational-section-heading">
       <div>
-        <p class="eyebrow">Immutable lifecycle record</p>
         <h2 id="incident-timeline-title">Timeline</h2>
       </div>
       <span class="section-count"

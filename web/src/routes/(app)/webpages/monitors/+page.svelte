@@ -98,7 +98,6 @@
 <svelte:head><title>Website monitors · Espial</title></svelte:head>
 <header class="page-header">
   <div>
-    <p class="eyebrow">Approved supervised collection</p>
     <h1>Website monitors</h1>
     <p class="page-description">
       Create exact endpoints within Core's host, address, and port allowlists.
@@ -132,7 +131,6 @@
     <section class="admin-section" aria-labelledby="monitor-list-title">
       <div class="operational-section-heading">
         <div>
-          <p class="eyebrow">Redacted configuration</p>
           <h2 id="monitor-list-title">Configured monitors</h2>
         </div>
         <span class="section-count">{data.monitors.length} configured</span>
@@ -186,7 +184,6 @@
     <section class="admin-section" aria-labelledby="monitor-editor-title">
       <div class="editor-heading">
         <div>
-          <p class="eyebrow">{selected ? 'Full replacement' : 'New monitor'}</p>
           <h2 id="monitor-editor-title">
             {selected?.display_name ?? 'Create monitor'}
           </h2>

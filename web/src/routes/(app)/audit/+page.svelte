@@ -28,7 +28,6 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Accountability and change history</p>
     <h1>Audit</h1>
     <p class="page-description">
       Trace administrative and operational actions to an actor and request.
@@ -93,10 +92,11 @@
 
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="audit-problem-title">
-    <p class="eyebrow">
-      {data.problem.status === 403 ? 'Permission denied' : 'Core unavailable'}
-    </p>
-    <h2 id="audit-problem-title">Audit history is unavailable.</h2>
+    <h2 id="audit-problem-title">
+      {data.problem.status === 403
+        ? 'Audit history is permission restricted.'
+        : 'Audit history is unavailable.'}
+    </h2>
     <p>{data.problem.message}</p>
     {#if data.problem.request_id}
       <p class="request-reference">

@@ -133,6 +133,13 @@ absolute UTC and local time available on focus/hover.
 - Primary navigation is a floating top bar with restrained rounded corners. Desktop
   dropdowns open on hover and focus, support click/touch, and close with `Escape`;
   smaller screens use one collapsed menu.
+- Every page, section, card, form, and state heading starts with the heading itself;
+  eyebrow, kicker, overline, and decorative category copy are not used in any view.
+  Useful explanation belongs below the heading as body copy, while meaningful state
+  belongs in the heading or an established status component.
+- Preserve restrained cyan rhythm with a short edge on standalone headings or a
+  short segment attached to a real divider. Do not use cyan decorative text as a
+  substitute.
 - Primary labels are links and activate their own route. A separate, accessible
   child-menu trigger is used when touch input needs to open a real submenu.
 - Hovered, focused, and current navigation labels use a short white underline, not

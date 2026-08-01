@@ -1,4 +1,5 @@
 <script lang="ts">
+  import AlertNavigation from '$lib/components/AlertNavigation.svelte';
   import IncidentList from '$lib/components/IncidentList.svelte';
   let { data } = $props();
 </script>
@@ -7,18 +8,11 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">Operational record</p>
     <h1>Alert history</h1>
     <p class="page-description">
       Recovered and resolved incidents, backed by immutable lifecycle timelines.
     </p>
   </div>
 </header>
-<nav class="section-navigation" aria-label="Alert views">
-  <a href="/alerts">Active</a><a
-    class="active"
-    aria-current="page"
-    href="/alerts/history">History</a
-  >
-</nav>
+<AlertNavigation permissions={data.session?.user.permissions ?? []} />
 <IncidentList {...data} history={true} />

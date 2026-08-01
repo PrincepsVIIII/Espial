@@ -1,12 +1,10 @@
 <script lang="ts">
   let {
-    eyebrow,
     title,
     description,
     phase,
     planned,
   }: {
-    eyebrow: string;
     title: string;
     description: string;
     phase: string;
@@ -16,15 +14,13 @@
 
 <header class="page-header">
   <div>
-    <p class="eyebrow">{eyebrow}</p>
     <h1>{title}</h1>
   </div>
-  <span class="state-label state-unknown">Not available</span>
+  <span class="state-label state-unknown">Planned · {phase}</span>
 </header>
 
 <section class="state-panel" aria-labelledby="availability-title">
   <div class="state-panel-summary">
-    <p class="eyebrow">{phase}</p>
     <h2 id="availability-title">
       This section is not connected to domain data yet.
     </h2>
