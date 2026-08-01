@@ -16,6 +16,8 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
+	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
+	"github.com/PrincepsVIIII/Espial/core/internal/notifications/mattermost"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -43,7 +45,8 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
-	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger)
+	intentWriter := notifications.NewIntentWriter()
+	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger, intentWriter)
 	if err != nil {
 		return fmt.Errorf("initialize adapter runtime: %w", err)
 	}
@@ -51,6 +54,24 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", cfg.Server.ListenAddress, err)
 	}
+	defer listener.Close()
+	notificationSecrets := notifications.FileSecretResolver{Root: cfg.Notifications.SecretDirectory}
+	mattermostDriver, err := mattermost.New(mattermost.Options{
+		ApprovedHosts: cfg.Notifications.ApprovedHosts, ApprovedCIDRs: cfg.Notifications.ApprovedCIDRs,
+		AllowedPorts: cfg.Notifications.AllowedPorts, RequestTimeout: cfg.Notifications.RequestTimeout,
+		ResolveTimeout: cfg.Notifications.ResolveTimeout, ResponseBodyLimit: cfg.Notifications.ResponseBodyLimit,
+	})
+	if err != nil {
+		return fmt.Errorf("initialize Mattermost network policy: %w", err)
+	}
+	notificationService := notifications.NewService(pool, monitoringRuntime.Hub(), mattermostDriver, notificationSecrets, nil)
+	notificationWorker := notifications.NewWorker(pool, monitoringRuntime.Hub(), notifications.WorkerOptions{
+		Concurrency: cfg.Notifications.WorkerConcurrency, PollInterval: cfg.Notifications.PollInterval,
+		ClaimLease: cfg.Notifications.ClaimLease, MaxAttempts: cfg.Notifications.MaxAttempts,
+		MaxRetryDelay: cfg.Notifications.MaxRetryDelay, PublicURL: cfg.Server.PublicURL,
+		Secrets: notificationSecrets, Drivers: map[string]notifications.Driver{notifications.DestinationMattermost: mattermostDriver},
+		OnError: func(err error) { logger.Error("notification worker exited", "error", err) },
+	})
 
 	incidentWorkflow := incidents.NewWorkflow(pool, monitoringRuntime.Hub(), nil)
 	handler := api.New(api.Dependencies{
@@ -60,6 +81,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		IncidentWorkflow: incidentWorkflow,
 		IncidentRules:    incidents.NewRuleService(pool, nil),
 		Suppressions:     monitoringRuntime.Suppressions(),
+		Notifications:    notificationService,
 		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
@@ -75,8 +97,9 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 
 	logger.Info("Espial Core ready", "address", listener.Addr().String())
-	runtimeErrors := make(chan error, 1)
+	runtimeErrors := make(chan error, 2)
 	go func() { runtimeErrors <- monitoringRuntime.Run(processContext) }()
+	go func() { runtimeErrors <- notificationWorker.Run(processContext) }()
 	go cleanSessions(processContext, logger, authService)
 	serverErrors := make(chan error, 1)
 	go func() { serverErrors <- runHTTPServer(processContext, server, listener, cfg.Server.ShutdownTimeout) }()
@@ -84,18 +107,26 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	case err := <-serverErrors:
 		cancelProcess()
 		<-runtimeErrors
+		<-runtimeErrors
 		return err
 	case err := <-runtimeErrors:
 		cancelProcess()
 		serverErr := <-serverErrors
+		otherRuntimeErr := <-runtimeErrors
 		if ctx.Err() != nil {
 			return serverErr
 		}
-		return fmt.Errorf("monitoring runtime: %w", err)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			return fmt.Errorf("Core runtime: %w", err)
+		}
+		if otherRuntimeErr != nil && !errors.Is(otherRuntimeErr, context.Canceled) {
+			return fmt.Errorf("Core runtime: %w", otherRuntimeErr)
+		}
+		return serverErr
 	}
 }
 
-func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) (*monitoring.Runtime, *adapters.Registry, error) {
+func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, intents incidents.IntentWriter) (*monitoring.Runtime, *adapters.Registry, error) {
 	descriptors := make([]adapters.Descriptor, 0, 1)
 	if cfg.Adapters.SampleExecutable != "" {
 		descriptors = append(descriptors, adapters.Descriptor{
@@ -113,6 +144,7 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger) 
 		FreshnessInterval:  cfg.Adapters.FreshnessInterval,
 		FreshnessBatchSize: cfg.Adapters.FreshnessBatchSize,
 		EventReplaySize:    cfg.Adapters.EventReplaySize,
+		IncidentIntents:    intents,
 		OnError: func(integrationID string, err error) {
 			logger.Error("integration supervisor exited", "integration_id", integrationID, "error", err)
 		},

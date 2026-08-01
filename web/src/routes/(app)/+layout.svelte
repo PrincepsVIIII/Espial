@@ -37,6 +37,11 @@
         ...(data.session?.user.permissions.includes('suppressions:manage')
           ? [{ label: 'Suppressions', href: '/alerts/suppressions' }]
           : []),
+        ...(data.session?.user.permissions.includes(
+          'notification_destinations:manage',
+        )
+          ? [{ label: 'Notifications', href: '/alerts/notifications' }]
+          : []),
       ],
     },
     {

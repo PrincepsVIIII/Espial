@@ -21,6 +21,15 @@
   let note = $state('');
   let resolutionNote = $state('');
   let retryKeys = $state<Record<string, string>>({});
+  const deliveryStateLabels: Record<string, string> = {
+    queued: 'Queued',
+    attempting: 'Attempting delivery',
+    delivered: 'Delivered',
+    retry_wait: 'Waiting to retry',
+    failed: 'Failed',
+    dead_letter: 'Dead letter',
+    suppressed: 'Suppressed by silence',
+  };
 
   function mutationHeaders(action: string) {
     const key = retryKeys[action] || newIdempotencyKey();
@@ -365,6 +374,55 @@
         <dd><code>{data.etag ?? `v${data.incident.version}`}</code></dd>
       </div>
     </dl>
+  </section>
+
+  <section class="admin-section" aria-labelledby="incident-delivery-title">
+    <div class="operational-section-heading">
+      <div>
+        <p class="eyebrow">Destination delivery evidence</p>
+        <h2 id="incident-delivery-title">Notifications</h2>
+      </div>
+      <span class="section-count">{data.deliveries.length} records</span>
+    </div>
+    {#if data.deliveries.length}
+      <div class="table-frame">
+        <table class="resource-table">
+          <thead
+            ><tr
+              ><th>Destination</th><th>Event</th><th>Status</th><th>Attempts</th
+              ><th>Last activity</th><th>Safe reason</th></tr
+            ></thead
+          >
+          <tbody>
+            {#each data.deliveries as delivery}
+              <tr>
+                <th
+                  ><span class="resource-name">{delivery.destination_name}</span
+                  ></th
+                >
+                <td>{delivery.event_kind.replaceAll('_', ' ')}</td>
+                <td>{deliveryStateLabels[delivery.state] ?? delivery.state}</td>
+                <td>{delivery.attempt_count} of 6</td>
+                <td
+                  ><Timestamp
+                    value={delivery.last_attempt_at ??
+                      delivery.event_occurred_at}
+                  /></td
+                >
+                <td><code>{delivery.last_error_code ?? '—'}</code></td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {:else}
+      <div class="empty-state">
+        <strong>No delivery evidence for this incident.</strong>
+        <span
+          >No destination intent has been committed for its notification events.</span
+        >
+      </div>
+    {/if}
   </section>
 
   <section class="incident-timeline" aria-labelledby="incident-timeline-title">

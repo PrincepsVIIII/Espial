@@ -1,0 +1,12 @@
+{
+  "schema": "notification-destination-write",
+  "data": {
+    "display_name": "Unsafe destination",
+    "destination_type": "mattermost",
+    "enabled": true,
+    "endpoint_host": "mattermost.example.net/path",
+    "endpoint_port": 443,
+    "path_prefix": "https://attacker.invalid",
+    "secret_reference": "../secret"
+  }
+}

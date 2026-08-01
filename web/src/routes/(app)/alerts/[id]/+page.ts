@@ -10,8 +10,10 @@ import type {
   IncidentDetailResponse,
   IncidentTimelineResponse,
 } from '$lib/incidents';
+import type { NotificationDeliveryEvidence } from '$lib/api/generated';
 
 type AssigneeList = { items: EligibleIncidentAssignee[]; next_cursor?: string };
+type DeliveryList = { items: NotificationDeliveryEvidence[] };
 
 export const load = (async ({ depends, fetch, params, parent, url }) => {
   depends('espial:monitoring');
@@ -20,7 +22,7 @@ export const load = (async ({ depends, fetch, params, parent, url }) => {
     const canOperate =
       parentData.session?.user.permissions.includes('incidents:operate') ??
       false;
-    const [detail, timeline, assigneesResult] = await Promise.all([
+    const [detail, timeline, deliveries, assigneesResult] = await Promise.all([
       requestJSONWithMetadata<IncidentDetailResponse>(
         fetch,
         `/api/v1/incidents/${params.id}`,
@@ -28,6 +30,10 @@ export const load = (async ({ depends, fetch, params, parent, url }) => {
       requestJSON<IncidentTimelineResponse>(
         fetch,
         `/api/v1/incidents/${params.id}/timeline?limit=100`,
+      ),
+      requestJSON<DeliveryList>(
+        fetch,
+        `/api/v1/incidents/${params.id}/deliveries?limit=100`,
       ),
       canOperate
         ? requestJSON<AssigneeList>(
@@ -42,6 +48,7 @@ export const load = (async ({ depends, fetch, params, parent, url }) => {
       incident: detail.data,
       etag: detail.etag,
       timeline,
+      deliveries: deliveries.items,
       canOperate,
       assignees: assigneesResult.value?.items ?? [],
       assigneeProblem: assigneesResult.problem,
@@ -55,6 +62,7 @@ export const load = (async ({ depends, fetch, params, parent, url }) => {
       incident: null,
       etag: undefined,
       timeline: null,
+      deliveries: [],
       canOperate: false,
       assignees: [],
       assigneeProblem: null,

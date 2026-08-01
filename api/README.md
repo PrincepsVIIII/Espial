@@ -23,6 +23,9 @@ here.
 - [`incident-summary.schema.json`](schemas/v1/incident-summary.schema.json): incident collection item
 - [`incident-detail.schema.json`](schemas/v1/incident-detail.schema.json): incident detail read model
 - [`incident-timeline-event.schema.json`](schemas/v1/incident-timeline-event.schema.json): immutable incident history item
+- [`notification-destination.schema.json`](schemas/v1/notification-destination.schema.json): redacted destination view
+- [`notification-destination-write.schema.json`](schemas/v1/notification-destination-write.schema.json): full destination replacement
+- [`notification-delivery.schema.json`](schemas/v1/notification-delivery.schema.json): delivery and retry evidence
 
 Schemas use JSON Schema draft 2020-12. A major directory version represents an
 incompatible contract boundary; additive compatible changes may update v1 after

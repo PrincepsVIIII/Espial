@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/notification-destination-write.schema.json",
+  "title": "Notification destination replacement",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "display_name",
+    "destination_type",
+    "enabled",
+    "endpoint_host",
+    "endpoint_port",
+    "path_prefix",
+    "secret_reference"
+  ],
+  "properties": {
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "destination_type": { "const": "mattermost" },
+    "enabled": { "type": "boolean" },
+    "endpoint_host": { "type": "string", "minLength": 1, "maxLength": 253 },
+    "endpoint_port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "path_prefix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "pattern": "^/[A-Za-z0-9._~/-]{0,255}$"
+    },
+    "secret_reference": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$"
+    }
+  }
+}

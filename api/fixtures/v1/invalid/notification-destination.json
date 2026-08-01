@@ -1,0 +1,12 @@
+{
+  "schema": "notification-destination",
+  "data": {
+    "id": "not-an-id",
+    "display_name": "Operations Mattermost",
+    "destination_type": "mattermost",
+    "enabled": true,
+    "version": 0,
+    "created_at": "2026-08-01T12:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  }
+}

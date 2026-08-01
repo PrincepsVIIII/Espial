@@ -27,6 +27,7 @@ type RuntimeOptions struct {
 	IncidentPoll        time.Duration
 	IncidentClaimLease  time.Duration
 	IncidentMaxAttempts int
+	IncidentIntents     incidents.IntentWriter
 	Process             adapters.ProcessOptions
 	Secrets             adapters.SecretResolver
 	OnError             func(string, error)
@@ -71,7 +72,7 @@ func NewRuntime(
 	incidentEvaluator := incidents.NewEvaluator(pool, hub, incidents.Options{
 		Clock: options.Clock, BatchSize: options.IncidentBatchSize,
 		PollInterval: options.IncidentPoll, ClaimLease: options.IncidentClaimLease,
-		MaxAttempts: options.IncidentMaxAttempts,
+		MaxAttempts: options.IncidentMaxAttempts, Intents: options.IncidentIntents,
 		OnError: func(err error) {
 			if options.OnError != nil {
 				options.OnError("incidents", err)

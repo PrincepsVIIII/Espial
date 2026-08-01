@@ -20,6 +20,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
+	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
 	"github.com/PrincepsVIIII/Espial/core/internal/suppressions"
 )
 
@@ -85,6 +86,15 @@ type SuppressionManager interface {
 	RevokeSilence(context.Context, string, suppressions.MutationMetadata) (adminops.Receipt, error)
 }
 
+type NotificationManager interface {
+	Destinations(context.Context, notifications.DestinationFilter) (notifications.DestinationList, error)
+	Destination(context.Context, string) (notifications.Destination, error)
+	CreateDestination(context.Context, notifications.DestinationDefinition, notifications.MutationMetadata) (adminops.Receipt, error)
+	ReplaceDestination(context.Context, string, notifications.DestinationDefinition, notifications.MutationMetadata) (adminops.Receipt, error)
+	TestDestination(context.Context, string, notifications.MutationMetadata) (adminops.Receipt, error)
+	Deliveries(context.Context, notifications.DeliveryFilter) (notifications.DeliveryList, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -108,6 +118,7 @@ type Dependencies struct {
 	IncidentWorkflow IncidentWorkflow
 	IncidentRules    IncidentRuleManager
 	Suppressions     SuppressionManager
+	Notifications    NotificationManager
 	Integrations     IntegrationManager
 	Users            UserAdministrator
 	Events           EventSource
@@ -171,6 +182,13 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/silences/{id}", server.silenceDetail)
 	mux.HandleFunc("PUT /api/v1/silences/{id}", server.replaceSilence)
 	mux.HandleFunc("POST /api/v1/silences/{id}/revoke", server.revokeSilence)
+	mux.HandleFunc("GET /api/v1/notification-destinations", server.notificationDestinationList)
+	mux.HandleFunc("POST /api/v1/notification-destinations", server.createNotificationDestination)
+	mux.HandleFunc("GET /api/v1/notification-destinations/{id}", server.notificationDestinationDetail)
+	mux.HandleFunc("PUT /api/v1/notification-destinations/{id}", server.replaceNotificationDestination)
+	mux.HandleFunc("POST /api/v1/notification-destinations/{id}/test", server.testNotificationDestination)
+	mux.HandleFunc("GET /api/v1/notification-deliveries", server.notificationDeliveryList)
+	mux.HandleFunc("GET /api/v1/incidents/{id}/deliveries", server.incidentDeliveryList)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

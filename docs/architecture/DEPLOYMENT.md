@@ -33,16 +33,22 @@ Espial Web               Espial Core
 
 Publish only HTTPS. PostgreSQL is never host-public. Core accepts Web traffic and
 admin health checks on the private network. Each adapter receives only required
-destination access; future sandboxing should deny filesystem and network access by
-default where the runtime supports it. The proxy preserves the originating address
-only from trusted proxy hops.
+destination access. Core's Mattermost client additionally requires exact host,
+resolved-CIDR, and port allowlists, pins validated DNS answers, uses HTTPS, and
+ignores ambient proxies and redirects. The production `private` network is internal;
+an internal Mattermost service must join an explicitly managed reachable network.
+Future sandboxing should deny filesystem and network access by default where the
+runtime supports it. The proxy preserves the originating address only from trusted
+proxy hops.
 
 ## Configuration and secrets
 
 Non-secret configuration comes from one validated file plus environment overrides.
 Secret configuration is represented by references to mounted files or an approved
 secret provider. Startup logs list sources and overridden key names, never values.
-Core fails closed on unknown configuration keys in production.
+Core fails closed on unknown configuration keys in production. Mattermost tokens are
+individual files beneath `/run/secrets`; destination JSON stores only the opaque file
+name. Empty notification host/CIDR allowlists disable destination configuration.
 
 ## Startup and shutdown
 

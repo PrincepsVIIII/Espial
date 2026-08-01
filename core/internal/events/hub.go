@@ -9,13 +9,15 @@ import (
 )
 
 const (
-	SchemaVersion      = 1
-	StateChanged       = "resource_state_changed"
-	IntegrationChanged = "integration_changed"
-	CollectionChanged  = "collection_changed"
-	IncidentChanged    = "incident_changed"
-	SuppressionChanged = "suppression_changed"
-	ResyncRequired     = "resync_required"
+	SchemaVersion                  = 1
+	StateChanged                   = "resource_state_changed"
+	IntegrationChanged             = "integration_changed"
+	CollectionChanged              = "collection_changed"
+	IncidentChanged                = "incident_changed"
+	SuppressionChanged             = "suppression_changed"
+	NotificationDestinationChanged = "notification_destination_changed"
+	NotificationDeliveryChanged    = "notification_delivery_changed"
+	ResyncRequired                 = "resync_required"
 
 	DefaultReplayCapacity     = 1024
 	DefaultSubscriberCapacity = 64
@@ -29,6 +31,7 @@ type Event struct {
 	ResourceID    string
 	IntegrationID string
 	IncidentID    string
+	DeliveryID    string
 	State         health.State
 	Result        string
 	ChangedAt     time.Time

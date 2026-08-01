@@ -13,3 +13,4 @@ history.
 | [0005](0005-initial-deployment.md) | Single-host container deployment with separate processes | Accepted |
 | [0006](0006-authentication-transition.md) | Local authentication now, provider-based SSO transition later | Accepted |
 | [0007](0007-durable-monitoring-signal-journal.md) | Durable PostgreSQL monitoring-signal journal for incident evaluation | Accepted |
+| [0008](0008-durable-notification-outbox.md) | Durable notification outbox and in-process Mattermost driver | Accepted |

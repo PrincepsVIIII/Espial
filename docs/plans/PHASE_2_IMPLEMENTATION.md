@@ -1,6 +1,6 @@
 # Phase 2 implementation plan: incidents, notifications, and certificates
 
-**Status:** In progress (2026-07-31)
+**Status:** In progress (2026-08-01)
 **Inputs:** [Roadmap](../ROADMAP.md),
 [Phase 1 implementation record](PHASE_1_IMPLEMENTATION.md),
 [backend plan](../BACKEND_PLAN.md), [frontend/UI plan](../FRONTEND_UI_PLAN.md),
@@ -20,7 +20,7 @@ does not make a slice complete.
 | 2.1 Automatic incident creation and read path | Implemented | [Slice 2.1 implementation record](SLICE_2_1_AUTOMATIC_INCIDENTS.md) |
 | 2.2 Operator incident workflow | Implemented | [Slice 2.2 record](SLICE_2_2_OPERATOR_INCIDENT_WORKFLOW.md) |
 | 2.3 Rules, maintenance windows, and silences | Implemented | [Slice 2.3 record](SLICE_2_3_RULES_AND_SUPPRESSIONS.md) |
-| 2.4 Notification routing and Mattermost delivery | Planned | — |
+| 2.4 Notification routing and Mattermost delivery | Implemented | [Slice 2.4 record](SLICE_2_4_NOTIFICATION_ROUTING.md) and [ADR 0008](../adr/0008-durable-notification-outbox.md) |
 | 2.5 Website availability monitoring | Planned | — |
 | 2.6 Certificate monitoring and Webpages experience | Planned | — |
 | 2.7 Phase integration, hardening, and acceptance | Planned | — |

@@ -25,6 +25,7 @@ type Options struct {
 	PollInterval time.Duration
 	ClaimLease   time.Duration
 	MaxAttempts  int
+	Intents      IntentWriter
 	OnError      func(error)
 }
 
@@ -219,7 +220,7 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 		return incidentChange{}, tx.Commit(ctx)
 	}
 
-	change, err := evaluate(ctx, tx, signal, rule, &state, resourceName, now, false)
+	change, err := evaluate(ctx, tx, signal, rule, &state, resourceName, now, false, evaluator.options.Intents)
 	if err != nil {
 		return incidentChange{}, err
 	}
@@ -399,7 +400,7 @@ func lockRuleState(ctx context.Context, tx pgx.Tx, ruleID, resourceID, checkType
 	return result, nil
 }
 
-func evaluate(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, state *ruleState, resourceName string, now time.Time, deadline bool) (incidentChange, error) {
+func evaluate(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, state *ruleState, resourceName string, now time.Time, deadline bool, intents IntentWriter) (incidentChange, error) {
 	change := incidentChange{IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, ChangedAt: now}
 	if signal.State == rule.RecoveryState {
 		state.MatchingSince, state.DeadlineAt = nil, nil
@@ -416,7 +417,7 @@ func evaluate(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, 
 		if state.RecoverySince != nil && state.RecoveryOccurrences >= rule.RecoveryMinOccurrences {
 			due := state.RecoverySince.Add(rule.RecoveryFor)
 			if !now.Before(due) {
-				return recoverIncident(ctx, tx, signal, state, now)
+				return recoverIncident(ctx, tx, signal, rule, state, resourceName, now, intents)
 			}
 			state.DeadlineAt = &due
 		}
@@ -449,10 +450,10 @@ func evaluate(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, 
 		return change, nil
 	}
 	state.DeadlineAt = nil
-	return openOrUpdateIncident(ctx, tx, signal, rule, state, resourceName, now)
+	return openOrUpdateIncident(ctx, tx, signal, rule, state, resourceName, now, intents)
 }
 
-func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, state *ruleState, resourceName string, now time.Time) (incidentChange, error) {
+func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, state *ruleState, resourceName string, now time.Time, intents IntentWriter) (incidentChange, error) {
 	change := incidentChange{IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, ChangedAt: now}
 	fingerprint := strings.Join([]string{rule.ID, signal.ResourceID, signal.CheckType}, ":")
 	if state.ActiveIncidentID == "" {
@@ -481,7 +482,11 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 			return change, err
 		}
 		if createdAt.Equal(now) {
-			if err := appendTimeline(ctx, tx, id, signal.ID, "detected", "", StatusOpen, "", rule.Condition.Severity, "Incident detected: "+signal.Reason, signal.OccurredAt); err != nil {
+			timelineID, err := appendTimeline(ctx, tx, id, signal.ID, "detected", "", StatusOpen, "", rule.Condition.Severity, "Incident detected: "+signal.Reason, signal.OccurredAt)
+			if err != nil {
+				return change, err
+			}
+			if err := enqueueNotification(ctx, tx, intents, NotificationEvent{TimelineEventID: timelineID, IncidentID: id, RuleID: rule.ID, ResourceID: signal.ResourceID, Kind: "detected", Title: title, Summary: signal.Reason, Severity: rule.Condition.Severity, Status: StatusOpen, OccurredAt: signal.OccurredAt, CreatedAt: now}); err != nil {
 				return change, err
 			}
 			change.IncidentID, change.Status, change.Changed = id, StatusOpen, true
@@ -494,7 +499,7 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 	if err := tx.QueryRow(ctx, `SELECT status, severity FROM incidents WHERE id = $1 FOR UPDATE`, state.ActiveIncidentID).Scan(&status, &severity); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			state.ActiveIncidentID = ""
-			return openOrUpdateIncident(ctx, tx, signal, rule, state, resourceName, now)
+			return openOrUpdateIncident(ctx, tx, signal, rule, state, resourceName, now, intents)
 		}
 		return change, err
 	}
@@ -507,7 +512,11 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 			signal.OccurredAt.UTC(), now); err != nil {
 			return change, err
 		}
-		if err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "recurrence", StatusRecovered, StatusOpen, Severity(severity), rule.Condition.Severity, "Condition recurred: "+signal.Reason, signal.OccurredAt); err != nil {
+		timelineID, err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "recurrence", StatusRecovered, StatusOpen, Severity(severity), rule.Condition.Severity, "Condition recurred: "+signal.Reason, signal.OccurredAt)
+		if err != nil {
+			return change, err
+		}
+		if err := enqueueNotification(ctx, tx, intents, NotificationEvent{TimelineEventID: timelineID, IncidentID: state.ActiveIncidentID, RuleID: rule.ID, ResourceID: signal.ResourceID, Kind: "recurrence", Title: boundedText(resourceName+": "+signal.CheckType, 256), Summary: signal.Reason, Severity: rule.Condition.Severity, Status: StatusOpen, OccurredAt: signal.OccurredAt, CreatedAt: now}); err != nil {
 			return change, err
 		}
 		return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: StatusOpen, ChangedAt: now, Changed: true}, nil
@@ -521,7 +530,11 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 			signal.OccurredAt.UTC(), now); err != nil {
 			return change, err
 		}
-		if err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "severity_changed", Status(status), Status(status), Severity(severity), rule.Condition.Severity, "Severity changed: "+signal.Reason, signal.OccurredAt); err != nil {
+		timelineID, err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "severity_changed", Status(status), Status(status), Severity(severity), rule.Condition.Severity, "Severity changed: "+signal.Reason, signal.OccurredAt)
+		if err != nil {
+			return change, err
+		}
+		if err := enqueueNotification(ctx, tx, intents, NotificationEvent{TimelineEventID: timelineID, IncidentID: state.ActiveIncidentID, RuleID: rule.ID, ResourceID: signal.ResourceID, Kind: "severity_changed", Title: boundedText(resourceName+": "+signal.CheckType, 256), Summary: signal.Reason, Severity: rule.Condition.Severity, Status: Status(status), OccurredAt: signal.OccurredAt, CreatedAt: now}); err != nil {
 			return change, err
 		}
 		return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: Status(status), ChangedAt: now, Changed: true}, nil
@@ -536,7 +549,7 @@ func openOrUpdateIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal,
 	return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: Status(status), ChangedAt: now, Changed: true}, nil
 }
 
-func recoverIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal, state *ruleState, now time.Time) (incidentChange, error) {
+func recoverIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal, rule rule, state *ruleState, resourceName string, now time.Time, intents IntentWriter) (incidentChange, error) {
 	change := incidentChange{IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, ChangedAt: now}
 	if state.ActiveIncidentID == "" {
 		return change, nil
@@ -559,25 +572,38 @@ func recoverIncident(ctx context.Context, tx pgx.Tx, signal signals.Signal, stat
 	`, state.ActiveIncidentID, signal.Reason, signal.OccurredAt.UTC(), now); err != nil {
 		return change, err
 	}
-	if err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "recovered", Status(status), StatusRecovered, Severity(severity), Severity(severity), "Condition recovered: "+signal.Reason, signal.OccurredAt); err != nil {
+	timelineID, err := appendTimeline(ctx, tx, state.ActiveIncidentID, signal.ID, "recovered", Status(status), StatusRecovered, Severity(severity), Severity(severity), "Condition recovered: "+signal.Reason, signal.OccurredAt)
+	if err != nil {
+		return change, err
+	}
+	if err := enqueueNotification(ctx, tx, intents, NotificationEvent{TimelineEventID: timelineID, IncidentID: state.ActiveIncidentID, RuleID: rule.ID, ResourceID: signal.ResourceID, Kind: "recovered", Title: boundedText(resourceName+": "+signal.CheckType, 256), Summary: signal.Reason, Severity: Severity(severity), Status: StatusRecovered, OccurredAt: signal.OccurredAt, CreatedAt: now}); err != nil {
 		return change, err
 	}
 	return incidentChange{IncidentID: state.ActiveIncidentID, IntegrationID: signal.IntegrationID, ResourceID: signal.ResourceID, Status: StatusRecovered, ChangedAt: now, Changed: true}, nil
 }
 
-func appendTimeline(ctx context.Context, tx pgx.Tx, incidentID, signalID, kind string, fromStatus, toStatus Status, fromSeverity, toSeverity Severity, summary string, occurredAt time.Time) error {
-	_, err := tx.Exec(ctx, `
+func appendTimeline(ctx context.Context, tx pgx.Tx, incidentID, signalID, kind string, fromStatus, toStatus Status, fromSeverity, toSeverity Severity, summary string, occurredAt time.Time) (string, error) {
+	var id string
+	err := tx.QueryRow(ctx, `
 		INSERT INTO incident_timeline (
 			incident_id, signal_id, kind, from_status, to_status,
 			from_severity, to_severity, summary, occurred_at
 		) VALUES ($1, NULLIF($2, '')::uuid, $3, NULLIF($4, ''), NULLIF($5, ''),
 			NULLIF($6, ''), NULLIF($7, ''), $8, $9)
+		RETURNING id::text
 	`, incidentID, signalID, kind, fromStatus, toStatus, fromSeverity, toSeverity,
-		boundedText(summary, 2048), occurredAt.UTC())
+		boundedText(summary, 2048), occurredAt.UTC()).Scan(&id)
 	if err != nil {
-		return fmt.Errorf("append incident timeline: %w", err)
+		return "", fmt.Errorf("append incident timeline: %w", err)
 	}
-	return nil
+	return id, nil
+}
+
+func enqueueNotification(ctx context.Context, tx pgx.Tx, writer IntentWriter, event NotificationEvent) error {
+	if writer == nil {
+		return nil
+	}
+	return writer.EnqueueIncidentEvent(ctx, tx, event)
 }
 
 func saveRuleState(ctx context.Context, tx pgx.Tx, ruleID, resourceID, checkType string, state ruleState, now time.Time) error {
@@ -684,7 +710,7 @@ func (evaluator *Evaluator) processOneDue(ctx context.Context, now time.Time) (i
 		}
 		return incidentChange{}, true, nil
 	}
-	change, err := evaluate(ctx, tx, signal, rule, &state, resourceName, now, true)
+	change, err := evaluate(ctx, tx, signal, rule, &state, resourceName, now, true, evaluator.options.Intents)
 	if err != nil {
 		return incidentChange{}, false, err
 	}

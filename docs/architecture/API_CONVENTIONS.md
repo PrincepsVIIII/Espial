@@ -147,11 +147,37 @@ when the session also has `audit:read`. `incident-assignees` requires
 `incidents:operate` and returns only opaque ID and display name for enabled users
 currently authorized to operate incidents.
 
+## Phase 2 notification surface
+
+```text
+GET  /api/v1/notification-destinations
+POST /api/v1/notification-destinations
+GET  /api/v1/notification-destinations/{id}
+PUT  /api/v1/notification-destinations/{id}
+POST /api/v1/notification-destinations/{id}/test
+GET  /api/v1/notification-deliveries
+GET  /api/v1/incidents/{id}/deliveries
+```
+
+Destination configuration and cross-incident delivery history require
+`notification_destinations:manage`. Reads expose destination identity, type,
+enabled state, version, and timestamps only. Creates and full replacements carry an
+exact host, port, safe path prefix, and opaque mounted-file reference as write-only
+fields; they require network-policy and secret resolution before commit. Mutations
+use trusted origin, CSRF, idempotency, strict bounded JSON, and version ETags where
+applicable, and return audit-linked administrative receipts.
+
+Test requests are asynchronous `202` operations. Their intent, message, UI state,
+and audit summary all say test; they never masquerade as incident notifications.
+Incident delivery reads require only `incidents:read`, verify the incident, and
+return status, time, attempt count, and a categorized safe error. Tokens, complete
+webhook URLs, response bodies, and claim tokens are not API fields.
+
 ## Live events
 
 SSE messages have `id`, `event`, and a JSON `data` object with `schema_version`,
-`resource_id`, `integration_id`, or `incident_id`, and `changed_at`. They are invalidations, not a
-second source of truth. Send a heartbeat comment every 15 seconds. Honor
+`resource_id`, `integration_id`, `incident_id`, or `delivery_id`, and `changed_at`.
+They are invalidations, not a second source of truth. Send a heartbeat comment every 15 seconds. Honor
 `Last-Event-ID` within a bounded replay window; otherwise emit `resync_required`.
 The heartbeat also revalidates the session and `overview:read` permission. A lost or
 revoked session closes the stream within that interval. Concurrent streams are

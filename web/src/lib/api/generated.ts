@@ -347,6 +347,7 @@ export interface LiveInvalidationData {
   resource_id?: string;
   integration_id?: string;
   incident_id?: string;
+  delivery_id?: string;
   state?: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
   result?: string;
   changed_at: string;
@@ -404,6 +405,48 @@ export interface DurableMonitoringSignal {
   reason: string;
   reason_code?: string;
   occurred_at: string;
+}
+
+export interface NotificationDeliveryEvidence {
+  id: string;
+  incident_id?: string;
+  incident_event_id?: string;
+  destination_id: string;
+  destination_name: string;
+  destination_type: "mattermost";
+  event_kind: "detected" | "severity_changed" | "recurrence" | "recovered" | "test";
+  test: boolean;
+  state: "queued" | "attempting" | "delivered" | "retry_wait" | "failed" | "dead_letter" | "suppressed";
+  attempt_count: number;
+  event_occurred_at: string;
+  last_attempt_at?: string;
+  available_at: string;
+  delivered_at?: string;
+  terminal_at?: string;
+  suppressed_silence_id?: string;
+  last_error_code?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationDestinationReplacement {
+  display_name: string;
+  destination_type: "mattermost";
+  enabled: boolean;
+  endpoint_host: string;
+  endpoint_port: number;
+  path_prefix: string;
+  secret_reference: string;
+}
+
+export interface RedactedNotificationDestinationAPIView {
+  id: string;
+  display_name: string;
+  destination_type: "mattermost";
+  enabled: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface NormalizedObservation {

@@ -16,6 +16,9 @@ const alertRulesPage = source('../routes/(app)/alerts/rules/+page.svelte');
 const alertSuppressionsPage = source(
   '../routes/(app)/alerts/suppressions/+page.svelte',
 );
+const alertNotificationsPage = source(
+  '../routes/(app)/alerts/notifications/+page.svelte',
+);
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
@@ -87,8 +90,12 @@ describe('authenticated shell contract', () => {
     expect(appShell).toContain(
       "{ label: 'Suppressions', href: '/alerts/suppressions' }",
     );
+    expect(appShell).toContain(
+      "{ label: 'Notifications', href: '/alerts/notifications' }",
+    );
     expect(appShell).toContain("permissions.includes('incident_rules:manage')");
     expect(appShell).toContain("permissions.includes('suppressions:manage')");
+    expect(appShell).toContain("'notification_destinations:manage',");
     expect(appShell).not.toMatch(
       /Planned workflow|Planned inventory|Open section/,
     );
@@ -141,6 +148,17 @@ describe('administrator capability evidence', () => {
     expect(alertSuppressionsPage).toContain('Maintenance windows');
     expect(alertSuppressionsPage).toContain('Silencing never changes health');
     expect(alertSuppressionsPage).toContain('View matching audit record');
+  });
+
+  it('exposes redacted destination controls and delivery evidence only after the full path exists', () => {
+    expect(alertNotificationsPage).toContain('<h1>Alert notifications</h1>');
+    expect(alertNotificationsPage).toContain('Send labeled test');
+    expect(alertNotificationsPage).toContain(
+      'Endpoint and secret details are write-only',
+    );
+    expect(alertNotificationsPage).toContain('Waiting to retry');
+    expect(alertNotificationsPage).toContain('View matching audit record');
+    expect(alertDetailPage).toContain('Destination delivery evidence');
   });
 
   it('shows mutation proof and links it to an exact audit receipt', () => {

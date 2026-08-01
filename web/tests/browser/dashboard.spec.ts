@@ -69,6 +69,7 @@ for (const viewport of [
         'History',
         'Rules',
         'Suppressions',
+        'Notifications',
         'Datacenter',
         'Hypervisor',
         'Webpages',
@@ -245,6 +246,9 @@ test('administrator alert controls are discoverable and viewer navigation hides 
   await expect(
     page.getByRole('link', { name: 'Suppressions', exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Notifications', exact: true }),
+  ).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(alertTrigger).toBeFocused();
 
@@ -258,6 +262,9 @@ test('administrator alert controls are discoverable and viewer navigation hides 
   await expect(
     page.getByRole('link', { name: 'Suppressions', exact: true }),
   ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Notifications', exact: true }),
+  ).toHaveCount(0);
 
   await page.goto('/alerts/rules');
   await waitForHydration(page);
@@ -266,6 +273,12 @@ test('administrator alert controls are discoverable and viewer navigation hides 
   );
   await expect(page.getByRole('button', { name: 'Create rule' })).toHaveCount(
     0,
+  );
+
+  await page.goto('/alerts/notifications');
+  await waitForHydration(page);
+  await expect(page.getByRole('alert')).toContainText(
+    'You do not have permission to manage notification destinations.',
   );
 });
 
@@ -305,6 +318,43 @@ for (const viewport of [
     ).toEqual([]);
     await page.screenshot({
       path: testInfo.outputPath(`suppressions-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  });
+}
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`notification administration and evidence remain usable at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/alerts/notifications');
+    await waitForHydration(page);
+    await expect(
+      page.getByRole('heading', { name: 'Alert notifications' }),
+    ).toBeVisible();
+    await expect(page.getByText('Operations Mattermost').first()).toBeVisible();
+    await expect(page.getByText('Waiting to retry')).toBeVisible();
+    await page.getByRole('button', { name: 'Send labeled test' }).click();
+    await expect(page.getByRole('status')).toContainText(
+      'Explicitly labeled test delivery queued.',
+    );
+    await expect(
+      page.getByRole('link', { name: 'View matching audit record' }),
+    ).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`notifications-${viewport.name}.png`),
       fullPage: true,
       animations: 'disabled',
     });

@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/notification-delivery.schema.json",
+  "title": "Notification delivery evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "destination_id",
+    "destination_name",
+    "destination_type",
+    "event_kind",
+    "test",
+    "state",
+    "attempt_count",
+    "event_occurred_at",
+    "available_at",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "incident_id": { "type": "string", "format": "uuid" },
+    "incident_event_id": { "type": "string", "format": "uuid" },
+    "destination_id": { "type": "string", "format": "uuid" },
+    "destination_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "destination_type": { "const": "mattermost" },
+    "event_kind": {
+      "enum": [
+        "detected",
+        "severity_changed",
+        "recurrence",
+        "recovered",
+        "test"
+      ]
+    },
+    "test": { "type": "boolean" },
+    "state": {
+      "enum": [
+        "queued",
+        "attempting",
+        "delivered",
+        "retry_wait",
+        "failed",
+        "dead_letter",
+        "suppressed"
+      ]
+    },
+    "attempt_count": { "type": "integer", "minimum": 0, "maximum": 6 },
+    "event_occurred_at": { "type": "string", "format": "date-time" },
+    "last_attempt_at": { "type": "string", "format": "date-time" },
+    "available_at": { "type": "string", "format": "date-time" },
+    "delivered_at": { "type": "string", "format": "date-time" },
+    "terminal_at": { "type": "string", "format": "date-time" },
+    "suppressed_silence_id": { "type": "string", "format": "uuid" },
+    "last_error_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

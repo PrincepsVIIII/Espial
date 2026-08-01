@@ -418,3 +418,35 @@ Phase 2 implementation contract.
 - Database-backed Core and race suites prove rule, maintenance, silence, audit,
   idempotency, expiry, and immediate re-evaluation behavior behind the rendered
   capability.
+
+## 2026-08-01 — Slice 2.4 notification administration review
+
+### Scope and material decisions
+
+Reviewed the permission-gated `/alerts/notifications` destination and incident
+delivery evidence against the general guidance, design system, and Phase 2 contract.
+The route was added only after redacted reads, full replacement, labeled test,
+delivery reads, success/error feedback, and audit-linked receipts existed in Core.
+
+- Kept destinations, the write-only replacement form, and delivery evidence in flat
+  bordered sections with the existing tables and controls. No icons, badges, glows,
+  gradients, filled hover tiles, or ornamental animation were added.
+- Protected endpoint and secret-reference values are never read back. Copy explains
+  full replacement and mounted secret files without implying that Web can reveal or
+  verify a webhook token.
+- Delivery state is text-first and includes status, event, time, attempt count, and a
+  bounded safe reason. Tests are explicitly labeled in both action and result copy.
+- Viewer navigation omits destination administration and direct access shows Core's
+  denial. Incident detail remains Viewer-readable and shows authoritative delivery
+  evidence without configuration controls.
+- Desktop dropdown and collapsed narrow navigation inherit hover, focus, click/touch,
+  and `Escape` behavior from the accepted shell.
+
+### Viewport and verification evidence
+
+At 1440px and 1280px the destination/editor columns remain compact; at 500px they
+stack in source order while tables use their bounded frame. Browser coverage checks
+all three sizes, direct Viewer denial, labeled-test receipt/audit linkage, and zero
+serious/critical accessibility findings. Svelte diagnostics and generated-contract
+checks remain clean; PostgreSQL/race and Mattermost security tests prove the paths
+behind the rendered capability.

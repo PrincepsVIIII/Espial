@@ -21,12 +21,36 @@ The release operator must record:
 - owner/app database credentials from an approved secret store;
 - tested backup target, encryption, retention, restore target, and restore owner;
 - adapter-specific egress allowlists and secret ownership;
+- Mattermost exact host, every expected resolved CIDR, HTTPS port, certificate
+  trust, webhook owner, and mounted token-file path;
 - memory/disk headroom against the measured Phase 1 baseline;
 - a named rollback decision-maker and maintenance window.
 
 Render `deployments/production/compose.yml` with `docker compose config`. Confirm
 only the proxy publishes ports, `private` is internal, Core has
 `ESPIAL_DATABASE_MIGRATE_ON_START=false`, and no rendered value contains a secret.
+
+## Mattermost destination rotation and failure
+
+1. Put only the new incoming-webhook token in a mode-`0600` secret file. Replace the
+   Compose secret source and restart Core; do not paste the token into the API.
+2. Confirm the destination host, every current DNS answer, and port remain in
+   `ESPIAL_NOTIFICATION_APPROVED_HOSTS`, `ESPIAL_NOTIFICATION_APPROVED_CIDRS`, and
+   `ESPIAL_NOTIFICATION_ALLOWED_PORTS`. Treat an unexpected extra DNS answer as a
+   policy failure, not a reason to widen the CIDR casually.
+3. In `/alerts/notifications`, replace the destination using the opaque secret
+   filename, then send the explicitly labeled test. Follow its receipt to audit and
+   confirm delivery evidence reaches `Delivered`.
+4. For `Waiting to retry`, inspect the safe reason and provider health. Espial stops
+   after six attempts. For `Failed`, correct configuration/provider rejection and
+   send a new test. For `Dead letter`, preserve the row and investigate; automatic
+   replay is intentionally unavailable.
+5. Rotate/revoke the old Mattermost webhook after the new test succeeds. Capture no
+   webhook URL/token, provider body, or secret-file contents in tickets or logs.
+
+During shutdown, Core cancels new claims and allows active HTTP calls to return under
+their configured timeout. Expired leases are reclaimed after restart. Do not edit
+intent/attempt tables or reset attempts to force replay.
 
 ## Upgrade or rollback
 

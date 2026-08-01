@@ -1,9 +1,10 @@
 # Operational data model
 
 PostgreSQL is authoritative for identity, configuration, current health, normalized
-observations, audit history, the Phase 2 monitoring-signal journal, and incidents.
-The first diagram preserves the Phase 1 foundation; notification, certificate,
-dependency, and physical inventory tables arrive in later roadmap slices.
+observations, audit history, the Phase 2 monitoring-signal journal, incidents, and
+notification evidence. The first diagram preserves the Phase 1 foundation;
+certificate, dependency, and physical inventory tables arrive in later roadmap
+slices.
 
 ```mermaid
 erDiagram
@@ -167,6 +168,11 @@ erDiagram
     RESOURCES ||--o{ SILENCES : targets
     USERS ||--o{ MAINTENANCE_WINDOWS : creates
     USERS ||--o{ SILENCES : creates
+    INCIDENT_TIMELINE ||--o{ NOTIFICATION_INTENTS : originates
+    INCIDENTS ||--o{ NOTIFICATION_INTENTS : receives
+    NOTIFICATION_DESTINATIONS ||--o{ NOTIFICATION_INTENTS : targets
+    NOTIFICATION_INTENTS ||--o{ NOTIFICATION_ATTEMPTS : records
+    SILENCES ||--o{ NOTIFICATION_INTENTS : suppresses
 ```
 
 - `monitoring_signals.source_key` is unique and is committed atomically with its
@@ -190,8 +196,16 @@ erDiagram
 - `incident_evaluation_evidence` stores the winning rule, optional maintenance
   window, outcome, and bounded explanation for each processed signal.
 - `silences` has exactly one incident/rule/resource target and a strict expiry.
-  Matching is read-only with respect to incidents and is consumed by the later
+  Matching is read-only with respect to incidents and is consumed in the atomic
   notification-intent transaction.
+- `notification_destinations` stores a redacted identity plus internal host, port,
+  path-prefix, and file-secret reference. Tokens are never database values.
+- `notification_intents` snapshots the incident event and owns the durable delivery
+  state. A partial unique index permits one intent per timeline event/destination;
+  due, incident, and destination indexes bound claims and reads.
+- `notification_attempts` is append-only and unique by intent/attempt number.
+  Terminal intent state and notification timeline entries remain the explanatory
+  evidence; remote response bodies are never stored.
 - `administrative_mutation_idempotency` binds actor, target type, operation, and
   key to a request hash and original version/correlation receipt for rule and
   suppression mutations.
@@ -215,7 +229,8 @@ erDiagram
   clients receive a live event and history remains explainable.
 - Audit records are append-only to application roles. Corrections create a new
   event; they do not update old events.
-- Secrets are references, never values, in `integrations` and audit summaries.
+- Secrets are references, never values, in integrations, notification destinations,
+  read models, and audit summaries.
 - Adapter-instance restart counters and deadlines are persisted so restarting Core
   cannot erase a failing adapter's backoff. Host-local process IDs are not stored.
 
@@ -226,10 +241,12 @@ rollback/recovery guidance. Core refuses to start when the database is newer tha
 the binary. Destructive or long-running migrations require a two-release expand /
 migrate / contract sequence.
 
-## Retention in Phase 1
+## Retention baseline
 
 Keep current state indefinitely while the resource exists. Retain detailed
 observations for 90 days initially and audit events for at least six months; make
 both durations configurable but enforce a safe minimum for audit data. A later
 retention worker will downsample older operational measurements rather than copy a
-metrics platform.
+metrics platform. Retain incident timelines, destination metadata, intents, and
+attempts for at least the matching audit-retention period so request, incident, and
+provider evidence remain correlatable.

@@ -2,8 +2,11 @@
 package incidents
 
 import (
+	"context"
 	"errors"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type Severity string
@@ -155,4 +158,25 @@ type Filter struct {
 type TimelineFilter struct {
 	Limit  int
 	Cursor string
+}
+
+// NotificationEvent is the normalized, destination-independent handoff produced
+// by an incident lifecycle transaction. It contains no transport configuration.
+type NotificationEvent struct {
+	TimelineEventID string
+	IncidentID      string
+	RuleID          string
+	ResourceID      string
+	Kind            string
+	Title           string
+	Summary         string
+	Severity        Severity
+	Status          Status
+	OccurredAt      time.Time
+	CreatedAt       time.Time
+}
+
+// IntentWriter appends notification outbox work inside the incident transaction.
+type IntentWriter interface {
+	EnqueueIncidentEvent(context.Context, pgx.Tx, NotificationEvent) error
 }

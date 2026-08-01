@@ -27,6 +27,59 @@ type testClock struct {
 	now time.Time
 }
 
+type recordingIntentWriter struct {
+	mu    sync.Mutex
+	kinds []string
+	err   error
+}
+
+func (writer *recordingIntentWriter) EnqueueIncidentEvent(_ context.Context, _ pgx.Tx, event NotificationEvent) error {
+	writer.mu.Lock()
+	writer.kinds = append(writer.kinds, event.Kind)
+	writer.mu.Unlock()
+	return writer.err
+}
+
+func TestIncidentAndNotificationIntentBoundaryRollsBackAtomically(t *testing.T) {
+	pool := incidentTestPool(t)
+	start := time.Now().UTC().Add(-time.Minute).Truncate(time.Microsecond)
+	clock := &testClock{now: start}
+	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
+	if _, err := ingestor.Ingest(context.Background(), incidentIntegrationID,
+		observationBatch("atomic-node", "Atomic node", "atomic-critical", health.Critical, "failed", start, 60, true)); err != nil {
+		t.Fatal(err)
+	}
+	evaluator := NewEvaluator(pool, nil, Options{Clock: clock,
+		Intents: &recordingIntentWriter{err: errors.New("intent store unavailable")}})
+	if processed, err := evaluator.ProcessOnce(context.Background()); err != nil || processed != 0 {
+		t.Fatalf("rolled-back evaluation = %d, %v", processed, err)
+	}
+	if count := incidentCount(t, pool, "atomic-node"); count != 0 {
+		t.Fatalf("incident committed without its notification intent: %d", count)
+	}
+	var processedAt *time.Time
+	if err := pool.QueryRow(context.Background(), `SELECT processed_at FROM monitoring_signals ORDER BY created_at DESC LIMIT 1`).Scan(&processedAt); err != nil {
+		t.Fatal(err)
+	}
+	if processedAt != nil {
+		t.Fatal("signal was marked processed after notification rollback")
+	}
+	var attempts int
+	var safeError string
+	if err := pool.QueryRow(context.Background(), `SELECT attempts,last_error_code FROM monitoring_signals ORDER BY created_at DESC LIMIT 1`).Scan(&attempts, &safeError); err != nil {
+		t.Fatal(err)
+	}
+	if attempts != 1 || safeError != "incident_evaluation_failed" {
+		t.Fatalf("notification rollback retry evidence = %d %q", attempts, safeError)
+	}
+}
+
+func (writer *recordingIntentWriter) eventKinds() []string {
+	writer.mu.Lock()
+	defer writer.mu.Unlock()
+	return append([]string(nil), writer.kinds...)
+}
+
 func (clock *testClock) Now() time.Time {
 	clock.mu.Lock()
 	defer clock.mu.Unlock()
@@ -45,9 +98,10 @@ func TestAutomaticIncidentLifecycleIsDurableAndIdempotent(t *testing.T) {
 	clock := &testClock{now: start}
 	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
 	hub := events.NewHub(32)
+	intentWriter := &recordingIntentWriter{}
 	subscription := hub.Subscribe(nil, 4)
 	defer subscription.Close()
-	evaluator := NewEvaluator(pool, hub, Options{Clock: clock, PollInterval: time.Millisecond})
+	evaluator := NewEvaluator(pool, hub, Options{Clock: clock, PollInterval: time.Millisecond, Intents: intentWriter})
 
 	critical := observationBatch("node-critical", "Critical node", "critical-1", health.Critical, "host unreachable", start, 60, true)
 	if _, err := ingestor.Ingest(context.Background(), incidentIntegrationID, critical); err != nil {
@@ -103,7 +157,7 @@ func TestAutomaticIncidentLifecycleIsDurableAndIdempotent(t *testing.T) {
 		observationBatch("node-critical", "Critical node", "healthy-2", health.Healthy, "reachable", clock.Now(), 60, false)); err != nil {
 		t.Fatal(err)
 	}
-	restartedForRecovery := NewEvaluator(pool, hub, Options{Clock: clock})
+	restartedForRecovery := NewEvaluator(pool, hub, Options{Clock: clock, Intents: intentWriter})
 	if _, err := restartedForRecovery.ProcessOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -138,14 +192,18 @@ func TestAutomaticIncidentLifecycleIsDurableAndIdempotent(t *testing.T) {
 	if kinds := timelineKinds(t, pool, incident.ID); len(kinds) != 3 {
 		t.Fatalf("out-of-order signal changed timeline: %v", kinds)
 	}
+	if kinds := intentWriter.eventKinds(); fmt.Sprint(kinds) != "[detected recovered recurrence]" {
+		t.Fatalf("notification event policy = %v", kinds)
+	}
 }
 
 func TestWarningDebouncePersistsAcrossEvaluatorRestart(t *testing.T) {
 	pool := incidentTestPool(t)
 	start := time.Now().UTC().Add(-10 * time.Minute).Truncate(time.Microsecond)
 	clock := &testClock{now: start}
+	intentWriter := &recordingIntentWriter{}
 	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
-	firstEvaluator := NewEvaluator(pool, nil, Options{Clock: clock})
+	firstEvaluator := NewEvaluator(pool, nil, Options{Clock: clock, Intents: intentWriter})
 	if _, err := ingestor.Ingest(context.Background(), incidentIntegrationID,
 		observationBatch("node-warning", "Warning node", "warning-1", health.Warning, "packet loss", start, 60, true)); err != nil {
 		t.Fatal(err)
@@ -162,7 +220,7 @@ func TestWarningDebouncePersistsAcrossEvaluatorRestart(t *testing.T) {
 		observationBatch("node-warning", "Warning node", "warning-2", health.Warning, "packet loss persists", clock.Now(), 60, false)); err != nil {
 		t.Fatal(err)
 	}
-	restarted := NewEvaluator(pool, nil, Options{Clock: clock})
+	restarted := NewEvaluator(pool, nil, Options{Clock: clock, Intents: intentWriter})
 	if _, err := restarted.ProcessOnce(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -183,6 +241,9 @@ func TestWarningDebouncePersistsAcrossEvaluatorRestart(t *testing.T) {
 		t.Fatalf("incident severity did not change = %#v", incident)
 	}
 	assertTimelineKinds(t, pool, incident.ID, "detected", "severity_changed")
+	if kinds := intentWriter.eventKinds(); fmt.Sprint(kinds) != "[detected severity_changed]" {
+		t.Fatalf("severity notification policy = %v", kinds)
+	}
 }
 
 func TestStaleDoesNotOpenButUnknownDoes(t *testing.T) {

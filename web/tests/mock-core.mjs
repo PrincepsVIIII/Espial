@@ -97,6 +97,7 @@ const server = http.createServer((request, response) => {
                 'users:manage',
                 'incident_rules:manage',
                 'suppressions:manage',
+                'notification_destinations:manage',
               ]),
         ],
       },
@@ -255,6 +256,44 @@ const server = http.createServer((request, response) => {
     return json(response, 200, { items: [] });
   if (url.pathname === '/api/v1/silences')
     return json(response, 200, { items: [] });
+  if (url.pathname === '/api/v1/notification-destinations') {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to manage notification destinations.',
+      );
+    if (request.method === 'POST')
+      return json(response, 201, administrativeReceipt('destination-create'));
+    return json(response, 200, {
+      items: [
+        {
+          id: '70000000-0000-4000-8000-000000000024',
+          display_name: 'Operations Mattermost',
+          destination_type: 'mattermost',
+          enabled: true,
+          version: 1,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+  }
+  if (url.pathname === '/api/v1/notification-deliveries') {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to manage notification destinations.',
+      );
+    return json(response, 200, { items: notificationDeliveries() });
+  }
+  if (url.pathname.match(/^\/api\/v1\/notification-destinations\/[^/]+$/))
+    return json(response, 200, administrativeReceipt('destination-replace'));
+  if (url.pathname.match(/^\/api\/v1\/notification-destinations\/[^/]+\/test$/))
+    return json(response, 202, administrativeReceipt('destination-test'));
   if (url.pathname === '/api/v1/incidents' && request.method === 'GET') {
     const active = url.searchParams.get('active') !== 'false';
     const items = active ? [incidentSummary()] : [recoveredIncidentSummary()];
@@ -301,6 +340,9 @@ const server = http.createServer((request, response) => {
     return json(response, 200, {
       items: incidentTimeline,
     });
+  }
+  if (url.pathname === `/api/v1/incidents/${incidentID}/deliveries`) {
+    return json(response, 200, { items: notificationDeliveries() });
   }
   const incidentAction = url.pathname.match(
     new RegExp(
@@ -666,6 +708,39 @@ function incidentAudit(correlationID, action) {
     correlation_id: correlationID,
     after_summary: { status: incidentStatus, version: incidentVersion },
     occurred_at: now,
+  };
+}
+
+function notificationDeliveries() {
+  return [
+    {
+      id: '72000000-0000-4000-8000-000000000024',
+      incident_id: incidentID,
+      incident_event_id: '81000000-0000-4000-8000-000000000021',
+      destination_id: '70000000-0000-4000-8000-000000000024',
+      destination_name: 'Operations Mattermost',
+      destination_type: 'mattermost',
+      event_kind: 'detected',
+      test: false,
+      state: 'retry_wait',
+      attempt_count: 2,
+      event_occurred_at: '2026-07-31T11:55:00Z',
+      last_attempt_at: now,
+      available_at: '2026-07-31T12:02:00Z',
+      last_error_code: 'provider_unavailable',
+      created_at: '2026-07-31T11:55:00Z',
+      updated_at: now,
+    },
+  ];
+}
+
+function administrativeReceipt(requestID) {
+  return {
+    id: '70000000-0000-4000-8000-000000000024',
+    version: 1,
+    request_id: requestID,
+    replayed: false,
+    audit_url: `/audit?correlation_id=${requestID}`,
   };
 }
 

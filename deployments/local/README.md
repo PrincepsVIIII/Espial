@@ -49,4 +49,8 @@ not delete data.
 
 The Core image is a static, non-root runtime image. PostgreSQL receives its local
 development DSN through a mounted Compose secret file rather than an environment
-variable. The committed value is not suitable for any shared or production host.
+variable. Mattermost remains disabled while its exact host/CIDR allowlists are empty.
+For local testing, put a disposable webhook token in a mode-`0600` file, set
+`ESPIAL_MATTERMOST_WEBHOOK_SECRET_FILE`, configure the exact network allowlists, and
+use `mattermost_webhook` as the destination's secret reference. The committed
+placeholder values are not suitable for any shared or production host.

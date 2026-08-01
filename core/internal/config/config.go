@@ -23,11 +23,12 @@ const (
 
 // Config contains the small set of settings needed by the Phase 1 Core.
 type Config struct {
-	Environment string
-	Server      Server
-	Database    Database
-	Auth        Auth
-	Adapters    Adapters
+	Environment   string
+	Server        Server
+	Database      Database
+	Auth          Auth
+	Adapters      Adapters
+	Notifications Notifications
 }
 
 type Server struct {
@@ -64,6 +65,21 @@ type Adapters struct {
 	FreshnessInterval  time.Duration
 	FreshnessBatchSize int
 	EventReplaySize    int
+}
+
+type Notifications struct {
+	WorkerConcurrency int
+	PollInterval      time.Duration
+	ClaimLease        time.Duration
+	MaxAttempts       int
+	MaxRetryDelay     time.Duration
+	RequestTimeout    time.Duration
+	ResolveTimeout    time.Duration
+	ResponseBodyLimit int64
+	ApprovedHosts     []string
+	ApprovedCIDRs     []string
+	AllowedPorts      []int
+	SecretDirectory   string
 }
 
 // Load applies defaults, an optional JSON file, then environment overrides.
@@ -113,6 +129,13 @@ func defaults() Config {
 			FreshnessInterval: time.Second, FreshnessBatchSize: 100,
 			EventReplaySize: 1024,
 		},
+		Notifications: Notifications{
+			WorkerConcurrency: 2, PollInterval: time.Second, ClaimLease: 30 * time.Second,
+			MaxAttempts: 6, MaxRetryDelay: 5 * time.Minute, RequestTimeout: 10 * time.Second,
+			ResolveTimeout: 2 * time.Second, ResponseBodyLimit: 4096,
+			ApprovedHosts: []string{}, ApprovedCIDRs: []string{}, AllowedPorts: []int{443},
+			SecretDirectory: "/run/secrets",
+		},
 	}
 }
 
@@ -150,6 +173,20 @@ type fileConfig struct {
 		FreshnessBatchSize *int   `json:"freshness_batch_size"`
 		EventReplaySize    *int   `json:"event_replay_size"`
 	} `json:"adapters"`
+	Notifications struct {
+		WorkerConcurrency *int     `json:"worker_concurrency"`
+		PollInterval      string   `json:"poll_interval"`
+		ClaimLease        string   `json:"claim_lease"`
+		MaxAttempts       *int     `json:"max_attempts"`
+		MaxRetryDelay     string   `json:"max_retry_delay"`
+		RequestTimeout    string   `json:"request_timeout"`
+		ResolveTimeout    string   `json:"resolve_timeout"`
+		ResponseBodyLimit *int64   `json:"response_body_limit_bytes"`
+		ApprovedHosts     []string `json:"approved_hosts"`
+		ApprovedCIDRs     []string `json:"approved_cidrs"`
+		AllowedPorts      []int    `json:"allowed_ports"`
+		SecretDirectory   string   `json:"secret_directory"`
+	} `json:"notifications"`
 }
 
 func applyFile(cfg *Config, name string) error {
@@ -289,32 +326,86 @@ func applyFile(cfg *Config, name string) error {
 			cfg.Adapters.FreshnessInterval = duration
 		}
 	}
+	if values.Notifications.WorkerConcurrency != nil {
+		cfg.Notifications.WorkerConcurrency = *values.Notifications.WorkerConcurrency
+	}
+	if values.Notifications.MaxAttempts != nil {
+		cfg.Notifications.MaxAttempts = *values.Notifications.MaxAttempts
+	}
+	if values.Notifications.ResponseBodyLimit != nil {
+		cfg.Notifications.ResponseBodyLimit = *values.Notifications.ResponseBodyLimit
+	}
+	if values.Notifications.ApprovedHosts != nil {
+		cfg.Notifications.ApprovedHosts = append([]string(nil), values.Notifications.ApprovedHosts...)
+	}
+	if values.Notifications.ApprovedCIDRs != nil {
+		cfg.Notifications.ApprovedCIDRs = append([]string(nil), values.Notifications.ApprovedCIDRs...)
+	}
+	if values.Notifications.AllowedPorts != nil {
+		cfg.Notifications.AllowedPorts = append([]int(nil), values.Notifications.AllowedPorts...)
+	}
+	if values.Notifications.SecretDirectory != "" {
+		cfg.Notifications.SecretDirectory = values.Notifications.SecretDirectory
+	}
+	for name, value := range map[string]string{
+		"notifications.poll_interval":   values.Notifications.PollInterval,
+		"notifications.claim_lease":     values.Notifications.ClaimLease,
+		"notifications.max_retry_delay": values.Notifications.MaxRetryDelay,
+		"notifications.request_timeout": values.Notifications.RequestTimeout,
+		"notifications.resolve_timeout": values.Notifications.ResolveTimeout,
+	} {
+		if value == "" {
+			continue
+		}
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		switch name {
+		case "notifications.poll_interval":
+			cfg.Notifications.PollInterval = duration
+		case "notifications.claim_lease":
+			cfg.Notifications.ClaimLease = duration
+		case "notifications.max_retry_delay":
+			cfg.Notifications.MaxRetryDelay = duration
+		case "notifications.request_timeout":
+			cfg.Notifications.RequestTimeout = duration
+		case "notifications.resolve_timeout":
+			cfg.Notifications.ResolveTimeout = duration
+		}
+	}
 	return nil
 }
 
 // SafeSummary returns useful startup settings without secret values or paths.
 func (cfg Config) SafeSummary() map[string]any {
 	return map[string]any{
-		"environment":                   cfg.Environment,
-		"listen_address":                cfg.Server.ListenAddress,
-		"public_url":                    cfg.Server.PublicURL.String(),
-		"auth_mode":                     cfg.Auth.Mode,
-		"auth_session_idle":             cfg.Auth.SessionIdle,
-		"auth_session_absolute":         cfg.Auth.SessionAbsolute,
-		"auth_lockout_duration":         cfg.Auth.LockoutDuration,
-		"database_dsn_configured":       cfg.Database.DSNFile != "",
-		"database_migrate_on_start":     cfg.Database.MigrateOnStart,
-		"database_max_open_connections": cfg.Database.MaxOpenConnections,
-		"database_connect_timeout":      cfg.Database.ConnectTimeout,
-		"database_migration_timeout":    cfg.Database.MigrationTimeout,
-		"sample_adapter_configured":     cfg.Adapters.SampleExecutable != "",
-		"sse_heartbeat":                 cfg.Server.SSEHeartbeat,
-		"sse_max_clients":               cfg.Server.SSEMaxClients,
-		"adapter_global_concurrency":    cfg.Adapters.GlobalConcurrency,
-		"adapter_reconcile_interval":    cfg.Adapters.ReconcileInterval,
-		"freshness_interval":            cfg.Adapters.FreshnessInterval,
-		"freshness_batch_size":          cfg.Adapters.FreshnessBatchSize,
-		"event_replay_size":             cfg.Adapters.EventReplaySize,
+		"environment":                              cfg.Environment,
+		"listen_address":                           cfg.Server.ListenAddress,
+		"public_url":                               cfg.Server.PublicURL.String(),
+		"auth_mode":                                cfg.Auth.Mode,
+		"auth_session_idle":                        cfg.Auth.SessionIdle,
+		"auth_session_absolute":                    cfg.Auth.SessionAbsolute,
+		"auth_lockout_duration":                    cfg.Auth.LockoutDuration,
+		"database_dsn_configured":                  cfg.Database.DSNFile != "",
+		"database_migrate_on_start":                cfg.Database.MigrateOnStart,
+		"database_max_open_connections":            cfg.Database.MaxOpenConnections,
+		"database_connect_timeout":                 cfg.Database.ConnectTimeout,
+		"database_migration_timeout":               cfg.Database.MigrationTimeout,
+		"sample_adapter_configured":                cfg.Adapters.SampleExecutable != "",
+		"sse_heartbeat":                            cfg.Server.SSEHeartbeat,
+		"sse_max_clients":                          cfg.Server.SSEMaxClients,
+		"adapter_global_concurrency":               cfg.Adapters.GlobalConcurrency,
+		"adapter_reconcile_interval":               cfg.Adapters.ReconcileInterval,
+		"freshness_interval":                       cfg.Adapters.FreshnessInterval,
+		"freshness_batch_size":                     cfg.Adapters.FreshnessBatchSize,
+		"event_replay_size":                        cfg.Adapters.EventReplaySize,
+		"notification_worker_concurrency":          cfg.Notifications.WorkerConcurrency,
+		"notification_max_attempts":                cfg.Notifications.MaxAttempts,
+		"notification_request_timeout":             cfg.Notifications.RequestTimeout,
+		"notification_approved_host_count":         len(cfg.Notifications.ApprovedHosts),
+		"notification_approved_cidr_count":         len(cfg.Notifications.ApprovedCIDRs),
+		"notification_secret_directory_configured": cfg.Notifications.SecretDirectory != "",
 	}
 }
 
@@ -409,6 +500,21 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 			*destination = duration
 		}
 	}
+	for name, destination := range map[string]*time.Duration{
+		"ESPIAL_NOTIFICATION_POLL_INTERVAL":   &cfg.Notifications.PollInterval,
+		"ESPIAL_NOTIFICATION_CLAIM_LEASE":     &cfg.Notifications.ClaimLease,
+		"ESPIAL_NOTIFICATION_MAX_RETRY_DELAY": &cfg.Notifications.MaxRetryDelay,
+		"ESPIAL_NOTIFICATION_REQUEST_TIMEOUT": &cfg.Notifications.RequestTimeout,
+		"ESPIAL_NOTIFICATION_RESOLVE_TIMEOUT": &cfg.Notifications.ResolveTimeout,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			duration, err := time.ParseDuration(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = duration
+		}
+	}
 	for name, destination := range map[string]*int{
 		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY": &cfg.Adapters.GlobalConcurrency,
 		"ESPIAL_FRESHNESS_BATCH_SIZE":       &cfg.Adapters.FreshnessBatchSize,
@@ -421,6 +527,44 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 			}
 			*destination = parsed
 		}
+	}
+	for name, destination := range map[string]*int{
+		"ESPIAL_NOTIFICATION_WORKER_CONCURRENCY": &cfg.Notifications.WorkerConcurrency,
+		"ESPIAL_NOTIFICATION_MAX_ATTEMPTS":       &cfg.Notifications.MaxAttempts,
+	} {
+		if value := strings.TrimSpace(getenv(name)); value != "" {
+			parsed, err := strconv.Atoi(value)
+			if err != nil {
+				return fmt.Errorf("parse %s: %w", name, err)
+			}
+			*destination = parsed
+		}
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_NOTIFICATION_RESPONSE_BODY_LIMIT_BYTES")); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_NOTIFICATION_RESPONSE_BODY_LIMIT_BYTES: %w", err)
+		}
+		cfg.Notifications.ResponseBodyLimit = parsed
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_NOTIFICATION_APPROVED_HOSTS")); value != "" {
+		cfg.Notifications.ApprovedHosts = splitCommaValues(value)
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_NOTIFICATION_APPROVED_CIDRS")); value != "" {
+		cfg.Notifications.ApprovedCIDRs = splitCommaValues(value)
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_NOTIFICATION_ALLOWED_PORTS")); value != "" {
+		cfg.Notifications.AllowedPorts = nil
+		for _, item := range splitCommaValues(value) {
+			parsed, err := strconv.Atoi(item)
+			if err != nil {
+				return fmt.Errorf("parse ESPIAL_NOTIFICATION_ALLOWED_PORTS: %w", err)
+			}
+			cfg.Notifications.AllowedPorts = append(cfg.Notifications.AllowedPorts, parsed)
+		}
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_NOTIFICATION_SECRET_DIRECTORY")); value != "" {
+		cfg.Notifications.SecretDirectory = value
 	}
 	for name, destination := range map[string]*time.Duration{
 		"ESPIAL_AUTH_SESSION_IDLE":      &cfg.Auth.SessionIdle,
@@ -465,6 +609,9 @@ func (cfg Config) Validate() error {
 	if cfg.Server.PublicURL == nil || cfg.Server.PublicURL.Host == "" {
 		return errors.New("public URL must be absolute")
 	}
+	if cfg.Server.PublicURL.User != nil || cfg.Server.PublicURL.RawQuery != "" || cfg.Server.PublicURL.Fragment != "" {
+		return errors.New("public URL must not include user information, query, or fragment")
+	}
 	if cfg.Server.PublicURL.Scheme != "http" && cfg.Server.PublicURL.Scheme != "https" {
 		return errors.New("public URL scheme must be http or https")
 	}
@@ -507,7 +654,40 @@ func (cfg Config) Validate() error {
 		cfg.Adapters.EventReplaySize < 1 || cfg.Adapters.EventReplaySize > 10000 {
 		return errors.New("adapter monitoring capacities are outside safe bounds")
 	}
+	if cfg.Notifications.WorkerConcurrency < 1 || cfg.Notifications.WorkerConcurrency > 32 ||
+		cfg.Notifications.MaxAttempts < 1 || cfg.Notifications.MaxAttempts > 6 ||
+		cfg.Notifications.ResponseBodyLimit < 128 || cfg.Notifications.ResponseBodyLimit > 65536 {
+		return errors.New("notification capacities are outside safe bounds")
+	}
+	if cfg.Notifications.PollInterval < 100*time.Millisecond || cfg.Notifications.PollInterval > time.Minute ||
+		cfg.Notifications.ClaimLease < time.Second || cfg.Notifications.ClaimLease > 10*time.Minute ||
+		cfg.Notifications.MaxRetryDelay < time.Second || cfg.Notifications.MaxRetryDelay > time.Hour ||
+		cfg.Notifications.RequestTimeout < time.Second || cfg.Notifications.RequestTimeout > time.Minute ||
+		cfg.Notifications.ResolveTimeout < 100*time.Millisecond || cfg.Notifications.ResolveTimeout > cfg.Notifications.RequestTimeout {
+		return errors.New("notification durations are outside safe bounds")
+	}
+	if !filepath.IsAbs(cfg.Notifications.SecretDirectory) {
+		return errors.New("notification secret directory must be absolute")
+	}
+	if len(cfg.Notifications.ApprovedHosts) > 256 || len(cfg.Notifications.ApprovedCIDRs) > 256 || len(cfg.Notifications.AllowedPorts) < 1 || len(cfg.Notifications.AllowedPorts) > 32 {
+		return errors.New("notification network policy is outside safe bounds")
+	}
+	for _, port := range cfg.Notifications.AllowedPorts {
+		if port < 1 || port > 65535 {
+			return errors.New("notification network policy contains an invalid port")
+		}
+	}
 	return nil
+}
+
+func splitCommaValues(value string) []string {
+	result := []string{}
+	for _, item := range strings.Split(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 // DatabaseDSN reads the database connection string without logging it.
