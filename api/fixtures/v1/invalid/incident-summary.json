@@ -1,0 +1,21 @@
+{
+  "schema": "incident-summary",
+  "data": {
+    "id": "bad",
+    "rule_id": "bad",
+    "rule_name": "",
+    "integration_id": "bad",
+    "integration_name": "",
+    "resource_id": "bad",
+    "resource_name": "",
+    "check_type": "BAD CHECK",
+    "title": "",
+    "summary": "",
+    "severity": "urgent",
+    "status": "alerted",
+    "detected_at": "bad",
+    "latest_signal_at": "bad",
+    "version": 0,
+    "updated_at": "bad"
+  }
+}

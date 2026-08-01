@@ -127,7 +127,8 @@ func (repo repository) insertObservation(
 		input.ExpectedRefreshSeconds, string(measurements), string(metadata)).Scan(&id)
 	if err == nil {
 		return health.Observation{
-			ID: id, ResourceID: resourceID, State: input.State, Summary: input.Summary,
+			ID: id, ResourceID: resourceID, CheckType: input.CheckType,
+			State: input.State, Summary: input.Summary,
 			ObservedAt: observedAt, ReceivedAt: receivedAt, ExpectedRefresh: refresh,
 		}, true, nil
 	}
@@ -157,7 +158,7 @@ func (repo repository) findConflictingObservation(
 	var refreshSeconds int
 	var measurements, metadata []byte
 	err := repo.tx.QueryRow(ctx, `
-		SELECT id::text, resource_id::text, observed_state, summary, observed_at,
+		SELECT id::text, resource_id::text, check_type, observed_state, summary, observed_at,
 			received_at, expected_refresh_seconds, measurements, metadata
 		FROM observations
 		WHERE integration_id = $1 AND (
@@ -168,7 +169,7 @@ func (repo repository) findConflictingObservation(
 		LIMIT 1
 	`, integrationID, input.ID, resourceID, input.CheckType,
 		postgresTime(input.ObservedAt)).Scan(
-		&result.ID, &result.ResourceID, &state, &result.Summary, &result.ObservedAt,
+		&result.ID, &result.ResourceID, &result.CheckType, &state, &result.Summary, &result.ObservedAt,
 		&result.ReceivedAt, &refreshSeconds, &measurements, &metadata,
 	)
 	if err != nil {
@@ -184,14 +185,14 @@ func (repo repository) latestObservation(ctx context.Context, resourceID string)
 	var state string
 	var refreshSeconds int
 	err := repo.tx.QueryRow(ctx, `
-		SELECT id::text, resource_id::text, observed_state, summary, observed_at,
+		SELECT id::text, resource_id::text, check_type, observed_state, summary, observed_at,
 			received_at, expected_refresh_seconds
 		FROM observations
 		WHERE resource_id = $1
 		ORDER BY observed_at DESC, received_at DESC, id DESC
 		LIMIT 1
 	`, resourceID).Scan(
-		&result.ID, &result.ResourceID, &state, &result.Summary, &result.ObservedAt,
+		&result.ID, &result.ResourceID, &result.CheckType, &state, &result.Summary, &result.ObservedAt,
 		&result.ReceivedAt, &refreshSeconds,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

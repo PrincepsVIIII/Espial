@@ -1,0 +1,10 @@
+{
+  "schema": "incident-timeline-event",
+  "data": {
+    "id": "bad",
+    "incident_id": "bad",
+    "kind": "invented",
+    "summary": "",
+    "occurred_at": "bad"
+  }
+}

@@ -1,6 +1,8 @@
 # Implementation plans
 
 - [Phase 1: Monitoring foundation](PHASE_1_IMPLEMENTATION.md)
+- [Phase 2: Incidents, notifications, and certificates](PHASE_2_IMPLEMENTATION.md)
+- [Slice 2.1: Automatic incident creation and reads](SLICE_2_1_AUTOMATIC_INCIDENTS.md)
 - [Slice 1.8: Deployment and phase acceptance](SLICE_1_8_PHASE_ACCEPTANCE.md)
 - [Slice 1.3: Normalized storage and health](SLICE_1_3_NORMALIZED_HEALTH.md)
 - [Slice 1.4: Adapter runtime and sample adapter](SLICE_1_4_ADAPTER_RUNTIME.md)

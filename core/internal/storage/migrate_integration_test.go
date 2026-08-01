@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 7 {
+	if migrationCount != 9 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -91,6 +91,22 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if roleCount != 3 {
 		t.Fatalf("role count = %d", roleCount)
 	}
+	var viewerReads, administratorManages bool
+	if err := pool.QueryRow(ctx, `
+		SELECT permissions ? 'incidents:read' AND permissions ? 'webpages:read'
+			AND NOT permissions ? 'incidents:operate'
+			AND NOT permissions ? 'incident_rules:manage'
+		FROM roles WHERE name = 'viewer'
+	`).Scan(&viewerReads); err != nil || !viewerReads {
+		t.Fatalf("viewer Phase 2 reads = %v, %v", viewerReads, err)
+	}
+	if err := pool.QueryRow(ctx, `
+		SELECT permissions ? 'incident_rules:manage'
+			AND permissions ? 'notification_destinations:manage'
+		FROM roles WHERE name = 'administrator'
+	`).Scan(&administratorManages); err != nil || !administratorManages {
+		t.Fatalf("administrator Phase 2 permissions = %v, %v", administratorManages, err)
+	}
 
 	if _, err := pool.Exec(ctx, `
 		INSERT INTO audit_events (id, action, target_type, result, correlation_id)
@@ -137,7 +153,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (8, '000008_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (10, '000010_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

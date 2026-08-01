@@ -94,11 +94,21 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-Groundwork already established before Phase 2 feature work:
+**Status:** In progress. Slices 2.0 and 2.1 are implemented; operator workflow,
+suppression, notification, website, and certificate slices remain planned.
 
-- Alerts is a direct primary route with an honest unavailable state until incident
-  read models exist;
-- Core already defines the `incidents:operate` authorization boundary;
+**Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
+
+Implemented Phase 2 groundwork and automatic incident read path:
+
+- monitoring observations/freshness commit a durable signal journal consumed by a
+  bounded restart-safe evaluator;
+- Core creates fingerprinted incidents with persisted debounce/recovery state and
+  append-only timelines;
+- Viewer-authorized incident list/detail/timeline APIs back Dashboard active
+  summaries and Alerts active/history/direct-detail routes;
+- `incidents:operate` remains the authorization boundary for Slice 2.2 actions,
+  which are not exposed yet;
 - administrator Audit and Users routes provide inspectable request-correlated
   evidence for access changes; and
 - the shell accepts only implemented dropdown children, so Phase 2 destinations

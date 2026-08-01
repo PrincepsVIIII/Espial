@@ -14,6 +14,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/api"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
+	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,6 +55,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	handler := api.New(api.Dependencies{
 		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
 		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
+		Incidents:    incidents.NewReader(pool),
 		Integrations: monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:        authService,
 		Events:       monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,

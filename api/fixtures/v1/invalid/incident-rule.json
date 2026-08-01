@@ -1,0 +1,15 @@
+{
+  "schema": "incident-rule",
+  "data": {
+    "id": "20000000-0000-4000-8000-000000000001",
+    "name": "",
+    "enabled": true,
+    "priority": -1,
+    "conditions": [],
+    "recovery_state": "fine",
+    "recovery_min_occurrences": 0,
+    "recovery_for_seconds": -1,
+    "created_at": "invalid",
+    "updated_at": "invalid"
+  }
+}

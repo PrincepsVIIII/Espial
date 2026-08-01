@@ -10,6 +10,8 @@ const appShell = source('../routes/(app)/+layout.svelte');
 const appLoader = source('../routes/(app)/+layout.ts');
 const dashboardPage = source('../routes/(app)/dashboard/+page.svelte');
 const alertsPage = source('../routes/(app)/alerts/+page.svelte');
+const alertHistoryPage = source('../routes/(app)/alerts/history/+page.svelte');
+const alertDetailPage = source('../routes/(app)/alerts/[id]/+page.svelte');
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
@@ -76,6 +78,7 @@ describe('authenticated shell contract', () => {
     expect(appShell).toContain('class="nav-link"');
     expect(appShell).toContain('href={item.href}');
     expect(appShell).toContain("{ label: 'Users', href: '/audit/users' }");
+    expect(appShell).toContain("{ label: 'History', href: '/alerts/history' }");
     expect(appShell).not.toMatch(
       /Planned workflow|Planned inventory|Open section/,
     );
@@ -135,12 +138,21 @@ describe('primary route skeletons', () => {
     expect(dashboardPage).toContain('Monitoring coverage');
     expect(dashboardPage).toContain('Authoritative resource health');
     expect(dashboardPage).toContain('Collection coverage');
-    expect(dashboardPage).not.toMatch(/incident count|active incidents/i);
+    expect(dashboardPage).toContain('Active incidents');
+    expect(dashboardPage).toContain('/alerts/${incident.id}');
     expect(overviewRedirect).toContain("redirect(308, '/dashboard')");
   });
 
+  it('exposes authoritative read-only active, history, and detail incident views', () => {
+    expect(alertsPage).toContain('<h1>Alerts</h1>');
+    expect(alertsPage).toContain('history={false}');
+    expect(alertHistoryPage).toContain('<h1>Alert history</h1>');
+    expect(alertDetailPage).toContain('Immutable lifecycle record');
+    expect(alertDetailPage).toContain('Read-only');
+    expect(alertsPage).not.toContain('UnavailableSection');
+  });
+
   it.each([
-    ['Alerts', alertsPage],
     ['Datacenter', datacenterPage],
     ['Hypervisor', hypervisorPage],
     ['Webpages', webpagesPage],

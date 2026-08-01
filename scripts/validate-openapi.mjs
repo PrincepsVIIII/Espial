@@ -29,6 +29,9 @@ const requiredOperations = new Map([
   ["/integrations/{id}", ["get"]],
   ["/integrations/{id}/configuration", ["put"]],
   ["/audit", ["get"]],
+  ["/incidents", ["get"]],
+  ["/incidents/{id}", ["get"]],
+  ["/incidents/{id}/timeline", ["get"]],
   ["/events/stream", ["get"]],
 ]);
 

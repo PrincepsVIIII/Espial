@@ -66,6 +66,7 @@ for (const viewport of [
       await expect(navigation.getByRole('link')).toHaveText([
         'Dashboard',
         'Alerts',
+        'History',
         'Datacenter',
         'Hypervisor',
         'Webpages',
@@ -78,6 +79,44 @@ for (const viewport of [
     }
     await page.screenshot({
       path: testInfo.outputPath(`dashboard-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  });
+}
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`Alerts preserves incident evidence at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/alerts');
+    await waitForHydration(page);
+    await expect(page.getByRole('heading', { name: 'Alerts' })).toBeVisible();
+    await expect(page.getByText('Compute node 2: availability')).toBeVisible();
+    await expect(page.getByText('Host unreachable.')).toBeVisible();
+    await page
+      .getByRole('link', { name: 'Compute node 2: availability' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Current state' }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Timeline' })).toBeVisible();
+    await expect(
+      page.getByText('Incident detected: host unreachable'),
+    ).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`incident-${viewport.name}.png`),
       fullPage: true,
       animations: 'disabled',
     });

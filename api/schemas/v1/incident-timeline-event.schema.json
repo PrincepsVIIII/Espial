@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-timeline-event.schema.json",
+  "title": "Incident timeline event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "incident_id", "kind", "summary", "occurred_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "incident_id": { "type": "string", "format": "uuid" },
+    "signal_id": { "type": "string", "format": "uuid" },
+    "actor_user_id": { "type": "string", "format": "uuid" },
+    "actor_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "kind": {
+      "enum": [
+        "detected",
+        "severity_changed",
+        "recurrence",
+        "recovered",
+        "acknowledged",
+        "investigating",
+        "assigned",
+        "note",
+        "resolved",
+        "notification"
+      ]
+    },
+    "from_status": {
+      "enum": ["open", "acknowledged", "investigating", "recovered", "resolved"]
+    },
+    "to_status": {
+      "enum": ["open", "acknowledged", "investigating", "recovered", "resolved"]
+    },
+    "from_severity": { "enum": ["warning", "critical"] },
+    "to_severity": { "enum": ["warning", "critical"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

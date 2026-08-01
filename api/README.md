@@ -18,6 +18,11 @@ here.
 - [`audit-event.schema.json`](schemas/v1/audit-event.schema.json): redacted administrative audit record
 - [`live-invalidation.schema.json`](schemas/v1/live-invalidation.schema.json): SSE invalidation payload
 - [`integration-write.schema.json`](schemas/v1/integration-write.schema.json): integration creation and configuration replacement
+- [`monitoring-signal.schema.json`](schemas/v1/monitoring-signal.schema.json): durable observation/freshness work item
+- [`incident-rule.schema.json`](schemas/v1/incident-rule.schema.json): bounded declarative incident rule
+- [`incident-summary.schema.json`](schemas/v1/incident-summary.schema.json): incident collection item
+- [`incident-detail.schema.json`](schemas/v1/incident-detail.schema.json): incident detail read model
+- [`incident-timeline-event.schema.json`](schemas/v1/incident-timeline-event.schema.json): immutable incident history item
 
 Schemas use JSON Schema draft 2020-12. A major directory version represents an
 incompatible contract boundary; additive compatible changes may update v1 after

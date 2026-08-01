@@ -137,7 +137,7 @@ func TestRuntimeSchedulesEnabledSampleAndDrains(t *testing.T) {
 	go func() { result <- runtimeOwner.Run(ctx) }()
 	deadline := time.Now().Add(6 * time.Second)
 	for {
-		var count int
+		var count, incidentCount int
 		err := pool.QueryRow(context.Background(), `
 			SELECT count(*) FROM integration_collection_runs WHERE result = 'succeeded'
 		`).Scan(&count)
@@ -145,12 +145,18 @@ func TestRuntimeSchedulesEnabledSampleAndDrains(t *testing.T) {
 			cancel()
 			t.Fatal(err)
 		}
-		if count > 0 {
+		if err := pool.QueryRow(context.Background(), `
+			SELECT count(*) FROM incidents WHERE status = 'open' AND severity = 'warning'
+		`).Scan(&incidentCount); err != nil {
+			cancel()
+			t.Fatal(err)
+		}
+		if count >= 2 && incidentCount == 1 {
 			break
 		}
 		if time.Now().After(deadline) {
 			cancel()
-			t.Fatal("scheduled collection did not complete")
+			t.Fatalf("sustained scheduled warning did not create one incident: collections=%d incidents=%d", count, incidentCount)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

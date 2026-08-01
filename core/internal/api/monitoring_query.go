@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
+	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 )
 
@@ -157,6 +158,108 @@ func parseAuditFilter(values url.Values, now time.Time) (monitoring.AuditFilter,
 		fields = append(fields, *field)
 	} else {
 		filter.CorrelationID = correlation
+	}
+	return filter, fields
+}
+
+func parseIncidentFilter(values url.Values) (incidents.Filter, queryErrors) {
+	allowed := map[string]bool{
+		"limit": true, "cursor": true, "severity": true, "status": true,
+		"integration": true, "resource": true, "owner": true, "active": true,
+		"from": true, "to": true,
+	}
+	if fields := rejectUnknownQuery(values, allowed); len(fields) > 0 {
+		return incidents.Filter{}, fields
+	}
+	limit, fields := parseLimit(values)
+	filter := incidents.Filter{Limit: limit}
+	if cursor, field := singleValue(values, "cursor", 2048); field != nil {
+		fields = append(fields, *field)
+	} else {
+		filter.Cursor = cursor
+	}
+	if len(values["severity"]) > maxFilterValues {
+		fields = append(fields, APIFieldError{Field: "severity", Code: "too_many"})
+	} else {
+		seen := map[incidents.Severity]bool{}
+		for _, raw := range values["severity"] {
+			severity := incidents.Severity(strings.TrimSpace(raw))
+			if severity != incidents.SeverityWarning && severity != incidents.SeverityCritical {
+				fields = append(fields, APIFieldError{Field: "severity", Code: "invalid"})
+				continue
+			}
+			if !seen[severity] {
+				seen[severity] = true
+				filter.Severities = append(filter.Severities, severity)
+			}
+		}
+	}
+	if len(values["status"]) > maxFilterValues {
+		fields = append(fields, APIFieldError{Field: "status", Code: "too_many"})
+	} else {
+		seen := map[incidents.Status]bool{}
+		for _, raw := range values["status"] {
+			status := incidents.Status(strings.TrimSpace(raw))
+			switch status {
+			case incidents.StatusOpen, incidents.StatusAcknowledged, incidents.StatusInvestigating,
+				incidents.StatusRecovered, incidents.StatusResolved:
+				if !seen[status] {
+					seen[status] = true
+					filter.Statuses = append(filter.Statuses, status)
+				}
+			default:
+				fields = append(fields, APIFieldError{Field: "status", Code: "invalid"})
+			}
+		}
+	}
+	filter.IntegrationIDs, fields = parseRepeated(values, "integration", uuidPattern.MatchString, fields)
+	filter.ResourceIDs, fields = parseRepeated(values, "resource", uuidPattern.MatchString, fields)
+	filter.OwnerIDs, fields = parseRepeated(values, "owner", uuidPattern.MatchString, fields)
+	if raw, field := singleValue(values, "active", 5); field != nil {
+		fields = append(fields, *field)
+	} else if raw != "" {
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			fields = append(fields, APIFieldError{Field: "active", Code: "invalid"})
+		} else {
+			filter.Active = &parsed
+		}
+	}
+	for name, destination := range map[string]**time.Time{"from": &filter.From, "to": &filter.To} {
+		raw, field := singleValue(values, name, 64)
+		if field != nil {
+			fields = append(fields, *field)
+			continue
+		}
+		if raw == "" {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			fields = append(fields, APIFieldError{Field: name, Code: "invalid"})
+			continue
+		}
+		value := parsed.UTC()
+		*destination = &value
+	}
+	if filter.From != nil && filter.To != nil &&
+		(!filter.From.Before(*filter.To) || filter.To.Sub(*filter.From) > 366*24*time.Hour) {
+		fields = append(fields, APIFieldError{Field: "from", Code: "invalid_range"})
+	}
+	return filter, fields
+}
+
+func parseTimelineFilter(values url.Values) (incidents.TimelineFilter, queryErrors) {
+	allowed := map[string]bool{"limit": true, "cursor": true}
+	if fields := rejectUnknownQuery(values, allowed); len(fields) > 0 {
+		return incidents.TimelineFilter{}, fields
+	}
+	limit, fields := parseLimit(values)
+	filter := incidents.TimelineFilter{Limit: limit}
+	if cursor, field := singleValue(values, "cursor", 2048); field != nil {
+		fields = append(fields, *field)
+	} else {
+		filter.Cursor = cursor
 	}
 	return filter, fields
 }

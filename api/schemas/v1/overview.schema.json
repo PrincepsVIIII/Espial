@@ -61,6 +61,57 @@
     },
     "stale_count": { "type": "integer", "minimum": 0 },
     "unknown_count": { "type": "integer", "minimum": 0 },
+    "active_incident_counts": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["severity", "count"],
+        "properties": {
+          "severity": { "enum": ["warning", "critical"] },
+          "count": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "active_incidents": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "title",
+          "severity",
+          "status",
+          "integration_name",
+          "resource_name",
+          "detected_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "severity": { "enum": ["warning", "critical"] },
+          "status": {
+            "enum": ["open", "acknowledged", "investigating"]
+          },
+          "integration_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "resource_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "detected_at": { "type": "string", "format": "date-time" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
     "recent_state_changes": {
       "type": "array",
       "maxItems": 10,

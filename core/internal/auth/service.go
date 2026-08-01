@@ -19,7 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-const bootstrapLockID int64 = 0x45535049414c4155 // "ESPIALAU"
+const bootstrapLockID int64 = 0x45535049414c4155   // "ESPIALAU"
 const managedUserLockID int64 = 0x45535049414c5553 // "ESPIALUS"
 
 const (
@@ -1160,7 +1160,9 @@ func keys(values map[string]struct{}) []string {
 
 func administratorPermissions() []string {
 	return []string{
-		"audit:read", "incidents:operate", "integrations:manage", "integrations:read",
-		"overview:read", "resources:read", "roles:manage", "users:manage",
+		"audit:read", "incident_rules:manage", "incidents:operate", "incidents:read",
+		"integrations:manage", "integrations:read", "notification_destinations:manage",
+		"overview:read", "resources:read", "roles:manage", "suppressions:manage",
+		"users:manage", "webpages:read", "website_monitors:manage",
 	}
 }

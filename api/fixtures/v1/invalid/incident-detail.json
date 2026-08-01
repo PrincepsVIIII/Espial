@@ -1,0 +1,23 @@
+{
+  "schema": "incident-detail",
+  "data": {
+    "id": "90000000-0000-4000-8000-000000000001",
+    "rule_id": "20000000-0000-4000-8000-000000000001",
+    "rule_name": "Default resource health",
+    "integration_id": "50000000-0000-4000-8000-000000000001",
+    "integration_name": "Sample monitoring",
+    "resource_id": "60000000-0000-4000-8000-000000000001",
+    "resource_name": "sample-node-1",
+    "check_type": "availability",
+    "title": "sample-node-1: availability",
+    "summary": "Endpoint refused the connection.",
+    "severity": "critical",
+    "status": "open",
+    "detected_at": "2026-07-31T12:00:00Z",
+    "latest_signal_at": "2026-07-31T12:00:00Z",
+    "version": 1,
+    "updated_at": "2026-07-31T12:00:00Z",
+    "fingerprint": "",
+    "secret": "must fail"
+  }
+}

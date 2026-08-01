@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
+	"github.com/PrincepsVIIII/Espial/core/internal/signals"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -14,12 +15,14 @@ import (
 type Options struct {
 	Clock     health.Clock
 	Publisher Publisher
+	Signals   *signals.Writer
 }
 
 type Service struct {
 	pool      *pgxpool.Pool
 	clock     health.Clock
 	publisher Publisher
+	signals   *signals.Writer
 }
 
 type CommitHook func(context.Context, pgx.Tx, Result) error
@@ -28,7 +31,10 @@ func NewService(pool *pgxpool.Pool, options Options) *Service {
 	if options.Clock == nil {
 		options.Clock = health.SystemClock{}
 	}
-	return &Service{pool: pool, clock: options.Clock, publisher: options.Publisher}
+	if options.Signals == nil {
+		options.Signals = signals.NewWriter()
+	}
+	return &Service{pool: pool, clock: options.Clock, publisher: options.Publisher, signals: options.Signals}
 }
 
 func (service *Service) Ingest(ctx context.Context, integrationID string, batch Batch) (Result, error) {
@@ -112,7 +118,7 @@ func (service *Service) IngestWithCommit(
 
 	for index, observation := range batch.Observations {
 		resourceID := resourceIDs[observation.ExternalResourceID]
-		_, inserted, err := repo.insertObservation(ctx, integrationID, resourceID, observation, receivedAt)
+		stored, inserted, err := repo.insertObservation(ctx, integrationID, resourceID, observation, receivedAt)
 		if err != nil {
 			var conflict *ConflictError
 			if errors.As(err, &conflict) {
@@ -122,6 +128,15 @@ func (service *Service) IngestWithCommit(
 		}
 		if inserted {
 			result.ObservationsInserted++
+			if err := service.signals.Append(ctx, tx, signals.Input{
+				SourceKey: signals.ObservationSourceKey(stored.ID), Kind: signals.KindObservation,
+				IntegrationID: integrationID, ResourceID: resourceID,
+				ObservationID: stored.ID, CheckType: stored.CheckType,
+				State: stored.State, Reason: stored.Summary, OccurredAt: stored.ObservedAt,
+				AvailableAt: receivedAt,
+			}); err != nil {
+				return Result{}, err
+			}
 		} else {
 			result.DuplicateObservations++
 		}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/monitoring-signal.schema.json",
+  "title": "Durable monitoring signal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "kind",
+    "integration_id",
+    "resource_id",
+    "check_type",
+    "state",
+    "reason",
+    "occurred_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "kind": { "enum": ["observation", "freshness"] },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "observation_id": { "type": "string", "format": "uuid" },
+    "check_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+    },
+    "state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "reason_code": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+    },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

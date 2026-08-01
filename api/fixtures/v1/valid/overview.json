@@ -6,6 +6,19 @@
     "integration_counts": [{ "state": "healthy", "count": 1 }],
     "stale_count": 0,
     "unknown_count": 0,
+    "active_incident_counts": [{ "severity": "critical", "count": 1 }],
+    "active_incidents": [
+      {
+        "id": "90000000-0000-4000-8000-000000000001",
+        "title": "sample-node-1: availability",
+        "severity": "critical",
+        "status": "open",
+        "integration_name": "Sample monitoring",
+        "resource_name": "sample-node-1",
+        "detected_at": "2026-07-31T12:00:00Z",
+        "updated_at": "2026-07-31T12:00:00Z"
+      }
+    ],
     "recent_state_changes": []
   }
 }

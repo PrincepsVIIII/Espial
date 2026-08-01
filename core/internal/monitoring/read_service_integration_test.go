@@ -57,6 +57,25 @@ func TestReadServiceOverviewFiltersDetailsAndStablePagination(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	var incidentResourceID string
+	if err := pool.QueryRow(context.Background(), `
+		SELECT id::text FROM resources WHERE integration_id = $1 ORDER BY external_id LIMIT 1
+	`, pipelineIntegrationID).Scan(&incidentResourceID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO incidents (
+			rule_id, integration_id, resource_id, check_type, fingerprint,
+			title, summary, severity, status, detected_at, latest_signal_at,
+			created_at, updated_at
+		) VALUES (
+			'20000000-0000-4000-8000-000000000001', $1, $2, 'availability',
+			'overview-active-incident', 'Read node incident', 'state critical',
+			'critical', 'open', $3, $3, $3, $3
+		)
+	`, pipelineIntegrationID, incidentResourceID, base); err != nil {
+		t.Fatal(err)
+	}
 	service := NewReadService(pool)
 	overview, err := service.Overview(context.Background())
 	if err != nil {
@@ -64,6 +83,11 @@ func TestReadServiceOverviewFiltersDetailsAndStablePagination(t *testing.T) {
 	}
 	if overview.StaleCount != 1 || overview.UnknownCount != 1 || len(overview.RecentChanges) != 5 {
 		t.Fatalf("overview = %#v", overview)
+	}
+	if len(overview.ActiveIncidentCounts) != 1 || overview.ActiveIncidentCounts[0].Severity != "critical" ||
+		overview.ActiveIncidentCounts[0].Count != 1 || len(overview.ActiveIncidents) != 1 ||
+		overview.ActiveIncidents[0].ID == "" {
+		t.Fatalf("overview incident summary = %#v %#v", overview.ActiveIncidentCounts, overview.ActiveIncidents)
 	}
 	integrationCounts := map[string]int64{}
 	for _, count := range overview.IntegrationCounts {

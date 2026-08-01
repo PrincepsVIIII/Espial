@@ -104,6 +104,61 @@
   </section>
 {/if}
 
+{#if data.overview}
+  <section
+    class="dashboard-incidents"
+    aria-labelledby="dashboard-incidents-title"
+  >
+    <div class="operational-section-heading">
+      <div>
+        <p class="eyebrow">Current operational attention</p>
+        <h2 id="dashboard-incidents-title">Active incidents</h2>
+      </div>
+      <a class="text-link" href="/alerts">View all active incidents</a>
+    </div>
+    <div class="incident-counts" aria-label="Active incident counts">
+      <span
+        ><strong
+          >{data.overview.active_incident_counts?.find(
+            (item) => item.severity === 'critical',
+          )?.count ?? 0}</strong
+        > critical</span
+      >
+      <span
+        ><strong
+          >{data.overview.active_incident_counts?.find(
+            (item) => item.severity === 'warning',
+          )?.count ?? 0}</strong
+        > warning</span
+      >
+    </div>
+    {#if data.overview.active_incidents?.length}
+      <div class="dashboard-incident-list">
+        {#each data.overview.active_incidents as incident (incident.id)}
+          <a href={`/alerts/${incident.id}`}>
+            <span class={`incident-severity severity-${incident.severity}`}
+              >{incident.severity}</span
+            >
+            <span
+              ><strong>{incident.title}</strong><small
+                >{incident.resource_name} · {incident.integration_name}</small
+              ></span
+            >
+            <Timestamp value={incident.updated_at} />
+          </a>
+        {/each}
+      </div>
+    {:else}
+      <div class="empty-state compact">
+        <strong>No active incidents.</strong><span
+          >The automatic evaluator has not detected a currently active
+          condition.</span
+        >
+      </div>
+    {/if}
+  </section>
+{/if}
+
 <section class="resource-section" aria-labelledby="resources-title">
   <div class="operational-section-heading">
     <div>

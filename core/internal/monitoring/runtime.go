@@ -9,27 +9,34 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/audit"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
+	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/observations"
 	"github.com/PrincepsVIIII/Espial/core/internal/scheduler"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type RuntimeOptions struct {
-	Clock              health.Clock
-	GlobalConcurrency  int
-	ReconcileInterval  time.Duration
-	FreshnessInterval  time.Duration
-	FreshnessBatchSize int
-	EventReplaySize    int
-	Process            adapters.ProcessOptions
-	Secrets            adapters.SecretResolver
-	OnError            func(string, error)
+	Clock               health.Clock
+	GlobalConcurrency   int
+	ReconcileInterval   time.Duration
+	FreshnessInterval   time.Duration
+	FreshnessBatchSize  int
+	EventReplaySize     int
+	IncidentBatchSize   int
+	IncidentPoll        time.Duration
+	IncidentClaimLease  time.Duration
+	IncidentMaxAttempts int
+	Process             adapters.ProcessOptions
+	Secrets             adapters.SecretResolver
+	OnError             func(string, error)
 }
 
-// Runtime owns every Slice 1.5 background goroutine and its bounded event hub.
+// Runtime owns the bounded collection, freshness, and incident evaluator
+// goroutines plus their shared invalidation hub.
 type Runtime struct {
 	coordinator *scheduler.Coordinator
 	freshness   *FreshnessWorker
+	incidents   *incidents.Evaluator
 	hub         *events.Hub
 }
 
@@ -58,7 +65,17 @@ func NewRuntime(
 		Clock: options.Clock, Publisher: hub, BatchSize: options.FreshnessBatchSize,
 		PollInterval: options.FreshnessInterval,
 	})
-	return &Runtime{coordinator: coordinator, freshness: freshness, hub: hub}
+	incidentEvaluator := incidents.NewEvaluator(pool, hub, incidents.Options{
+		Clock: options.Clock, BatchSize: options.IncidentBatchSize,
+		PollInterval: options.IncidentPoll, ClaimLease: options.IncidentClaimLease,
+		MaxAttempts: options.IncidentMaxAttempts,
+		OnError: func(err error) {
+			if options.OnError != nil {
+				options.OnError("incidents", err)
+			}
+		},
+	})
+	return &Runtime{coordinator: coordinator, freshness: freshness, incidents: incidentEvaluator, hub: hub}
 }
 
 func (runtime *Runtime) Hub() *events.Hub { return runtime.hub }
@@ -66,18 +83,24 @@ func (runtime *Runtime) Hub() *events.Hub { return runtime.hub }
 func (runtime *Runtime) Run(ctx context.Context) error {
 	runContext, cancel := context.WithCancel(ctx)
 	defer cancel()
-	errorsChannel := make(chan error, 2)
+	errorsChannel := make(chan error, 3)
 	go func() { errorsChannel <- runtime.coordinator.Run(runContext) }()
 	go func() { errorsChannel <- runtime.freshness.Run(runContext) }()
+	go func() { errorsChannel <- runtime.incidents.Run(runContext) }()
 
 	first := <-errorsChannel
 	cancel()
 	second := <-errorsChannel
-	if ctx.Err() != nil || errors.Is(first, context.Canceled) && errors.Is(second, context.Canceled) {
+	third := <-errorsChannel
+	if ctx.Err() != nil || errors.Is(first, context.Canceled) &&
+		errors.Is(second, context.Canceled) && errors.Is(third, context.Canceled) {
 		return ctx.Err()
 	}
 	if first != nil && !errors.Is(first, context.Canceled) {
 		return first
 	}
-	return second
+	if second != nil && !errors.Is(second, context.Canceled) {
+		return second
+	}
+	return third
 }

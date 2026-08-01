@@ -1,0 +1,13 @@
+{
+  "schema": "monitoring-signal",
+  "data": {
+    "id": "not-an-id",
+    "kind": "browser",
+    "integration_id": "also-invalid",
+    "resource_id": "60000000-0000-4000-8000-000000000001",
+    "check_type": "Availability with spaces",
+    "state": "urgent",
+    "reason": "",
+    "occurred_at": "later"
+  }
+}

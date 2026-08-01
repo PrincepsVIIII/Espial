@@ -9,6 +9,7 @@
     "schema_version": { "const": 1 },
     "resource_id": { "type": "string", "format": "uuid" },
     "integration_id": { "type": "string", "format": "uuid" },
+    "incident_id": { "type": "string", "format": "uuid" },
     "state": {
       "enum": [
         "healthy",

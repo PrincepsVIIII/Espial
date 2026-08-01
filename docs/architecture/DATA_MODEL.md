@@ -1,9 +1,9 @@
-# Initial Phase 1 data model
+# Operational data model
 
 PostgreSQL is authoritative for identity, configuration, current health, normalized
-observations, and audit history. The diagram is intentionally limited to Phase 1;
-incident, notification, certificate, dependency, and physical inventory tables are
-added in their roadmap phases.
+observations, audit history, the Phase 2 monitoring-signal journal, and incidents.
+The first diagram preserves the Phase 1 foundation; notification, certificate,
+dependency, and physical inventory tables arrive in later roadmap slices.
 
 ```mermaid
 erDiagram
@@ -145,6 +145,34 @@ erDiagram
       timestamptz occurred_at
     }
 ```
+
+## Phase 2 incident addendum
+
+```mermaid
+erDiagram
+    INTEGRATIONS ||--o{ MONITORING_SIGNALS : emits
+    RESOURCES ||--o{ MONITORING_SIGNALS : emits
+    INCIDENT_RULES ||--o{ INCIDENT_RULE_CONDITIONS : defines
+    INCIDENT_RULES ||--o{ INCIDENT_RULE_STATES : evaluates
+    RESOURCES ||--o{ INCIDENT_RULE_STATES : tracks
+    INCIDENT_RULES ||--o{ INCIDENTS : opens
+    RESOURCES ||--o{ INCIDENTS : affects
+    INCIDENTS ||--o{ INCIDENT_TIMELINE : records
+    MONITORING_SIGNALS ||--o| INCIDENT_TIMELINE : explains
+```
+
+- `monitoring_signals.source_key` is unique and is committed atomically with its
+  observation or freshness transition. Claim, attempt, completion, retry, and
+  dead-letter fields make evaluator work replayable without SSE.
+- `incident_rule_states` persists matching/recovery start times, occurrence counts,
+  due deadlines, last signal ordering, and the active incident link for one
+  `(rule, resource, check_type)` tuple.
+- A partial unique index permits at most one non-resolved incident for a stable
+  `(rule_id, resource_id, check_type)` fingerprint.
+- `incident_timeline` is append-only through database triggers. Detection,
+  meaningful severity change, recurrence, and recovery create immutable evidence.
+- Incident and timeline rows are retained; later retention policy must not remove
+  evidence earlier than the audit retention boundary.
 
 ## Invariants
 

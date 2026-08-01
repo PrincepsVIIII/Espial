@@ -12,6 +12,8 @@ intentions into implementable contracts.
 | [Roadmap](ROADMAP.md) | Phase boundaries, ordering, and product scope |
 | [Phase 0 record](phase-0/README.md) | Completed design deliverables, decisions, and known external inputs |
 | [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
+| [Phase 2 plan](plans/PHASE_2_IMPLEMENTATION.md) | Incident, notification, website, and certificate delivery slices and acceptance gates |
+| [Slice 2.1 record](plans/SLICE_2_1_AUTOMATIC_INCIDENTS.md) | Durable signals, automatic lifecycle, incident read APIs, Dashboard/Alerts UI, and verification evidence |
 | [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
 | [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |
 | [Slice 1.5 record](plans/SLICE_1_5_SCHEDULING_PIPELINE.md) | Bounded scheduling, atomic collection/audit, freshness ownership, and internal events |
@@ -27,7 +29,7 @@ intentions into implementable contracts.
 - [API conventions](architecture/API_CONVENTIONS.md)
 - [Adapter protocol](architecture/ADAPTER_PROTOCOL.md)
 - [Authentication and authorization](architecture/AUTHENTICATION.md)
-- [Initial data model](architecture/DATA_MODEL.md)
+- [Operational data model](architecture/DATA_MODEL.md)
 - [Deployment baseline](architecture/DEPLOYMENT.md)
 - [Versioned JSON schemas](../api/README.md)
 

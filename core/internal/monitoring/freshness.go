@@ -8,6 +8,7 @@ import (
 
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
 	"github.com/PrincepsVIIII/Espial/core/internal/observations"
+	"github.com/PrincepsVIIII/Espial/core/internal/signals"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -29,6 +30,7 @@ type FreshnessOptions struct {
 	BatchSize    int
 	PollInterval time.Duration
 	NewTimer     func(time.Duration) FreshnessTimer
+	Signals      *signals.Writer
 }
 
 type FreshnessWorker struct {
@@ -52,6 +54,9 @@ func NewFreshnessWorker(pool *pgxpool.Pool, options FreshnessOptions) *Freshness
 		options.NewTimer = func(delay time.Duration) FreshnessTimer {
 			return freshnessSystemTimer{timer: time.NewTimer(delay)}
 		}
+	}
+	if options.Signals == nil {
+		options.Signals = signals.NewWriter()
 	}
 	return &FreshnessWorker{pool: pool, options: options}
 }
@@ -97,12 +102,13 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 	defer tx.Rollback(ctx)
 	rows, err := tx.Query(ctx, `
 		SELECT
-			ch.resource_id::text, ch.state, ch.reason, ch.observation_id::text,
+			r.integration_id::text, ch.resource_id::text, ch.state, ch.reason, ch.observation_id::text,
 			ch.observed_at, ch.last_success_at, ch.stale_at, ch.unknown_at, ch.updated_at,
-			o.observed_state, o.summary, o.observed_at, o.received_at,
+			o.check_type, o.observed_state, o.summary, o.observed_at, o.received_at,
 			o.expected_refresh_seconds
 		FROM current_health ch
 		JOIN observations o ON o.id = ch.observation_id
+		JOIN resources r ON r.id = ch.resource_id
 		WHERE ch.state <> 'disabled' AND (
 			(ch.state NOT IN ('stale', 'unknown') AND ch.stale_at <= $1) OR
 			(ch.state = 'stale' AND ch.unknown_at <= $1)
@@ -117,8 +123,9 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 		return nil, fmt.Errorf("claim due freshness rows: %w", err)
 	}
 	type dueRow struct {
-		previous    health.Current
-		observation health.Observation
+		integrationID string
+		previous      health.Current
+		observation   health.Observation
 	}
 	claimed := make([]dueRow, 0, worker.options.BatchSize)
 	for rows.Next() {
@@ -127,9 +134,9 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 		var currentObserved, lastSuccess, staleAt, unknownAt pgtype.Timestamptz
 		var refreshSeconds int
 		if err := rows.Scan(
-			&row.previous.ResourceID, &currentState, &row.previous.Reason, &row.observation.ID,
+			&row.integrationID, &row.previous.ResourceID, &currentState, &row.previous.Reason, &row.observation.ID,
 			&currentObserved, &lastSuccess, &staleAt, &unknownAt, &row.previous.UpdatedAt,
-			&observedState, &row.observation.Summary, &row.observation.ObservedAt,
+			&row.observation.CheckType, &observedState, &row.observation.Summary, &row.observation.ObservedAt,
 			&row.observation.ReceivedAt, &refreshSeconds,
 		); err != nil {
 			rows.Close()
@@ -172,6 +179,15 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 			desired.ObservedAt, desired.LastSuccessAt, desired.StaleAt, desired.UnknownAt,
 			desired.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("update due freshness row: %w", err)
+		}
+		if err := worker.options.Signals.Append(ctx, tx, signals.Input{
+			SourceKey: signals.FreshnessSourceKey(desired.ResourceID, desired.State, desired.UpdatedAt),
+			Kind:      signals.KindFreshness, IntegrationID: row.integrationID,
+			ResourceID: desired.ResourceID, ObservationID: row.observation.ID,
+			CheckType: row.observation.CheckType, State: desired.State,
+			Reason: desired.Reason, OccurredAt: desired.UpdatedAt, AvailableAt: now,
+		}); err != nil {
+			return nil, err
 		}
 		before := row.previous
 		changes = append(changes, health.Change{Before: &before, After: desired})

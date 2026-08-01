@@ -35,6 +35,7 @@ func (state State) PositiveDetermination() bool {
 type Observation struct {
 	ID              string
 	ResourceID      string
+	CheckType       string
 	State           State
 	Summary         string
 	ObservedAt      time.Time

@@ -3,7 +3,7 @@
   "info": {
     "title": "Espial Core API",
     "version": "1.0.0",
-    "description": "Authenticated Phase 1 monitoring reads, integration configuration, and live invalidations."
+    "description": "Authenticated monitoring, automatic incident reads, integration configuration, and live invalidations."
   },
   "servers": [{ "url": "/api/v1" }],
   "paths": {
@@ -133,7 +133,7 @@
         "security": [{ "cookieAuth": [] }],
         "responses": {
           "200": {
-            "description": "Small authoritative monitoring overview without incident data.",
+            "description": "Small authoritative monitoring overview with bounded active incident data.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "../schemas/v1/overview.schema.json" }
@@ -461,6 +461,149 @@
         }
       }
     },
+    "/incidents": {
+      "get": {
+        "operationId": "listIncidents",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" },
+          {
+            "name": "severity",
+            "in": "query",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "enum": ["warning", "critical"] }
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": {
+                "enum": [
+                  "open",
+                  "acknowledged",
+                  "investigating",
+                  "recovered",
+                  "resolved"
+                ]
+              }
+            }
+          },
+          {
+            "name": "integration",
+            "in": "query",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string", "format": "uuid" }
+            }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string", "format": "uuid" }
+            }
+          },
+          {
+            "name": "owner",
+            "in": "query",
+            "explode": true,
+            "schema": {
+              "type": "array",
+              "maxItems": 32,
+              "items": { "type": "string", "format": "uuid" }
+            }
+          },
+          { "name": "active", "in": "query", "schema": { "type": "boolean" } },
+          {
+            "name": "from",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "schema": { "type": "string", "format": "date-time" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable snapshot page of authoritative incidents.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IncidentList" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/incidents/{id}": {
+      "get": {
+        "operationId": "getIncident",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Authoritative incident detail with a version ETag.",
+            "headers": { "ETag": { "schema": { "type": "string" } } },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/v1/incident-detail.schema.json"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
+    "/incidents/{id}/timeline": {
+      "get": {
+        "operationId": "listIncidentTimeline",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Limit" },
+          { "$ref": "#/components/parameters/Cursor" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stable snapshot page of immutable incident timeline events.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IncidentTimeline" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" }
+        }
+      }
+    },
     "/roles": {
       "get": {
         "operationId": "listManagedRoles",
@@ -713,6 +856,11 @@
       "LiveInvalidation": {
         "$ref": "../schemas/v1/live-invalidation.schema.json"
       },
+      "Incident": { "$ref": "../schemas/v1/incident-summary.schema.json" },
+      "IncidentDetail": { "$ref": "../schemas/v1/incident-detail.schema.json" },
+      "IncidentTimelineEvent": {
+        "$ref": "../schemas/v1/incident-timeline-event.schema.json"
+      },
       "ResourceList": {
         "type": "object",
         "additionalProperties": false,
@@ -752,6 +900,34 @@
           "next_cursor": { "type": "string", "maxLength": 2048 },
           "from": { "type": "string", "format": "date-time" },
           "to": { "type": "string", "format": "date-time" }
+        }
+      },
+      "IncidentList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/incident-summary.schema.json" }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
+        }
+      },
+      "IncidentTimeline": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "$ref": "../schemas/v1/incident-timeline-event.schema.json"
+            }
+          },
+          "next_cursor": { "type": "string", "maxLength": 2048 }
         }
       },
       "ManagedUser": {

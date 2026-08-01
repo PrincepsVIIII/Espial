@@ -26,13 +26,31 @@ type RecentStateChange struct {
 	ChangedAt     time.Time    `json:"changed_at"`
 }
 
+type ActiveIncidentCount struct {
+	Severity string `json:"severity"`
+	Count    int64  `json:"count"`
+}
+
+type ActiveIncidentSummary struct {
+	ID              string    `json:"id"`
+	Title           string    `json:"title"`
+	Severity        string    `json:"severity"`
+	Status          string    `json:"status"`
+	IntegrationName string    `json:"integration_name"`
+	ResourceName    string    `json:"resource_name"`
+	DetectedAt      time.Time `json:"detected_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
+}
+
 type Overview struct {
-	GeneratedAt       time.Time               `json:"generated_at"`
-	ResourceCounts    []StateCount            `json:"resource_counts"`
-	IntegrationCounts []IntegrationStateCount `json:"integration_counts"`
-	StaleCount        int64                   `json:"stale_count"`
-	UnknownCount      int64                   `json:"unknown_count"`
-	RecentChanges     []RecentStateChange     `json:"recent_state_changes"`
+	GeneratedAt          time.Time               `json:"generated_at"`
+	ResourceCounts       []StateCount            `json:"resource_counts"`
+	IntegrationCounts    []IntegrationStateCount `json:"integration_counts"`
+	StaleCount           int64                   `json:"stale_count"`
+	UnknownCount         int64                   `json:"unknown_count"`
+	RecentChanges        []RecentStateChange     `json:"recent_state_changes"`
+	ActiveIncidentCounts []ActiveIncidentCount   `json:"active_incident_counts"`
+	ActiveIncidents      []ActiveIncidentSummary `json:"active_incidents"`
 }
 
 type CurrentHealthView struct {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
+	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 )
 
@@ -50,6 +51,12 @@ type IntegrationManager interface {
 	Update(context.Context, monitoring.IntegrationConfigUpdate) (time.Time, error)
 }
 
+type IncidentReader interface {
+	Incidents(context.Context, incidents.Filter) (incidents.List, error)
+	Incident(context.Context, string) (incidents.Detail, error)
+	Timeline(context.Context, string, incidents.TimelineFilter) (incidents.Timeline, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -69,6 +76,7 @@ type Dependencies struct {
 	PublicURL     *url.URL
 	SecureCookies bool
 	Monitoring    MonitoringReader
+	Incidents     IncidentReader
 	Integrations  IntegrationManager
 	Users         UserAdministrator
 	Events        EventSource
@@ -108,6 +116,9 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/integrations/{id}", server.integration)
 	mux.HandleFunc("PUT /api/v1/integrations/{id}/configuration", server.updateIntegration)
 	mux.HandleFunc("GET /api/v1/audit", server.auditEvents)
+	mux.HandleFunc("GET /api/v1/incidents", server.incidentList)
+	mux.HandleFunc("GET /api/v1/incidents/{id}", server.incidentDetail)
+	mux.HandleFunc("GET /api/v1/incidents/{id}/timeline", server.incidentTimeline)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

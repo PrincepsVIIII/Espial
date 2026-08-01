@@ -35,7 +35,11 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 		return Overview{}, fmt.Errorf("begin overview read: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	result := Overview{ResourceCounts: []StateCount{}, IntegrationCounts: []IntegrationStateCount{}, RecentChanges: []RecentStateChange{}}
+	result := Overview{
+		ResourceCounts: []StateCount{}, IntegrationCounts: []IntegrationStateCount{},
+		RecentChanges: []RecentStateChange{}, ActiveIncidentCounts: []ActiveIncidentCount{},
+		ActiveIncidents: []ActiveIncidentSummary{},
+	}
 	if err := tx.QueryRow(ctx, "SELECT now()").Scan(&result.GeneratedAt); err != nil {
 		return Overview{}, fmt.Errorf("read overview time: %w", err)
 	}
@@ -112,6 +116,61 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 	if err := rows.Err(); err != nil {
 		rows.Close()
 		return Overview{}, fmt.Errorf("read recent state changes: %w", err)
+	}
+	rows.Close()
+
+	rows, err = tx.Query(ctx, `
+		SELECT severity, count(*)
+		FROM incidents
+		WHERE status NOT IN ('recovered', 'resolved')
+		GROUP BY severity ORDER BY severity
+	`)
+	if err != nil {
+		return Overview{}, fmt.Errorf("read active incident counts: %w", err)
+	}
+	for rows.Next() {
+		var item ActiveIncidentCount
+		if err := rows.Scan(&item.Severity, &item.Count); err != nil {
+			rows.Close()
+			return Overview{}, fmt.Errorf("scan active incident count: %w", err)
+		}
+		result.ActiveIncidentCounts = append(result.ActiveIncidentCounts, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return Overview{}, fmt.Errorf("read active incident counts: %w", err)
+	}
+	rows.Close()
+
+	rows, err = tx.Query(ctx, `
+		SELECT incident.id::text, incident.title, incident.severity, incident.status,
+			integration.display_name, resource.display_name,
+			incident.detected_at, incident.updated_at
+		FROM incidents incident
+		JOIN integrations integration ON integration.id = incident.integration_id
+		JOIN resources resource ON resource.id = incident.resource_id
+		WHERE incident.status NOT IN ('recovered', 'resolved')
+		ORDER BY incident.updated_at DESC, incident.id DESC LIMIT 5
+	`)
+	if err != nil {
+		return Overview{}, fmt.Errorf("read active incidents: %w", err)
+	}
+	for rows.Next() {
+		var item ActiveIncidentSummary
+		if err := rows.Scan(
+			&item.ID, &item.Title, &item.Severity, &item.Status,
+			&item.IntegrationName, &item.ResourceName, &item.DetectedAt, &item.UpdatedAt,
+		); err != nil {
+			rows.Close()
+			return Overview{}, fmt.Errorf("scan active incident: %w", err)
+		}
+		item.DetectedAt = item.DetectedAt.UTC()
+		item.UpdatedAt = item.UpdatedAt.UTC()
+		result.ActiveIncidents = append(result.ActiveIncidents, item)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		return Overview{}, fmt.Errorf("read active incidents: %w", err)
 	}
 	rows.Close()
 	if err := tx.Commit(ctx); err != nil {

@@ -92,6 +92,113 @@ export interface EspialEvent {
   };
 }
 
+export type IncidentAPIDetail = IncidentAPISummary & {
+  fingerprint: string;
+  [k: string]: unknown;
+};
+
+export interface IncidentAPISummary {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  integration_id: string;
+  integration_name: string;
+  resource_id: string;
+  resource_name: string;
+  check_type: string;
+  title: string;
+  summary: string;
+  severity: "warning" | "critical";
+  status: "open" | "acknowledged" | "investigating" | "recovered" | "resolved";
+  owner_user_id?: string;
+  owner_name?: string;
+  detected_at: string;
+  latest_signal_at: string;
+  acknowledged_at?: string;
+  recovered_at?: string;
+  resolved_at?: string;
+  version: number;
+  updated_at: string;
+  fingerprint?: string;
+}
+
+export interface IncidentRuleAPIView {
+  id: string;
+  name: string;
+  enabled: boolean;
+  priority: number;
+  integration_id?: string;
+  resource_id?: string;
+  resource_kind?: string;
+  check_type?: string;
+  reason_code?: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  conditions: {
+    state: "warning" | "critical" | "unknown" | "stale";
+    severity: "warning" | "critical";
+    min_occurrences: number;
+    for_seconds: number;
+  }[];
+  recovery_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  recovery_min_occurrences: number;
+  recovery_for_seconds: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncidentAPISummary {
+  id: string;
+  rule_id: string;
+  rule_name: string;
+  integration_id: string;
+  integration_name: string;
+  resource_id: string;
+  resource_name: string;
+  check_type: string;
+  title: string;
+  summary: string;
+  severity: "warning" | "critical";
+  status: "open" | "acknowledged" | "investigating" | "recovered" | "resolved";
+  owner_user_id?: string;
+  owner_name?: string;
+  detected_at: string;
+  latest_signal_at: string;
+  acknowledged_at?: string;
+  recovered_at?: string;
+  resolved_at?: string;
+  version: number;
+  updated_at: string;
+  fingerprint?: string;
+}
+
+export interface IncidentTimelineEvent {
+  id: string;
+  incident_id: string;
+  signal_id?: string;
+  actor_user_id?: string;
+  actor_name?: string;
+  kind:
+    | "detected"
+    | "severity_changed"
+    | "recurrence"
+    | "recovered"
+    | "acknowledged"
+    | "investigating"
+    | "assigned"
+    | "note"
+    | "resolved"
+    | "notification";
+  from_status?: "open" | "acknowledged" | "investigating" | "recovered" | "resolved";
+  to_status?: "open" | "acknowledged" | "investigating" | "recovered" | "resolved";
+  from_severity?: "warning" | "critical";
+  to_severity?: "warning" | "critical";
+  summary: string;
+  occurred_at: string;
+}
+
 export interface IntegrationAPIView {
   id: string;
   adapter_id: string;
@@ -167,6 +274,7 @@ export interface LiveInvalidationData {
   schema_version: 1;
   resource_id?: string;
   integration_id?: string;
+  incident_id?: string;
   state?: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
   result?: string;
   changed_at: string;
@@ -184,6 +292,19 @@ export interface ManagedUser {
   password_changed_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface DurableMonitoringSignal {
+  id: string;
+  kind: "observation" | "freshness";
+  integration_id: string;
+  resource_id: string;
+  observation_id?: string;
+  check_type: string;
+  state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  reason: string;
+  reason_code?: string;
+  occurred_at: string;
 }
 
 export interface NormalizedObservation {
@@ -220,6 +341,26 @@ export interface MonitoringOverview {
   }[];
   stale_count: number;
   unknown_count: number;
+  /**
+   * @maxItems 2
+   */
+  active_incident_counts?: {
+    severity: "warning" | "critical";
+    count: number;
+  }[];
+  /**
+   * @maxItems 5
+   */
+  active_incidents?: {
+    id: string;
+    title: string;
+    severity: "warning" | "critical";
+    status: "open" | "acknowledged" | "investigating";
+    integration_name: string;
+    resource_name: string;
+    detected_at: string;
+    updated_at: string;
+  }[];
   /**
    * @maxItems 10
    */

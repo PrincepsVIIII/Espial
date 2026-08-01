@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-summary.schema.json",
+  "title": "Incident API summary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "rule_id",
+    "rule_name",
+    "integration_id",
+    "integration_name",
+    "resource_id",
+    "resource_name",
+    "check_type",
+    "title",
+    "summary",
+    "severity",
+    "status",
+    "detected_at",
+    "latest_signal_at",
+    "version",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "rule_id": { "type": "string", "format": "uuid" },
+    "rule_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "integration_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "resource_name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "check_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "severity": { "enum": ["warning", "critical"] },
+    "status": {
+      "enum": ["open", "acknowledged", "investigating", "recovered", "resolved"]
+    },
+    "owner_user_id": { "type": "string", "format": "uuid" },
+    "owner_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "detected_at": { "type": "string", "format": "date-time" },
+    "latest_signal_at": { "type": "string", "format": "date-time" },
+    "acknowledged_at": { "type": "string", "format": "date-time" },
+    "recovered_at": { "type": "string", "format": "date-time" },
+    "resolved_at": { "type": "string", "format": "date-time" },
+    "version": { "type": "integer", "minimum": 1 },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "fingerprint": { "type": "string", "minLength": 1, "maxLength": 256 }
+  }
+}

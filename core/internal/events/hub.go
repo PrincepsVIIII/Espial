@@ -13,6 +13,7 @@ const (
 	StateChanged       = "resource_state_changed"
 	IntegrationChanged = "integration_changed"
 	CollectionChanged  = "collection_changed"
+	IncidentChanged    = "incident_changed"
 	ResyncRequired     = "resync_required"
 
 	DefaultReplayCapacity     = 1024
@@ -26,6 +27,7 @@ type Event struct {
 	SchemaVersion int
 	ResourceID    string
 	IntegrationID string
+	IncidentID    string
 	State         health.State
 	Result        string
 	ChangedAt     time.Time

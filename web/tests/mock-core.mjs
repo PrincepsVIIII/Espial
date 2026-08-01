@@ -10,6 +10,7 @@ let eventID = 0;
 
 const now = '2026-07-31T12:00:00Z';
 const integrationID = '60000000-0000-4000-8000-000000000001';
+const incidentID = '80000000-0000-4000-8000-000000000021';
 let users = initialUsers();
 let auditEvents = initialAuditEvents();
 const resources = [
@@ -81,6 +82,7 @@ const server = http.createServer((request, response) => {
           'overview:read',
           'resources:read',
           'integrations:read',
+          'incidents:read',
           'audit:read',
           'users:manage',
         ],
@@ -97,7 +99,8 @@ const server = http.createServer((request, response) => {
   if (
     url.pathname.startsWith('/api/v1/overview') ||
     url.pathname.startsWith('/api/v1/resources') ||
-    url.pathname.startsWith('/api/v1/integrations')
+    url.pathname.startsWith('/api/v1/integrations') ||
+    url.pathname.startsWith('/api/v1/incidents')
   ) {
     monitoringReads += 1;
     if (apiMode === 'forbidden')
@@ -127,6 +130,22 @@ const server = http.createServer((request, response) => {
       integration_counts: [{ state: 'healthy', count: 1 }],
       stale_count: 1,
       unknown_count: 1,
+      active_incident_counts: [
+        { severity: 'critical', count: 1 },
+        { severity: 'warning', count: 0 },
+      ],
+      active_incidents: [
+        {
+          id: incidentID,
+          title: 'Compute node 2: availability',
+          severity: 'critical',
+          status: 'open',
+          integration_name: 'Sample infrastructure',
+          resource_name: 'Compute node 2',
+          detected_at: '2026-07-31T11:55:00Z',
+          updated_at: now,
+        },
+      ],
       recent_state_changes: [],
     });
   }
@@ -171,6 +190,46 @@ const server = http.createServer((request, response) => {
           },
           created_at: '2026-07-31T10:00:00Z',
           updated_at: now,
+        },
+      ],
+    });
+  }
+  if (url.pathname === '/api/v1/incidents' && request.method === 'GET') {
+    const active = url.searchParams.get('active') !== 'false';
+    const items = active ? [incidentSummary()] : [recoveredIncidentSummary()];
+    const severity = url.searchParams.get('severity');
+    const status = url.searchParams.get('status');
+    return json(response, 200, {
+      items: items.filter(
+        (item) =>
+          (!severity || item.severity === severity) &&
+          (!status || item.status === status),
+      ),
+    });
+  }
+  if (url.pathname === `/api/v1/incidents/${incidentID}`) {
+    return json(
+      response,
+      200,
+      {
+        ...incidentSummary(),
+        fingerprint: 'default:compute-node-2:availability',
+      },
+      'browser-incident-detail',
+      '"v1"',
+    );
+  }
+  if (url.pathname === `/api/v1/incidents/${incidentID}/timeline`) {
+    return json(response, 200, {
+      items: [
+        {
+          id: '81000000-0000-4000-8000-000000000021',
+          incident_id: incidentID,
+          kind: 'detected',
+          to_status: 'open',
+          to_severity: 'critical',
+          summary: 'Incident detected: host unreachable',
+          occurred_at: '2026-07-31T11:55:00Z',
         },
       ],
     });
@@ -309,6 +368,40 @@ function resource(id, externalID, displayName, kind, state, reason) {
     first_seen_at: '2026-07-31T10:00:00Z',
     last_seen_at: now,
     health: { state, reason, observed_at: now, updated_at: now },
+  };
+}
+
+function incidentSummary() {
+  return {
+    id: incidentID,
+    rule_id: '20000000-0000-4000-8000-000000000001',
+    rule_name: 'Default resource health',
+    integration_id: integrationID,
+    integration_name: 'Sample infrastructure',
+    resource_id: '61000000-0000-4000-8000-000000000002',
+    resource_name: 'Compute node 2',
+    check_type: 'availability',
+    title: 'Compute node 2: availability',
+    summary: 'Host unreachable.',
+    severity: 'critical',
+    status: 'open',
+    detected_at: '2026-07-31T11:55:00Z',
+    latest_signal_at: now,
+    version: 1,
+    updated_at: now,
+  };
+}
+
+function recoveredIncidentSummary() {
+  return {
+    ...incidentSummary(),
+    id: '80000000-0000-4000-8000-000000000022',
+    title: 'Archive node 3: availability',
+    resource_id: '61000000-0000-4000-8000-000000000003',
+    resource_name: 'Archive node 3',
+    summary: 'Condition recovered: reachable.',
+    status: 'recovered',
+    recovered_at: now,
   };
 }
 

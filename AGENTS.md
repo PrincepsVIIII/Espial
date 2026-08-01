@@ -1,5 +1,19 @@
 # Repository instructions
 
+## Phase 2 implementation slices
+
+Before planning, implementing, or reviewing any Phase 2 slice, read
+`docs/plans/PHASE_2_IMPLEMENTATION.md` in full and treat it as the execution contract
+for scope, slice order, dependencies, invariants, verification, and completion.
+
+Implement slices in the documented order unless a later explicit user instruction
+changes the sequence. Do not expose a later-slice route, navigation child,
+capability claim, or enabled behavior from preparatory code. When a slice is
+accepted, update the plan's implementation-progress table with dated evidence and
+update any architecture, API, operations, security, and design records named by
+that slice. Code presence without the slice's required tests and evidence is not
+completion.
+
 ## UI changes
 
 Before planning, implementing, or reviewing any user-interface change, read

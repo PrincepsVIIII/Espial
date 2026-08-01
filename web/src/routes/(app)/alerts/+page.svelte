@@ -1,17 +1,29 @@
 <script lang="ts">
-  import UnavailableSection from '$lib/components/UnavailableSection.svelte';
+  import { navigating } from '$app/state';
+  import IncidentList from '$lib/components/IncidentList.svelte';
+  let { data } = $props();
 </script>
 
 <svelte:head><title>Alerts · Espial</title></svelte:head>
 
-<UnavailableSection
-  eyebrow="Operational attention"
-  title="Alerts"
-  phase="Phase 2"
-  description="The incident state machine and alert API are not implemented. Espial will not invent alert counts or activity while that source is unavailable."
-  planned={[
-    'Active and historical alerts',
-    'Acknowledgement, assignment, and resolution',
-    'Incident context, timelines, and delivery state',
-  ]}
-/>
+<header class="page-header">
+  <div>
+    <p class="eyebrow">Operational attention</p>
+    <h1>Alerts</h1>
+    <p class="page-description">
+      Authoritative incidents detected from resource health. This view is
+      read-only in Phase 2.1.
+    </p>
+  </div>
+</header>
+
+<nav class="section-navigation" aria-label="Alert views">
+  <a class="active" aria-current="page" href="/alerts">Active</a>
+  <a href="/alerts/history">History</a>
+</nav>
+
+{#if navigating.to?.url.pathname.startsWith('/alerts')}
+  <div class="refresh-notice" aria-live="polite">Refreshing incidents…</div>
+{/if}
+
+<IncidentList {...data} history={false} />

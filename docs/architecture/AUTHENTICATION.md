@@ -54,16 +54,21 @@ mutation returns a request correlation that the UI links to immutable audit hist
 
 Permissions are named actions so roles can evolve without route-specific checks.
 
-| Permission                                             | Viewer | Operator | Administrator | Action Approver |
-| ------------------------------------------------------ | :----: | :------: | :-----------: | :-------------: |
-| `overview:read`, `resources:read`, `integrations:read` |  Yes   |   Yes    |      Yes      |       Yes       |
-| `audit:read`                                           |   No   |    No    |      Yes      |       No        |
-| `incidents:operate`                                    |   No   |   Yes    |      Yes      |       No        |
-| `integrations:manage`, `users:manage`, `roles:manage`  |   No   |    No    |      Yes      |       No        |
-| `actions:approve`                                      |   No   |    No    |      No       |    Reserved     |
+| Permission                                                        | Viewer | Operator | Administrator | Action Approver |
+| ----------------------------------------------------------------- | :----: | :------: | :-----------: | :-------------: |
+| `overview:read`, `resources:read`, `integrations:read`            |  Yes   |   Yes    |      Yes      |       Yes       |
+| `incidents:read`, `webpages:read`                                 |  Yes   |   Yes    |      Yes      |       No        |
+| `audit:read`                                                      |   No   |    No    |      Yes      |       No        |
+| `incidents:operate`                                               |   No   |   Yes    |      Yes      |       No        |
+| `integrations:manage`, `users:manage`, `roles:manage`             |   No   |    No    |      Yes      |       No        |
+| `incident_rules:manage`, `suppressions:manage`                    |   No   |    No    |      Yes      |       No        |
+| `notification_destinations:manage`, `website_monitors:manage`    |   No   |    No    |      Yes      |       No        |
+| `actions:approve`                                                 |   No   |    No    |      No       |    Reserved     |
 
-Phase 1 implements the first row and administrator management boundaries. Incident
-and action permissions exist as reserved names until their roadmap phases.
+Phase 1 implements monitoring and administrator management boundaries. Phase 2.1
+implements `incidents:read`; incident operation and the remaining Phase 2 manage
+permissions are authorization seams for later slices and do not imply a route or
+capability before that slice is implemented. Action permissions remain reserved.
 
 ## Provider interface
 

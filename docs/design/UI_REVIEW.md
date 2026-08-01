@@ -278,8 +278,9 @@ honest Phase 2 navigation contract against the
 
 ### Phase 2 readiness
 
-- Alerts remains a real direct route with honest unavailable copy until its read
-  model exists.
+- At that review point, Alerts remained a real direct route with honest unavailable
+  copy until its read model existed; the later Slice 2.1 review records its
+  replacement.
 - The existing `incidents:operate` permission remains the authorization seam for
   incident actions.
 - New feature navigation now has a repository-level acceptance rule: a visible
@@ -298,3 +299,40 @@ honest Phase 2 navigation contract against the
   under the race detector, including atomic audit evidence and session revocation.
 - OpenAPI validation, generated-type freshness, documentation links, formatting,
   whitespace checks, and the production SvelteKit build passed.
+
+## 2026-07-31 — Slice 2.1 automatic incident read review
+
+### Scope
+
+Reviewed Dashboard active-incident additions and Alerts active/history/detail at
+1440×900, 1280×800, and 500×900 against the
+[general UI guidance](UI_GUIDANCE.md), [design system](DESIGN_SYSTEM.md), and Phase
+2 implementation contract.
+
+### Material decisions
+
+- Replaced the unavailable Alerts copy only after Core exposed permission-gated,
+  cursor-backed incident reads and immutable timeline evidence.
+- Kept Slice 2.1 read-only. Active/history tabs, direct detail URLs, severity/status
+  filters, explicit empty/denied/unavailable states, and factual timeline text are
+  present; acknowledge/assignment/resolution controls remain absent.
+- Added one real Alerts child destination, History. The existing desktop
+  hover/focus/click/touch/`Escape` dropdown and equivalent narrow menu behavior
+  apply without adding speculative children.
+- Added compact Dashboard counts and newest incidents from the additive overview
+  response only. No client-side rule evaluation or invented fallback count exists.
+- Used flat tables, definition rows, thin dividers, textual severity/status, and
+  restrained semantic color. No icons, badges, gradients, glow, or decorative
+  animation were introduced.
+- The narrow review exposed insufficient inherited text contrast on the transparent
+  Menu button; setting its foreground to the normal text token corrected the issue
+  across authenticated routes.
+
+### Verification evidence
+
+- Svelte diagnostics: zero errors and zero warnings; 46 frontend tests passed.
+- Chromium active-list-to-detail/timeline scenarios passed at all three viewports;
+  serious/critical axe findings were zero and full-page captures were recorded.
+- Keyboard navigation, direct routes, URL-backed filters, menu `Escape` focus,
+  reduced motion, SSE reconnect/resync refetch, permission denial, Core failure,
+  and the fixed floating shell remain covered by the complete browser suite.

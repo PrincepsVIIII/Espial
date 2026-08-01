@@ -29,7 +29,7 @@
     {
       label: 'Alerts',
       href: '/alerts',
-      children: [],
+      children: [{ label: 'History', href: '/alerts/history' }],
     },
     {
       label: 'Datacenter',

@@ -110,10 +110,25 @@ respectively. Both mutations require `integrations:manage`, trusted origin, CSRF
 bounded JSON, and an audit record. Configuration values and secret-reference values
 never appear in read models or audit summaries; only their key names do.
 
+## Phase 2 incident read surface
+
+```text
+GET /api/v1/incidents
+GET /api/v1/incidents/{id}
+GET /api/v1/incidents/{id}/timeline
+```
+
+These endpoints require `incidents:read`. Incident filters are repeated `severity`,
+`status`, `integration`, `resource`, and `owner` values plus one `active` boolean
+and bounded `from`/`to` timestamps. Collection and timeline cursors bind the stable
+snapshot and filter fingerprint so a cursor cannot be reused under different
+filters. Detail returns a version `ETag`. Slice 2.1 exposes no incident mutations;
+those require the later operate/idempotency/audit contract.
+
 ## Live events
 
 SSE messages have `id`, `event`, and a JSON `data` object with `schema_version`,
-`resource_id` or `integration_id`, and `changed_at`. They are invalidations, not a
+`resource_id`, `integration_id`, or `incident_id`, and `changed_at`. They are invalidations, not a
 second source of truth. Send a heartbeat comment every 15 seconds. Honor
 `Last-Event-ID` within a bounded replay window; otherwise emit `resync_required`.
 The heartbeat also revalidates the session and `overview:read` permission. A lost or
