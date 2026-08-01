@@ -177,12 +177,25 @@ func (checker *Checker) request(ctx context.Context, target *url.URL, config Con
 	stream := connection
 	if target.Scheme == "https" {
 		tlsStarted := checker.clock.Now()
-		// Verification is performed immediately below with the injected clock and
-		// approved roots so failure evidence can be retained. HTTP is never sent
-		// unless both chain and hostname verification succeed.
-		secure := tls.Client(connection, &tls.Config{MinVersion: tls.VersionTLS12, ServerName: target.Hostname(), InsecureSkipVerify: true}) // #nosec G402 -- manually verified before use
+		secure := tls.Client(connection, &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			ServerName: target.Hostname(),
+			RootCAs:    checker.rootCAs,
+			Time:       func() time.Time { return checker.clock.Now().UTC() },
+		})
 		if err := secure.HandshakeContext(ctx); err != nil {
 			evidence.tlsMS += elapsedMS(tlsStarted, checker.clock.Now())
+			state := secure.ConnectionState()
+			var verificationError *tls.CertificateVerificationError
+			if len(state.PeerCertificates) == 0 && errors.As(err, &verificationError) {
+				state.PeerCertificates = verificationError.UnverifiedCertificates
+			}
+			if len(state.PeerCertificates) > 0 {
+				certificate := checker.inspectCertificate(target, state, config)
+				result := failed("tls_"+certificate.ReasonCode, certificate.Summary)
+				result.Certificate = &certificate
+				return nil, nil, "", result
+			}
 			result := failed("tls_no_certificate", "Website TLS negotiation did not provide a verifiable certificate.")
 			result.Certificate = noCertificateEvidence(target)
 			return nil, nil, "", result
@@ -216,7 +229,7 @@ func (checker *Checker) request(ctx context.Context, target *url.URL, config Con
 		return nil, nil, "", failed("request_write_failed", "Website request could not be sent.")
 	}
 	limited := &countingLimitReader{reader: stream, remaining: checker.policy.headerLimit + 1}
-	buffered := bufio.NewReaderSize(limited, int(min64(checker.policy.headerLimit, 64*1024)))
+	buffered := bufio.NewReaderSize(limited, 64*1024)
 	response, err := http.ReadResponse(buffered, request)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) || isTimeout(err) {
@@ -388,12 +401,6 @@ func appendUnique(values []string, value string) []string {
 	return append(values, value)
 }
 func isTimeout(err error) bool { var value net.Error; return errors.As(err, &value) && value.Timeout() }
-func min64(left, right int64) int64 {
-	if left < right {
-		return left
-	}
-	return right
-}
 
 func sameOrigin(left, right *url.URL) bool {
 	leftPort, leftErr := targetPort(left.Scheme, left.Port())

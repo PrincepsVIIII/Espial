@@ -33,6 +33,8 @@ An Operator other than the runbook author records:
 - an isolated restore containing real Phase 2 state; and
 - every production blocker, accountable person, decision, and due date.
 
-Repository automation cannot mark this external sign-off complete. Until the record
-exists, Slice 2.7 implementation is present but Phase 2 production acceptance
-remains pending.
+Repository automation cannot mark this external sign-off complete. The project
+explicitly deferred it on 2026-08-01 so Phase 2 could close for development
+sequencing and Phase 3 pre-planning could begin. The deferral is not evidence of a
+dry run and does not waive this production-release gate; complete this record before
+promoting Espial to production.

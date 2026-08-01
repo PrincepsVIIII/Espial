@@ -1,9 +1,9 @@
 # Slice 2.7 implementation record: Phase integration and acceptance
 
 **Implemented:** 2026-08-01  
-**Acceptance status:** repository-owned automated and security gates passed locally;
-the independent operational dry run and named production-owner sign-off remain
-external release gates.
+**Acceptance status:** accepted for development sequencing on 2026-08-01 after the
+remaining independent operational dry run and named production-owner sign-off were
+explicitly deferred; both remain external production-release gates.
 
 ## Runtime hardening
 
@@ -46,10 +46,11 @@ acceptance, load, deployment, and restore guidance. The Phase 2 threat review ow
 every critical/high residual by role and explicitly carries Phase 1 production
 blockers forward.
 
-## External acceptance still required
+## External production acceptance deferred
 
 The repository cannot provide an independent operator dry run, actual UBNetDef
 backup/secret/egress values, named accountable people, or risk acceptance for
-upstream infrastructure-image findings. The Phase 2 exit checklist leaves the final
-external release item open and must not be represented as production approval until
-its linked record exists.
+upstream infrastructure-image findings. An explicit project decision on 2026-08-01
+deferred this evidence and accepted Slice 2.7 for development sequencing. This is
+not evidence that the exercise occurred and must not be represented as production
+approval until the linked external record exists.

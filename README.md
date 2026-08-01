@@ -74,26 +74,28 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 - [Project roadmap](docs/ROADMAP.md)
 - [Phase 0 design baseline](docs/phase-0/README.md)
 - [Phase 1 implementation plan](docs/plans/PHASE_1_IMPLEMENTATION.md)
+- [Phase 2 implementation plan](docs/plans/PHASE_2_IMPLEMENTATION.md)
+- [Phase 3 pre-planning](docs/plans/PHASE_3_PREPLANNING.md)
 - [Backend plan](docs/BACKEND_PLAN.md)
 - [Frontend and UI plan](docs/FRONTEND_UI_PLAN.md)
 
 ## Project status
 
-Phase 0 and the Phase 1 monitoring foundation are complete. The repository includes
-the supervised sample-adapter vertical slice, normalized health and freshness,
-audited local authentication/RBAC, REST/SSE, the operational SvelteKit Dashboard,
-repeatable clean-stack/restore acceptance, security gates, and hardened deployment
-examples. Environment-specific values that require UBNetDef operator input are recorded in the
+Phases 0, 1, and 2 are complete for development sequencing, and Phase 3 is in
+pre-planning. The repository includes the supervised adapter foundation, normalized
+health and freshness, audited authentication/RBAC, incidents and notifications,
+website/TLS monitoring, REST/SSE, the operational SvelteKit application, repeatable
+clean-stack/restore acceptance, security gates, and hardened deployment examples.
+Environment-specific values that require UBNetDef operator input are recorded in the
 [environment inventory](docs/operations/ENVIRONMENT_INVENTORY.md), rather than
 being guessed. SSO is an explicit external dependency; Phase 1 uses audited local
 authentication and retains a provider boundary for SSO when its
 protocol is ready.
 
-Implementation evidence is recorded in the
-[Phase 1 plan](docs/plans/PHASE_1_IMPLEMENTATION.md) and
-[Slice 1.8 acceptance record](docs/plans/SLICE_1_8_PHASE_ACCEPTANCE.md). Espial is
-not yet production-release-approved: named site inputs and current upstream image
-findings explicitly block production without blocking Phase 2 development.
+Implementation evidence is recorded in the Phase 1 and Phase 2 plans. Espial is not
+yet production-release-approved: the deferred independent Phase 2 operational
+acceptance, named site inputs, and current upstream image findings explicitly block
+production without blocking Phase 3 planning.
 
 ## Development quick start
 

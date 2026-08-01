@@ -13,6 +13,7 @@ intentions into implementable contracts.
 | [Phase 0 record](phase-0/README.md) | Completed design deliverables, decisions, and known external inputs |
 | [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
 | [Phase 2 plan](plans/PHASE_2_IMPLEMENTATION.md) | Incident, notification, website, and certificate delivery slices and acceptance gates |
+| [Phase 3 pre-planning](plans/PHASE_3_PREPLANNING.md) | Discovery gates, provisional ordering, and boundaries for infrastructure integrations |
 | [Slice 2.1 record](plans/SLICE_2_1_AUTOMATIC_INCIDENTS.md) | Durable signals, automatic lifecycle, incident read APIs, Dashboard/Alerts UI, and verification evidence |
 | [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
 | [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |

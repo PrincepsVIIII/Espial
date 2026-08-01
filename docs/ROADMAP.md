@@ -94,10 +94,11 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-**Status:** Implementation complete through Slice 2.7 (2026-08-01). Automated
-acceptance, race, load, restore, and UI gates are defined; production acceptance
-remains pending the independent runbook dry run, named site owners/values, and
-carried-forward image/security decisions recorded in the Slice 2.7 evidence.
+**Status:** Complete for development sequencing through Slice 2.7 (2026-08-01).
+Automated acceptance, race, load, restore, and UI gates passed. The independent
+runbook dry run and named site-owner sign-off were explicitly deferred so Phase 3
+pre-planning can proceed; they and the carried-forward production inputs/security
+decisions remain production-release gates.
 
 **Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
 
@@ -166,6 +167,9 @@ Implemented Phase 2 groundwork, incident workflow, and suppression controls:
 - operators can acknowledge and investigate incidents
 
 ## Phase 3: Core infrastructure integrations
+
+**Status:** Pre-planning started (2026-08-01); no implementation slice is active.
+See the [Phase 3 pre-planning record](plans/PHASE_3_PREPLANNING.md).
 
 Prioritize integrations based on environment value and API quality.
 

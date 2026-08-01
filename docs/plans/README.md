@@ -2,6 +2,7 @@
 
 - [Phase 1: Monitoring foundation](PHASE_1_IMPLEMENTATION.md)
 - [Phase 2: Incidents, notifications, and certificates](PHASE_2_IMPLEMENTATION.md)
+- [Phase 3 pre-planning: Core infrastructure integrations](PHASE_3_PREPLANNING.md)
 - [Slice 2.1: Automatic incident creation and reads](SLICE_2_1_AUTOMATIC_INCIDENTS.md)
 - [Slice 2.2: Operator incident workflow](SLICE_2_2_OPERATOR_INCIDENT_WORKFLOW.md)
 - [Slice 2.3: Rules, maintenance windows, and silences](SLICE_2_3_RULES_AND_SUPPRESSIONS.md)

@@ -13,9 +13,10 @@
   expiry/latest/attention indexes, fingerprint and issuer change evidence, the
   specific certificate rule, and persisted incident reason-code state.
 - Extended the trusted `webcheck` collection to emit a distinct certificate
-  resource and `certificate.validity` observation after HTTPS handshakes. Manual
-  verification uses the configured hostname, approved roots, and injected time;
-  HTTP is never sent when that verification fails.
+  resource and `certificate.validity` observation after HTTPS handshakes. Go's TLS
+  verifier uses the configured hostname, approved roots, and injected time; bounded
+  peer identity evidence is recovered from certificate-verification errors, and
+  HTTP is never sent when verification fails.
 - Distinguished no reported certificate, untrusted chain, hostname mismatch,
   expired, not-yet-valid, approaching expiry, critical expiry, and the 7-day
   escalation threshold without retaining private keys, full chains, raw handshake
