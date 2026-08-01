@@ -22,6 +22,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
+	"github.com/PrincepsVIIII/Espial/core/internal/operations"
 	"github.com/PrincepsVIIII/Espial/core/internal/suppressions"
 	"github.com/PrincepsVIIII/Espial/core/internal/webpages"
 )
@@ -124,6 +125,10 @@ type EventSource interface {
 	Subscribe(*uint64, int) *events.Subscription
 }
 
+type OperationalMetrics interface {
+	Snapshot(context.Context) (operations.Snapshot, error)
+}
+
 type Dependencies struct {
 	Logger           *slog.Logger
 	Ready            Readiness
@@ -138,6 +143,7 @@ type Dependencies struct {
 	Notifications    NotificationManager
 	Websites         WebsiteManager
 	Certificates     CertificateReader
+	Metrics          OperationalMetrics
 	Integrations     IntegrationManager
 	Users            UserAdministrator
 	Events           EventSource
@@ -164,6 +170,7 @@ func New(dependencies Dependencies) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health/live", healthLive)
 	mux.HandleFunc("GET /api/v1/health/ready", healthReady(dependencies.Ready))
+	mux.HandleFunc("GET /metrics", operationalMetrics(dependencies.Metrics))
 	mux.HandleFunc("GET /api/v1/auth/capabilities", server.capabilities)
 	mux.HandleFunc("POST /api/v1/auth/local/login", server.login)
 	mux.HandleFunc("GET /api/v1/auth/session", server.currentSession)
@@ -244,6 +251,25 @@ func healthReady(ready Readiness) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+func operationalMetrics(metrics OperationalMetrics) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if metrics == nil {
+			http.Error(w, "metrics unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		snapshot, err := metrics.Snapshot(ctx)
+		if err != nil {
+			http.Error(w, "metrics unavailable", http.StatusServiceUnavailable)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = io.WriteString(w, operations.RenderPrometheus(snapshot))
 	}
 }
 

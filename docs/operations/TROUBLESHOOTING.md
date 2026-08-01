@@ -40,3 +40,19 @@ Confirm secret file permissions, DSN role, PostgreSQL health, connection limits,
 and that the one-shot migration completed. Runtime Core intentionally cannot change
 existing audit records and must not run owner migrations. Stop a rollout on schema
 drift or an audit-write failure; protected administrative mutations fail closed.
+
+Readiness also requires required workers to have initialized. If PostgreSQL is
+healthy but readiness never succeeds, inspect the first Core runtime error rather
+than restarting in a loop. A Mattermost or monitored website outage does not make
+Core unready.
+
+## Phase 2 backlog
+
+Read private Core `/metrics` and compare signal queue depth/oldest age,
+notification states/oldest due age, active incidents/controls, and webpage/
+certificate state counts. Labels are intentionally fixed and never identify a
+resource. Follow [notification recovery](NOTIFICATION_RECOVERY.md) for retry or
+dead-letter state and [incident operations](INCIDENT_AND_RULE_OPERATIONS.md) for
+rule/suppression behavior. Do not change queue rows with SQL or raise concurrency
+before ruling out database saturation, poison work, egress policy, and provider
+failure.

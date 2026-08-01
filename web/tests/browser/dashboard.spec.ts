@@ -324,6 +324,51 @@ test('primary navigation links directly and its real child menu closes with Esca
   await expect(trigger).toBeFocused();
 });
 
+test('touch can open a real desktop submenu and navigate its child', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({
+    hasTouch: true,
+    viewport: { width: 1280, height: 800 },
+  });
+  const page = await context.newPage();
+  await page.goto('/dashboard');
+  await waitForHydration(page);
+  await page.getByRole('button', { name: 'Webpages sections' }).tap();
+  await expect(
+    page.getByRole('link', { name: 'Certificates', exact: true }),
+  ).toBeVisible();
+  await page.getByRole('link', { name: 'Certificates', exact: true }).tap();
+  await expect(page).toHaveURL(/\/webpages\/certificates$/);
+  await context.close();
+});
+
+test('Phase 2 routes reflow at a 200 percent zoom-equivalent width', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 640, height: 800 });
+  for (const pathname of [
+    '/dashboard',
+    '/alerts',
+    '/alerts/notifications',
+    '/webpages',
+    '/webpages/certificates',
+  ]) {
+    await page.goto(pathname);
+    await waitForHydration(page);
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(
+      overflow,
+      `${pathname} introduced page-level horizontal overflow`,
+    ).toBeLessThanOrEqual(1);
+    await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
+  }
+});
+
 test('administrator alert controls are discoverable and viewer navigation hides them', async ({
   page,
   request,

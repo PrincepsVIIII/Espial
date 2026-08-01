@@ -14,7 +14,18 @@ import (
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
+	"github.com/PrincepsVIIII/Espial/core/internal/operations"
+	"github.com/PrincepsVIIII/Espial/core/internal/signals"
 )
+
+type fakeMetrics struct {
+	snapshot operations.Snapshot
+	err      error
+}
+
+func (fake fakeMetrics) Snapshot(context.Context) (operations.Snapshot, error) {
+	return fake.snapshot, fake.err
+}
 
 type fakeAuth struct {
 	session   auth.Session
@@ -67,6 +78,27 @@ func TestReadinessFailure(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/health/ready", nil))
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d", response.Code)
+	}
+}
+
+func TestOperationalMetricsRemainPrivateAndBounded(t *testing.T) {
+	publicURL, _ := url.Parse("https://espial.test")
+	handler := New(Dependencies{Logger: discardLogger(), Ready: func(context.Context) error { return nil }, Auth: &fakeAuth{}, PublicURL: publicURL,
+		Metrics: fakeMetrics{snapshot: operations.Snapshot{Signals: signals.Metrics{QueueDepth: 7},
+			IncidentsBySeverity: map[string]int64{"critical": 2}, IncidentsByStatus: map[string]int64{},
+			WebpagesByState: map[string]int64{}, CertificatesByState: map[string]int64{}}}})
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/metrics", nil))
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), "espial_monitoring_signals_queued 7") {
+		t.Fatalf("metrics = %d %s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "resource_id") || strings.Contains(response.Body.String(), "hostname") {
+		t.Fatalf("metrics exposed prohibited labels: %s", response.Body.String())
+	}
+	apiResponse := httptest.NewRecorder()
+	handler.ServeHTTP(apiResponse, httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil))
+	if apiResponse.Code != http.StatusNotFound {
+		t.Fatalf("public API metrics status = %d", apiResponse.Code)
 	}
 }
 

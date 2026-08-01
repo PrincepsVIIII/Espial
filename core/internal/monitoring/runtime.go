@@ -23,6 +23,7 @@ type RuntimeOptions struct {
 	FreshnessInterval   time.Duration
 	FreshnessBatchSize  int
 	EventReplaySize     int
+	IncidentConcurrency int
 	IncidentBatchSize   int
 	IncidentPoll        time.Duration
 	IncidentClaimLease  time.Duration
@@ -71,7 +72,7 @@ func NewRuntime(
 		PollInterval: options.FreshnessInterval,
 	})
 	incidentEvaluator := incidents.NewEvaluator(pool, hub, incidents.Options{
-		Clock: options.Clock, BatchSize: options.IncidentBatchSize,
+		Clock: options.Clock, Concurrency: options.IncidentConcurrency, BatchSize: options.IncidentBatchSize,
 		PollInterval: options.IncidentPoll, ClaimLease: options.IncidentClaimLease,
 		MaxAttempts: options.IncidentMaxAttempts, Intents: options.IncidentIntents,
 		OnError: func(err error) {

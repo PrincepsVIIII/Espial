@@ -253,10 +253,11 @@ migrate / contract sequence.
 
 ## Retention baseline
 
-Keep current state indefinitely while the resource exists. Retain detailed
-observations for 90 days initially and audit events for at least six months; make
-both durations configurable but enforce a safe minimum for audit data. A later
-retention worker will downsample older operational measurements rather than copy a
-metrics platform. Retain incident timelines, destination metadata, intents, and
-attempts for at least the matching audit-retention period so request, incident, and
-provider evidence remain correlatable.
+Keep current state indefinitely while the resource exists. Phase 2 does not enable
+automatic deletion: detailed observations and audit/incident/delivery/certificate
+evidence are retained indefinitely until a later bounded retention worker ships.
+That worker will target 90 days of detailed observations and at least six months of
+audit-correlated evidence, enforce safe minimums, downsample older operational
+measurements rather than copy a metrics platform, and pass backup/restore and
+correlation tests before activation. Incident timelines, destination metadata,
+intents, and attempts must never expire earlier than matching audit evidence.

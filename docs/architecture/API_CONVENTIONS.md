@@ -217,3 +217,13 @@ Additive fields and endpoints are backward-compatible within v1. Removing fields
 changing semantics/types, or making optional data required needs a new API version
 or an announced deprecation window. Schemas and representative fixtures are tested
 in CI before backend and generated frontend types are accepted.
+
+## Private operational metrics
+
+Core exposes Prometheus text at `GET /metrics` on its private listener. It is not a
+versioned browser API and the production reverse proxy intentionally routes only
+`/api/*` to Core. Fixed labels cover signal queue/age/claims/retries/dead letters,
+incident severity/status, active controls, notification states/age/attempts, and
+webpage state and fixed stage-latency plus certificate state/expiry buckets.
+Resource IDs, URLs, hostnames, usernames, notes,
+incident text, certificate subjects, and provider responses are prohibited labels.

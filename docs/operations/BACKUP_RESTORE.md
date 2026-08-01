@@ -1,7 +1,7 @@
 # PostgreSQL backup and restore runbook
 
 Backups are useful only after an isolated restore proves authentication, current
-health, audit history, and schema state. The production backup destination,
+health, Phase 2 incident/delivery/certificate evidence, audit history, and schema state. The production backup destination,
 encryption mechanism, schedule, retention, and operator remain deployment blockers
 until named in the [environment inventory](ENVIRONMENT_INVENTORY.md).
 
@@ -27,9 +27,18 @@ pg_dump --format=custom --no-owner --no-acl --dbname="$ESPIAL_BACKUP_DSN" --file
 4. Start matching Core/Web images against the isolated database.
 5. Verify administrator login, Viewer `403`, integration configuration and state,
    current resources, and required audit events. Do not contact production targets.
-6. Record duration and outcome, then securely dispose of the temporary copy.
+6. Compare pre-backup and restored counts for `monitoring_signals`, `incident_rules`,
+   `incidents`, `incident_timeline`, `maintenance_windows`, `silences`,
+   `notification_destinations`, `notification_intents`, `notification_attempts`,
+   and `certificate_observations`. Counts alone are insufficient: select one
+   incident and prove its rule/resource/timeline, suppression, destination metadata,
+   delivery history, certificate/webpage source, and audit correlation still join.
+7. Confirm destination and monitor reads remain redacted and no restored row contains
+   a webhook token, protected-header value, private key, or response body. Keep
+   egress disabled so the restored workers cannot contact production targets.
+8. Record duration and outcome, then securely dispose of the temporary copy.
 
-`npm run acceptance:phase1` automates this shape with disposable databases and
-non-production sample data. It is not a substitute for a scheduled restore of the
+`npm run acceptance:phase2` automates this shape with disposable databases and
+non-production fixtures. It is not a substitute for a scheduled restore of the
 real encrypted production artifact. Run a restore drill before first production
 use, after database-image changes, and at the documented operational cadence.

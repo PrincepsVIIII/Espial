@@ -21,6 +21,7 @@ type Clock interface{ Now() time.Time }
 
 type Options struct {
 	Clock        Clock
+	Concurrency  int
 	BatchSize    int
 	PollInterval time.Duration
 	ClaimLease   time.Duration
@@ -40,6 +41,9 @@ type Evaluator struct {
 func NewEvaluator(pool *pgxpool.Pool, hub *events.Hub, options Options) *Evaluator {
 	if options.Clock == nil {
 		options.Clock = health.SystemClock{}
+	}
+	if options.Concurrency <= 0 {
+		options.Concurrency = 2
 	}
 	if options.BatchSize <= 0 {
 		options.BatchSize = 50
@@ -61,6 +65,27 @@ func (evaluator *Evaluator) Run(ctx context.Context) error {
 		return errors.New("incident evaluator is already running")
 	}
 	defer evaluator.running.Store(false)
+	runContext, cancel := context.WithCancel(ctx)
+	defer cancel()
+	errorsChannel := make(chan error, evaluator.options.Concurrency)
+	for range evaluator.options.Concurrency {
+		go func() { errorsChannel <- evaluator.runOne(runContext) }()
+	}
+	first := <-errorsChannel
+	cancel()
+	for index := 1; index < evaluator.options.Concurrency; index++ {
+		candidate := <-errorsChannel
+		if first == nil || errors.Is(first, context.Canceled) {
+			first = candidate
+		}
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	return first
+}
+
+func (evaluator *Evaluator) runOne(ctx context.Context) error {
 	for {
 		processed, err := evaluator.ProcessOnce(ctx)
 		if err != nil {

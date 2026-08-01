@@ -45,6 +45,8 @@ environment variable. Never use an example credential.
 - TLS termination and unbuffered long-lived SSE at the proxy;
 - separate migration-owner and runtime-application database credentials;
 - no published Core, Web, or PostgreSQL port.
+- private-only `/metrics` with fixed low-cardinality Phase 2 queue/state labels;
+- bounded incident and notification worker settings backed by the Phase 2 load gate.
 
 Use the [operations runbooks](../../docs/operations/README.md) for backup, restore,
 upgrade, diagnosis, account recovery, and shutdown.

@@ -521,3 +521,44 @@ findings. Svelte diagnostics report zero errors and warnings, all 48 unit tests
 pass, and generated contracts remain current. PostgreSQL/race evidence proves that
 the rendered threshold, replacement, and incident claims come from authoritative
 Core state.
+
+## 2026-08-01 — Slice 2.7 final Phase 2 cross-route review
+
+### Scope and capability trace
+
+Re-checked Dashboard, Alerts active/history/detail, rule administration,
+maintenance/silence, notification administration and incident delivery evidence,
+Webpages list/detail, certificate list/detail, monitor administration, Audit
+receipts, and the shared navigation against the general guidance, design system,
+wireframes, and Phase 2 execution contract.
+
+- Every visible Phase 2 destination maps to an authoritative Core read. Operator and
+  administrator mutations expose validation/error/success state, a request receipt,
+  and the exact Audit link when the session can read Audit.
+- Viewer navigation omits management children while direct Core calls return `403`;
+  incident and webpage/certificate reads remain independently available.
+- Loading, honest empty/not-configured, denial, stale/unknown, disconnected/resync,
+  Core-unavailable, conflict, and unexpected-error treatment remains in the shared
+  shell. Dashboard never invents incident or certificate counts after read failure.
+- The final review introduced no new visual component. Flat divided sections,
+  compact tables/definitions, text-first status, restrained cyan, the unmodified
+  UBNetDef logo, near-black canvas, and floating top bar remain consistent. No
+  gradients, glows, filled hover tiles, decorative badges/icons, or ornamental
+  motion entered Phase 2.
+
+### Input, viewport, and accessibility evidence
+
+The browser suite covers 1440×900, 1280×800, and 500×900 route captures; desktop
+hover/focus/click, keyboard `Escape` focus return, an explicit touch-context child
+navigation test, and 640 CSS-pixel reflow as a 1280-pixel viewport at 200% zoom.
+Reduced-motion, SSE disconnect/reconnect/full resync, fixed navigation, URL-backed
+filters, direct detail URLs, and Core-unavailable behavior remain covered. Page-level
+horizontal overflow is rejected at the zoom-equivalent width, and serious/critical
+axe findings remain zero on the operational viewport scenarios.
+
+Final verification passed with zero Svelte errors or warnings, 48 frontend unit
+tests, all 37 Chromium scenarios, and the production SvelteKit build.
+
+The independent human touch/zoom/runbook dry run remains a production acceptance
+record rather than something repository automation can self-certify; see the Phase
+2 acceptance runbook.

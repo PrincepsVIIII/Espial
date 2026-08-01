@@ -28,8 +28,8 @@ These values are implementation inputs, not reasons to hard-code sample assumpti
 | iDRAC | Health/inventory inbound | Redfish preferred; SNMP/events if useful | 3 | Inventory versions/licenses and Redfish/event availability |
 | Grafana or metric source | Health inbound/deep links | HTTP APIs, Alertmanager/webhook, source API | 3 | Identify authoritative data source; avoid duplicating all metrics |
 | pfSense | Health/inventory inbound | API package, SNMP, syslog TBD | 3 | Confirm edition/version and approved integration method |
-| Website/TLS endpoints | Scheduled checks | DNS/TCP/TLS/HTTP from Core or built-in adapter | 2 | Need endpoint list, expected status/content, ownership, discovery method |
-| Mattermost | Notifications outbound | Incoming webhook or bot API | 2 | Confirm destination model, retry expectations, secret ownership |
+| Website/TLS endpoints | Scheduled checks | Supervised `webcheck` DNS/TCP/TLS/HTTP adapter | 2 | Implementation accepted; Operations must still name the real endpoint list, expectations, exact egress, and service owners |
+| Mattermost | Notifications outbound | Incoming webhook with mounted token reference | 2 | Implementation accepted; Operations/Security must still name the destination, DNS/CIDR policy, token owner, and rotation approver |
 
 ## SSO discovery checklist
 

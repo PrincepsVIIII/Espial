@@ -1,6 +1,6 @@
 # Phase 2 implementation plan: incidents, notifications, and certificates
 
-**Status:** In progress (2026-08-01)
+**Status:** Implementation complete; external production acceptance pending (2026-08-01)
 **Inputs:** [Roadmap](../ROADMAP.md),
 [Phase 1 implementation record](PHASE_1_IMPLEMENTATION.md),
 [backend plan](../BACKEND_PLAN.md), [frontend/UI plan](../FRONTEND_UI_PLAN.md),
@@ -23,7 +23,7 @@ does not make a slice complete.
 | 2.4 Notification routing and Mattermost delivery | Implemented | [Slice 2.4 record](SLICE_2_4_NOTIFICATION_ROUTING.md) and [ADR 0008](../adr/0008-durable-notification-outbox.md) |
 | 2.5 Website availability monitoring | Implemented (2026-08-01) | [Slice 2.5 record](SLICE_2_5_WEBSITE_AVAILABILITY.md) and [ADR 0009](../adr/0009-website-monitor-integration-projection.md) |
 | 2.6 Certificate monitoring and Webpages experience | Implemented (2026-08-01) | [Slice 2.6 record](SLICE_2_6_CERTIFICATE_MONITORING.md) and [ADR 0010](../adr/0010-certificate-resource-projection.md) |
-| 2.7 Phase integration, hardening, and acceptance | Planned | — |
+| 2.7 Phase integration, hardening, and acceptance | Implemented; external sign-off pending (2026-08-01) | [Slice 2.7 record](SLICE_2_7_PHASE_ACCEPTANCE.md), [threat review](../security/THREAT_REVIEW_PHASE_2.md), and [acceptance runbook](../operations/PHASE_2_ACCEPTANCE.md) |
 
 ## 1. Outcome
 
@@ -827,32 +827,41 @@ Before Phase 2 is complete:
 
 Phase 2 is complete only when all are checked and linked to evidence:
 
-- [ ] Monitoring signals, incident evaluation, and notification intents survive
+- [x] Monitoring signals, incident evaluation, and notification intents survive
   crashes/restarts without relying on SSE or creating duplicate database work.
-- [ ] Meaningful critical/warning/unknown and website/certificate failures create
+- [x] Meaningful critical/warning/unknown and website/certificate failures create
   predictable, deduplicated incidents with tested debounce and recovery.
-- [ ] Viewer read and Operator workflow permissions are proven directly against
+- [x] Viewer read and Operator workflow permissions are proven directly against
   Core; concurrent mutations cannot silently overwrite each other.
-- [ ] Alerts provides active/history filters, direct detail URLs, factual timeline,
+- [x] Alerts provides active/history filters, direct detail URLs, factual timeline,
   delivery evidence, and complete loading/empty/error/disconnected states.
-- [ ] Maintenance prevents expected incident noise without rewriting raw health;
+- [x] Maintenance prevents expected incident noise without rewriting raw health;
   silences suppress delivery without hiding incidents.
-- [ ] Mattermost initial, meaningful update, and recovery delivery is traceable,
+- [x] Mattermost initial, meaningful update, and recovery delivery is traceable,
   retryable, bounded, secret-safe, and operable through documented recovery steps.
-- [ ] Website checks isolate DNS/TCP/TLS/HTTP failures, respect explicit egress
+- [x] Website checks isolate DNS/TCP/TLS/HTTP failures, respect explicit egress
   policy, and become stale/unknown when the adapter fails.
-- [ ] Webpages shows authoritative availability and certificate identity/expiry,
+- [x] Webpages shows authoritative availability and certificate identity/expiry,
   active incident links, freshness, and honest unknown/not-configured states.
-- [ ] Dashboard incident/certificate summaries come from authoritative Core read
+- [x] Dashboard incident/certificate summaries come from authoritative Core read
   models and remain correct through SSE replay/resync.
-- [ ] Every administrative mutation returns a visible correlation receipt linked to
+- [x] Every administrative mutation returns a visible correlation receipt linked to
   matching redacted audit evidence for authorized users.
-- [ ] Phase 2 screens pass keyboard, touch, accessibility, contrast, reduced-motion,
+- [x] Phase 2 screens pass keyboard, touch, accessibility, contrast, reduced-motion,
   1440px, 1280px, narrow viewport, and cross-route UBNetDef visual review.
-- [ ] Migrations, race/concurrency tests, dependency/image scans, threat review,
+- [x] Migrations, race/concurrency tests, dependency/image scans, threat review,
   load/backlog evidence, clean-stack acceptance, and backup/restore pass.
 - [ ] Operator runbooks have been dry-run by someone other than their author and all
   production blockers have named owners.
+
+Evidence for the checked product criteria is linked from the implementation-progress
+table and consolidated in the [Slice 2.7 record](SLICE_2_7_PHASE_ACCEPTANCE.md),
+[final UI review](../design/UI_REVIEW.md), and
+[Phase 2 threat review](../security/THREAT_REVIEW_PHASE_2.md). The automated race,
+load, clean-stack, shutdown, restore, production dependency, repository, and
+release-shaped image gates passed locally on 2026-08-01. The final criterion
+requires the external record described by the
+[acceptance runbook](../operations/PHASE_2_ACCEPTANCE.md).
 
 After these criteria pass, Phase 3 can add high-value infrastructure integrations
 that reuse the incident and notification path without changing its Core lifecycle.

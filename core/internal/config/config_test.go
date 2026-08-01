@@ -31,6 +31,11 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_FRESHNESS_INTERVAL":                     "2s",
 		"ESPIAL_FRESHNESS_BATCH_SIZE":                   "25",
 		"ESPIAL_EVENT_REPLAY_SIZE":                      "512",
+		"ESPIAL_INCIDENT_WORKER_CONCURRENCY":            "4",
+		"ESPIAL_INCIDENT_CLAIM_BATCH_SIZE":              "75",
+		"ESPIAL_INCIDENT_POLL_INTERVAL":                 "750ms",
+		"ESPIAL_INCIDENT_CLAIM_LEASE":                   "45s",
+		"ESPIAL_INCIDENT_MAX_SIGNAL_ATTEMPTS":           "9",
 		"ESPIAL_NOTIFICATION_WORKER_CONCURRENCY":        "3",
 		"ESPIAL_NOTIFICATION_MAX_ATTEMPTS":              "5",
 		"ESPIAL_NOTIFICATION_REQUEST_TIMEOUT":           "8s",
@@ -75,6 +80,11 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		cfg.Adapters.EventReplaySize != 512 {
 		t.Fatalf("adapter settings = %#v", cfg.Adapters)
 	}
+	if cfg.Incidents.WorkerConcurrency != 4 || cfg.Incidents.ClaimBatchSize != 75 ||
+		cfg.Incidents.PollInterval != 750*time.Millisecond || cfg.Incidents.ClaimLease != 45*time.Second ||
+		cfg.Incidents.MaxSignalAttempts != 9 {
+		t.Fatalf("incident settings = %#v", cfg.Incidents)
+	}
 	if cfg.Notifications.WorkerConcurrency != 3 || cfg.Notifications.MaxAttempts != 5 ||
 		cfg.Notifications.RequestTimeout != 8*time.Second || cfg.Notifications.ResolveTimeout != 1500*time.Millisecond ||
 		cfg.Notifications.ResponseBodyLimit != 2048 || len(cfg.Notifications.ApprovedHosts) != 2 ||
@@ -102,7 +112,8 @@ func TestLoadEnvironmentOverridesFile(t *testing.T) {
 	contents := `{
 		"environment": "test",
 		"server": {"listen_address": "127.0.0.1:7000"},
-		"database": {"max_open_connections": 6}
+		"database": {"max_open_connections": 6},
+		"incidents": {"worker_concurrency": 3, "claim_batch_size": 80, "poll_interval": "2s", "claim_lease": "40s", "max_signal_attempts": 10}
 	}`
 	if err := os.WriteFile(name, []byte(contents), 0o600); err != nil {
 		t.Fatal(err)
@@ -119,6 +130,11 @@ func TestLoadEnvironmentOverridesFile(t *testing.T) {
 	}
 	if cfg.Database.MaxOpenConnections != 6 {
 		t.Fatalf("max open connections = %d", cfg.Database.MaxOpenConnections)
+	}
+	if cfg.Incidents.WorkerConcurrency != 3 || cfg.Incidents.ClaimBatchSize != 80 ||
+		cfg.Incidents.PollInterval != 2*time.Second || cfg.Incidents.ClaimLease != 40*time.Second ||
+		cfg.Incidents.MaxSignalAttempts != 10 {
+		t.Fatalf("incident file settings = %#v", cfg.Incidents)
 	}
 }
 
@@ -196,6 +212,11 @@ func TestValidateRejectsUnsafeMonitoringBounds(t *testing.T) {
 		"notification timeout":     func(cfg *Config) { cfg.Notifications.RequestTimeout = 2 * time.Minute },
 		"notification ports":       func(cfg *Config) { cfg.Notifications.AllowedPorts = []int{0} },
 		"notification secret path": func(cfg *Config) { cfg.Notifications.SecretDirectory = "relative" },
+		"incident concurrency":     func(cfg *Config) { cfg.Incidents.WorkerConcurrency = 0 },
+		"incident batch":           func(cfg *Config) { cfg.Incidents.ClaimBatchSize = 1001 },
+		"incident poll":            func(cfg *Config) { cfg.Incidents.PollInterval = time.Millisecond },
+		"incident lease":           func(cfg *Config) { cfg.Incidents.ClaimLease = 20 * time.Minute },
+		"incident attempts":        func(cfg *Config) { cfg.Incidents.MaxSignalAttempts = 33 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			cfg := defaults()

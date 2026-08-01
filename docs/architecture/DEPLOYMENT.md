@@ -57,6 +57,13 @@ webcheck secret directory; monitor JSON stores only the opaque file name and red
 reads expose only header names. Empty notification or webcheck host/CIDR allowlists
 disable their respective configuration paths.
 
+Incident evaluation defaults to two workers, a 50-signal claim batch, one-second
+poll, 30-second lease, and eight attempts. Notification delivery defaults to two
+workers, one-second poll, 30-second lease, six attempts, and a five-minute retry
+cap. These values are bounded configuration and are justified by the Phase 2 load
+record. Phase 2 retains correlated incident/delivery/certificate evidence
+indefinitely rather than enabling an untested automatic deletion worker.
+
 ## Startup and shutdown
 
 PostgreSQL readiness precedes migrations. Core migrates/checks schema, initializes
@@ -65,6 +72,10 @@ only when its server is running; it presents an upstream-unavailable state if Co
 is down. On termination, Core stops accepting mutations, closes SSE streams,
 cancels scheduled work, requests adapter shutdown, flushes audit writes, and closes
 the database within a bounded deadline.
+
+Core exposes low-cardinality Prometheus text on `/metrics` only on its private
+listener. The reference Caddy configuration does not route that path. Remote
+Mattermost or monitored-site failure changes queue/check metrics, not readiness.
 
 ## Production readiness checklist
 

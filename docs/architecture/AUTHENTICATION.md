@@ -65,10 +65,12 @@ Permissions are named actions so roles can evolve without route-specific checks.
 | `notification_destinations:manage`, `website_monitors:manage`    |   No   |    No    |      Yes      |       No        |
 | `actions:approve`                                                 |   No   |    No    |      No       |    Reserved     |
 
-Phase 1 implements monitoring and administrator management boundaries. Phase 2.1
-implements `incidents:read`; incident operation and the remaining Phase 2 manage
-permissions are authorization seams for later slices and do not imply a route or
-capability before that slice is implemented. Action permissions remain reserved.
+Phase 1 implements monitoring and administrator management boundaries. Phase 2
+implements incident/webpage reads, incident operation, and the rule, suppression,
+notification-destination, and website-monitor administration permissions shown
+above. Each corresponding route is backed by Core and independently tested; a
+permission alone never implies a future capability. Action permissions remain
+reserved.
 
 ## Provider interface
 

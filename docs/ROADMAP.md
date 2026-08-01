@@ -94,8 +94,10 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-**Status:** In progress. Slices 2.0 through 2.6 are implemented; the phase
-integration, hardening, and acceptance slice remains planned.
+**Status:** Implementation complete through Slice 2.7 (2026-08-01). Automated
+acceptance, race, load, restore, and UI gates are defined; production acceptance
+remains pending the independent runbook dry run, named site owners/values, and
+carried-forward image/security decisions recorded in the Slice 2.7 evidence.
 
 **Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
 
@@ -128,7 +130,10 @@ Implemented Phase 2 groundwork, incident workflow, and suppression controls:
   evidence for access changes; and
 - the shell accepts only implemented dropdown children, so Phase 2 destinations
   must ship with their real route, permission boundary, loading/error states, and
-  backend contract rather than appearing as planned navigation.
+  backend contract rather than appearing as planned navigation; and
+- private low-cardinality metrics, configurable incident workers, disposable race/
+  backlog/clean-stack gates, Phase 2 threat review, and operator recovery/restore
+  runbooks provide the Slice 2.7 release evidence.
 
 ### Backend
 

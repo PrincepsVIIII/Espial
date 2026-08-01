@@ -21,13 +21,14 @@ const (
 	Production  = "production"
 )
 
-// Config contains the small set of settings needed by the Phase 1 Core.
+// Config contains the bounded settings needed by Espial Core.
 type Config struct {
 	Environment   string
 	Server        Server
 	Database      Database
 	Auth          Auth
 	Adapters      Adapters
+	Incidents     Incidents
 	Notifications Notifications
 	Webcheck      Webcheck
 }
@@ -66,6 +67,14 @@ type Adapters struct {
 	FreshnessInterval  time.Duration
 	FreshnessBatchSize int
 	EventReplaySize    int
+}
+
+type Incidents struct {
+	WorkerConcurrency int
+	ClaimBatchSize    int
+	PollInterval      time.Duration
+	ClaimLease        time.Duration
+	MaxSignalAttempts int
 }
 
 type Notifications struct {
@@ -142,6 +151,10 @@ func defaults() Config {
 			FreshnessInterval: time.Second, FreshnessBatchSize: 100,
 			EventReplaySize: 1024,
 		},
+		Incidents: Incidents{
+			WorkerConcurrency: 2, ClaimBatchSize: 50, PollInterval: time.Second,
+			ClaimLease: 30 * time.Second, MaxSignalAttempts: 8,
+		},
 		Notifications: Notifications{
 			WorkerConcurrency: 2, PollInterval: time.Second, ClaimLease: 30 * time.Second,
 			MaxAttempts: 6, MaxRetryDelay: 5 * time.Minute, RequestTimeout: 10 * time.Second,
@@ -189,6 +202,13 @@ type fileConfig struct {
 		FreshnessBatchSize *int   `json:"freshness_batch_size"`
 		EventReplaySize    *int   `json:"event_replay_size"`
 	} `json:"adapters"`
+	Incidents struct {
+		WorkerConcurrency *int   `json:"worker_concurrency"`
+		ClaimBatchSize    *int   `json:"claim_batch_size"`
+		PollInterval      string `json:"poll_interval"`
+		ClaimLease        string `json:"claim_lease"`
+		MaxSignalAttempts *int   `json:"max_signal_attempts"`
+	} `json:"incidents"`
 	Notifications struct {
 		WorkerConcurrency *int     `json:"worker_concurrency"`
 		PollInterval      string   `json:"poll_interval"`
@@ -353,6 +373,32 @@ func applyFile(cfg *Config, name string) error {
 			cfg.Adapters.FreshnessInterval = duration
 		}
 	}
+	if values.Incidents.WorkerConcurrency != nil {
+		cfg.Incidents.WorkerConcurrency = *values.Incidents.WorkerConcurrency
+	}
+	if values.Incidents.ClaimBatchSize != nil {
+		cfg.Incidents.ClaimBatchSize = *values.Incidents.ClaimBatchSize
+	}
+	if values.Incidents.MaxSignalAttempts != nil {
+		cfg.Incidents.MaxSignalAttempts = *values.Incidents.MaxSignalAttempts
+	}
+	for name, value := range map[string]string{
+		"incidents.poll_interval": values.Incidents.PollInterval,
+		"incidents.claim_lease":   values.Incidents.ClaimLease,
+	} {
+		if value == "" {
+			continue
+		}
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse %s: %w", name, err)
+		}
+		if name == "incidents.poll_interval" {
+			cfg.Incidents.PollInterval = duration
+		} else {
+			cfg.Incidents.ClaimLease = duration
+		}
+	}
 	if values.Notifications.WorkerConcurrency != nil {
 		cfg.Notifications.WorkerConcurrency = *values.Notifications.WorkerConcurrency
 	}
@@ -458,6 +504,11 @@ func (cfg Config) SafeSummary() map[string]any {
 		"freshness_interval":                       cfg.Adapters.FreshnessInterval,
 		"freshness_batch_size":                     cfg.Adapters.FreshnessBatchSize,
 		"event_replay_size":                        cfg.Adapters.EventReplaySize,
+		"incident_worker_concurrency":              cfg.Incidents.WorkerConcurrency,
+		"incident_claim_batch_size":                cfg.Incidents.ClaimBatchSize,
+		"incident_poll_interval":                   cfg.Incidents.PollInterval,
+		"incident_claim_lease":                     cfg.Incidents.ClaimLease,
+		"incident_max_signal_attempts":             cfg.Incidents.MaxSignalAttempts,
 		"notification_worker_concurrency":          cfg.Notifications.WorkerConcurrency,
 		"notification_max_attempts":                cfg.Notifications.MaxAttempts,
 		"notification_request_timeout":             cfg.Notifications.RequestTimeout,
@@ -602,6 +653,8 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	for name, destination := range map[string]*time.Duration{
 		"ESPIAL_ADAPTER_RECONCILE_INTERVAL": &cfg.Adapters.ReconcileInterval,
 		"ESPIAL_FRESHNESS_INTERVAL":         &cfg.Adapters.FreshnessInterval,
+		"ESPIAL_INCIDENT_POLL_INTERVAL":     &cfg.Incidents.PollInterval,
+		"ESPIAL_INCIDENT_CLAIM_LEASE":       &cfg.Incidents.ClaimLease,
 	} {
 		if value := strings.TrimSpace(getenv(name)); value != "" {
 			duration, err := time.ParseDuration(value)
@@ -627,9 +680,12 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 		}
 	}
 	for name, destination := range map[string]*int{
-		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY": &cfg.Adapters.GlobalConcurrency,
-		"ESPIAL_FRESHNESS_BATCH_SIZE":       &cfg.Adapters.FreshnessBatchSize,
-		"ESPIAL_EVENT_REPLAY_SIZE":          &cfg.Adapters.EventReplaySize,
+		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY":   &cfg.Adapters.GlobalConcurrency,
+		"ESPIAL_FRESHNESS_BATCH_SIZE":         &cfg.Adapters.FreshnessBatchSize,
+		"ESPIAL_EVENT_REPLAY_SIZE":            &cfg.Adapters.EventReplaySize,
+		"ESPIAL_INCIDENT_WORKER_CONCURRENCY":  &cfg.Incidents.WorkerConcurrency,
+		"ESPIAL_INCIDENT_CLAIM_BATCH_SIZE":    &cfg.Incidents.ClaimBatchSize,
+		"ESPIAL_INCIDENT_MAX_SIGNAL_ATTEMPTS": &cfg.Incidents.MaxSignalAttempts,
 	} {
 		if value := strings.TrimSpace(getenv(name)); value != "" {
 			parsed, err := strconv.Atoi(value)
@@ -778,6 +834,15 @@ func (cfg Config) Validate() error {
 	if cfg.Adapters.FreshnessBatchSize < 1 || cfg.Adapters.FreshnessBatchSize > 1000 ||
 		cfg.Adapters.EventReplaySize < 1 || cfg.Adapters.EventReplaySize > 10000 {
 		return errors.New("adapter monitoring capacities are outside safe bounds")
+	}
+	if cfg.Incidents.WorkerConcurrency < 1 || cfg.Incidents.WorkerConcurrency > 16 ||
+		cfg.Incidents.ClaimBatchSize < 1 || cfg.Incidents.ClaimBatchSize > 1000 ||
+		cfg.Incidents.MaxSignalAttempts < 1 || cfg.Incidents.MaxSignalAttempts > 32 {
+		return errors.New("incident worker capacities are outside safe bounds")
+	}
+	if cfg.Incidents.PollInterval < 100*time.Millisecond || cfg.Incidents.PollInterval > time.Minute ||
+		cfg.Incidents.ClaimLease < time.Second || cfg.Incidents.ClaimLease > 10*time.Minute {
+		return errors.New("incident worker durations are outside safe bounds")
 	}
 	if cfg.Notifications.WorkerConcurrency < 1 || cfg.Notifications.WorkerConcurrency > 32 ||
 		cfg.Notifications.MaxAttempts < 1 || cfg.Notifications.MaxAttempts > 6 ||

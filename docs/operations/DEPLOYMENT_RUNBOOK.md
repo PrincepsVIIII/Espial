@@ -27,11 +27,18 @@ The release operator must record:
   ports, redirect ceiling, response limits, timeout policy, and protected-header
   secret-file ownership;
 - memory/disk headroom against the measured Phase 1 baseline;
+- incident and notification worker settings justified by the current
+  [Phase 2 load record](PHASE_2_LOAD_TEST.md), private `/metrics` collection, and
+  retention capacity for at least six months of correlated evidence;
 - a named rollback decision-maker and maintenance window.
 
 Render `deployments/production/compose.yml` with `docker compose config`. Confirm
 only the proxy publishes ports, `private` is internal, Core has
 `ESPIAL_DATABASE_MIGRATE_ON_START=false`, and no rendered value contains a secret.
+Confirm `/metrics` is reachable only from the private management network and is not
+routed by Caddy. Readiness must remain unavailable until PostgreSQL and required
+workers initialize; Mattermost or a monitored endpoint outage must not make Core
+unready.
 
 ## Mattermost destination rotation and failure
 
@@ -94,6 +101,10 @@ is compatible. Migrations are forward-only; never edit the schema manually or
 assume an old binary can use a newer schema. When compatibility is not guaranteed,
 restore the pre-upgrade backup into a clean database and deploy the matching image
 set.
+
+Run `npm run acceptance:phase2` before promotion. A passing automated gate does not
+replace the independent operator/runbook and production-blocker sign-off in
+[PHASE_2_ACCEPTANCE.md](PHASE_2_ACCEPTANCE.md).
 
 ## Complete shutdown
 

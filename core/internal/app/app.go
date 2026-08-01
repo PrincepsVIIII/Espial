@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
@@ -21,6 +22,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications/mattermost"
+	"github.com/PrincepsVIIII/Espial/core/internal/operations"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/PrincepsVIIII/Espial/core/internal/webcheck"
 	"github.com/PrincepsVIIII/Espial/core/internal/webpages"
@@ -86,10 +88,11 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("initialize website network policy: %w", err)
 	}
 	websiteService := webpages.NewService(pool, monitoringRuntime.Hub(), monitoringRuntime, websitePolicy, nil)
+	var workersReady atomic.Bool
 
 	incidentWorkflow := incidents.NewWorkflow(pool, monitoringRuntime.Hub(), nil)
 	handler := api.New(api.Dependencies{
-		Logger: logger, Ready: pool.Ping, Auth: authService, PublicURL: cfg.Server.PublicURL,
+		Logger: logger, Ready: readyWhenWorkersStarted(pool.Ping, &workersReady), Auth: authService, PublicURL: cfg.Server.PublicURL,
 		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
 		Incidents:        incidents.NewReader(pool),
 		IncidentWorkflow: incidentWorkflow,
@@ -98,6 +101,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Notifications:    notificationService,
 		Websites:         websiteService,
 		Certificates:     certificates.NewService(pool),
+		Metrics:          operations.NewCollector(pool, notificationService, nil),
 		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
@@ -112,10 +116,12 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		},
 	}
 
-	logger.Info("Espial Core ready", "address", listener.Addr().String())
 	runtimeErrors := make(chan error, 2)
 	go func() { runtimeErrors <- monitoringRuntime.Run(processContext) }()
 	go func() { runtimeErrors <- notificationWorker.Run(processContext) }()
+	workersReady.Store(true)
+	defer workersReady.Store(false)
+	logger.Info("Espial Core ready", "address", listener.Addr().String())
 	go cleanSessions(processContext, logger, authService)
 	serverErrors := make(chan error, 1)
 	go func() { serverErrors <- runHTTPServer(processContext, server, listener, cfg.Server.ShutdownTimeout) }()
@@ -139,6 +145,15 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 			return fmt.Errorf("Core runtime: %w", otherRuntimeErr)
 		}
 		return serverErr
+	}
+}
+
+func readyWhenWorkersStarted(database api.Readiness, workersReady *atomic.Bool) api.Readiness {
+	return func(ctx context.Context) error {
+		if !workersReady.Load() {
+			return errors.New("required workers are not initialized")
+		}
+		return database(ctx)
 	}
 }
 
@@ -167,13 +182,18 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, 
 		return nil, nil, err
 	}
 	return monitoring.NewRuntime(pool, registry, monitoring.RuntimeOptions{
-		GlobalConcurrency:  cfg.Adapters.GlobalConcurrency,
-		ReconcileInterval:  cfg.Adapters.ReconcileInterval,
-		FreshnessInterval:  cfg.Adapters.FreshnessInterval,
-		FreshnessBatchSize: cfg.Adapters.FreshnessBatchSize,
-		EventReplaySize:    cfg.Adapters.EventReplaySize,
-		IncidentIntents:    intents,
-		Secrets:            secrets,
+		GlobalConcurrency:   cfg.Adapters.GlobalConcurrency,
+		ReconcileInterval:   cfg.Adapters.ReconcileInterval,
+		FreshnessInterval:   cfg.Adapters.FreshnessInterval,
+		FreshnessBatchSize:  cfg.Adapters.FreshnessBatchSize,
+		EventReplaySize:     cfg.Adapters.EventReplaySize,
+		IncidentConcurrency: cfg.Incidents.WorkerConcurrency,
+		IncidentBatchSize:   cfg.Incidents.ClaimBatchSize,
+		IncidentPoll:        cfg.Incidents.PollInterval,
+		IncidentClaimLease:  cfg.Incidents.ClaimLease,
+		IncidentMaxAttempts: cfg.Incidents.MaxSignalAttempts,
+		IncidentIntents:     intents,
+		Secrets:             secrets,
 		OnError: func(integrationID string, err error) {
 			logger.Error("integration supervisor exited", "integration_id", integrationID, "error", err)
 		},
