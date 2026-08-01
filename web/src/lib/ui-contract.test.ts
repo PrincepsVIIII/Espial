@@ -12,6 +12,10 @@ const dashboardPage = source('../routes/(app)/dashboard/+page.svelte');
 const alertsPage = source('../routes/(app)/alerts/+page.svelte');
 const alertHistoryPage = source('../routes/(app)/alerts/history/+page.svelte');
 const alertDetailPage = source('../routes/(app)/alerts/[id]/+page.svelte');
+const alertRulesPage = source('../routes/(app)/alerts/rules/+page.svelte');
+const alertSuppressionsPage = source(
+  '../routes/(app)/alerts/suppressions/+page.svelte',
+);
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
@@ -79,6 +83,12 @@ describe('authenticated shell contract', () => {
     expect(appShell).toContain('href={item.href}');
     expect(appShell).toContain("{ label: 'Users', href: '/audit/users' }");
     expect(appShell).toContain("{ label: 'History', href: '/alerts/history' }");
+    expect(appShell).toContain("{ label: 'Rules', href: '/alerts/rules' }");
+    expect(appShell).toContain(
+      "{ label: 'Suppressions', href: '/alerts/suppressions' }",
+    );
+    expect(appShell).toContain("permissions.includes('incident_rules:manage')");
+    expect(appShell).toContain("permissions.includes('suppressions:manage')");
     expect(appShell).not.toMatch(
       /Planned workflow|Planned inventory|Open section/,
     );
@@ -121,6 +131,16 @@ describe('administrator capability evidence', () => {
     expect(usersPage).toContain('<h1>Users</h1>');
     expect(usersPage).toContain('Create local user');
     expect(usersPage).toContain('Replace password');
+  });
+
+  it('exposes rule and suppression controls with receipts and honest semantics', () => {
+    expect(alertRulesPage).toContain('<h1>Alert rules</h1>');
+    expect(alertRulesPage).toContain('Explain rule precedence');
+    expect(alertRulesPage).toContain('View matching audit record');
+    expect(alertSuppressionsPage).toContain('<h1>Suppressions</h1>');
+    expect(alertSuppressionsPage).toContain('Maintenance windows');
+    expect(alertSuppressionsPage).toContain('Silencing never changes health');
+    expect(alertSuppressionsPage).toContain('View matching audit record');
   });
 
   it('shows mutation proof and links it to an exact audit receipt', () => {

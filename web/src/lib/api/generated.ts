@@ -41,6 +41,14 @@ export interface AdapterManifest {
   secret_fields?: string[];
 }
 
+export interface AdministrativeMutationReceipt {
+  id: string;
+  version: number;
+  request_id: string;
+  replayed: boolean;
+  audit_url?: string;
+}
+
 export interface APIErrorResponse {
   error: {
     code: string;
@@ -142,6 +150,47 @@ export interface IncidentMutationReceipt {
   audit_url?: string;
 }
 
+export interface IncidentRulePrecedencePreview {
+  winner?: Candidate;
+  /**
+   * @maxItems 200
+   */
+  candidates: Candidate[];
+  explanation: string;
+}
+export interface Candidate {
+  id: string;
+  name: string;
+  priority: number;
+  specificity: number;
+  winner: boolean;
+  explanation: string;
+}
+
+export interface IncidentRuleWrite {
+  name: string;
+  enabled: boolean;
+  priority: number;
+  integration_id?: string;
+  resource_id?: string;
+  resource_kind?: string;
+  check_type?: string;
+  reason_code?: string;
+  /**
+   * @minItems 1
+   * @maxItems 4
+   */
+  conditions: {
+    state: "warning" | "critical" | "unknown" | "stale";
+    severity: "warning" | "critical";
+    min_occurrences: number;
+    for_seconds: number;
+  }[];
+  recovery_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  recovery_min_occurrences: number;
+  recovery_for_seconds: number;
+}
+
 export interface IncidentRuleAPIView {
   id: string;
   name: string;
@@ -165,6 +214,7 @@ export interface IncidentRuleAPIView {
   recovery_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
   recovery_min_occurrences: number;
   recovery_for_seconds: number;
+  version: number;
   created_at: string;
   updated_at: string;
 }
@@ -302,6 +352,33 @@ export interface LiveInvalidationData {
   changed_at: string;
 }
 
+export interface MaintenanceWindowWrite {
+  reason: string;
+  integration_id?: string;
+  resource_id?: string;
+  check_type?: string;
+  starts_at: string;
+  ends_at: string;
+  enabled: boolean;
+}
+
+export interface MaintenanceWindow {
+  id: string;
+  reason: string;
+  integration_id?: string;
+  resource_id?: string;
+  check_type?: string;
+  starts_at: string;
+  ends_at: string;
+  enabled: boolean;
+  revoked_at?: string;
+  expired_at?: string;
+  created_by_name: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ManagedUser {
   id: string;
   username: string;
@@ -318,7 +395,7 @@ export interface ManagedUser {
 
 export interface DurableMonitoringSignal {
   id: string;
-  kind: "observation" | "freshness";
+  kind: "observation" | "freshness" | "maintenance_expiry";
   integration_id: string;
   resource_id: string;
   observation_id?: string;
@@ -412,6 +489,13 @@ export interface ResourceAPIView {
   health: {
     state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
     reason: string;
+    raw_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+    raw_reason: string;
+    maintenance?: {
+      id: string;
+      reason: string;
+      ends_at: string;
+    };
     observation_id?: string;
     observed_at?: string;
     last_success_at?: string;
@@ -451,4 +535,31 @@ export interface NormalizedResource {
 export interface RoleView {
   name: string;
   permissions: string[];
+}
+
+export interface NotificationSilenceWrite {
+  reason: string;
+  incident_id?: string;
+  rule_id?: string;
+  resource_id?: string;
+  starts_at: string;
+  expires_at: string;
+  enabled: boolean;
+}
+
+export interface NotificationSilence {
+  id: string;
+  reason: string;
+  incident_id?: string;
+  rule_id?: string;
+  resource_id?: string;
+  starts_at: string;
+  expires_at: string;
+  enabled: boolean;
+  revoked_at?: string;
+  expired_at?: string;
+  created_by_name: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
 }

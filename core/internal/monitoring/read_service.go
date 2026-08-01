@@ -44,9 +44,18 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 		return Overview{}, fmt.Errorf("read overview time: %w", err)
 	}
 	rows, err := tx.Query(ctx, `
-		SELECT COALESCE(ch.state, 'unknown'), count(*)
+		SELECT CASE WHEN EXISTS (
+			SELECT 1 FROM maintenance_windows mw
+			WHERE mw.enabled AND mw.revoked_at IS NULL AND mw.starts_at <= now() AND mw.ends_at > now()
+			 AND (mw.integration_id IS NULL OR mw.integration_id=r.integration_id)
+			 AND (mw.resource_id IS NULL OR mw.resource_id=r.id)
+			 AND (mw.check_type IS NULL OR EXISTS (
+				SELECT 1 FROM observations observation
+				WHERE observation.id=ch.observation_id AND observation.check_type=mw.check_type
+			 ))
+		) THEN 'maintenance' ELSE COALESCE(ch.state, 'unknown') END effective_state, count(*)
 		FROM resources r LEFT JOIN current_health ch ON ch.resource_id = r.id
-		GROUP BY COALESCE(ch.state, 'unknown') ORDER BY COALESCE(ch.state, 'unknown')
+		GROUP BY effective_state ORDER BY effective_state
 	`)
 	if err != nil {
 		return Overview{}, fmt.Errorf("read overview resource counts: %w", err)
@@ -97,8 +106,24 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 	rows.Close()
 
 	rows, err = tx.Query(ctx, `
-		SELECT r.id::text, r.integration_id::text, r.display_name, ch.state, ch.reason, ch.updated_at
+		SELECT r.id::text, r.integration_id::text, r.display_name,
+			CASE WHEN mw.id IS NOT NULL THEN 'maintenance' ELSE ch.state END,
+			CASE WHEN mw.id IS NOT NULL THEN 'Maintenance: '||mw.reason ELSE ch.reason END,
+			ch.updated_at
 		FROM current_health ch JOIN resources r ON r.id = ch.resource_id
+		LEFT JOIN LATERAL (
+			SELECT id,reason FROM maintenance_windows
+			WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
+			 AND (integration_id IS NULL OR integration_id=r.integration_id)
+			 AND (resource_id IS NULL OR resource_id=r.id)
+			 AND (check_type IS NULL OR EXISTS (
+				SELECT 1 FROM observations observation
+				WHERE observation.id=ch.observation_id AND observation.check_type=maintenance_windows.check_type
+			 ))
+			ORDER BY (resource_id IS NOT NULL) DESC,
+			 ((integration_id IS NOT NULL)::int+(check_type IS NOT NULL)::int) DESC,
+			 starts_at DESC,id LIMIT 1
+		) mw ON true
 		ORDER BY ch.updated_at DESC, r.id DESC LIMIT 10
 	`)
 	if err != nil {
@@ -210,7 +235,10 @@ func (service *ReadService) Resources(ctx context.Context, filter ResourceFilter
 				r.id::text AS resource_id, r.integration_id::text, i.display_name,
 				r.external_id, r.kind, r.display_name, r.attributes::text,
 				COALESCE(r.source_url, ''), r.first_seen_at, r.last_seen_at,
+				CASE WHEN mw.id IS NOT NULL THEN 'maintenance' ELSE COALESCE(ch.state, 'unknown') END,
+				CASE WHEN mw.id IS NOT NULL THEN 'Maintenance: '||mw.reason ELSE COALESCE(ch.reason, 'no valid observation') END,
 				COALESCE(ch.state, 'unknown'), COALESCE(ch.reason, 'no valid observation'),
+				mw.id::text, mw.reason, mw.ends_at,
 				COALESCE(ch.observation_id::text, ''), ch.observed_at, ch.last_success_at,
 				ch.stale_at, ch.unknown_at, COALESCE(ch.updated_at, r.last_seen_at),
 				lo.id::text AS latest_observation_id, lo.check_type, lo.observed_state, lo.summary,
@@ -224,11 +252,21 @@ func (service *ReadService) Resources(ctx context.Context, filter ResourceFilter
 				SELECT o.* FROM observations o WHERE o.resource_id = r.id
 				ORDER BY o.observed_at DESC, o.received_at DESC, o.id DESC LIMIT 1
 			) lo ON true
+			LEFT JOIN LATERAL (
+				SELECT id,reason,ends_at FROM maintenance_windows
+				WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
+				 AND (integration_id IS NULL OR integration_id=r.integration_id)
+				 AND (resource_id IS NULL OR resource_id=r.id)
+				 AND (check_type IS NULL OR check_type=lo.check_type)
+				ORDER BY (resource_id IS NOT NULL) DESC,
+				 ((integration_id IS NOT NULL)::int+(check_type IS NOT NULL)::int) DESC,
+				 starts_at DESC,id LIMIT 1
+			) mw ON true
 			WHERE COALESCE(ch.updated_at, r.last_seen_at) <= $1
-			  AND (COALESCE(cardinality($4::text[]), 0) = 0 OR COALESCE(ch.state, 'unknown') = ANY($4::text[]))
+			  AND (COALESCE(cardinality($4::text[]), 0) = 0 OR CASE WHEN mw.id IS NOT NULL THEN 'maintenance' ELSE COALESCE(ch.state, 'unknown') END = ANY($4::text[]))
 			  AND (COALESCE(cardinality($5::text[]), 0) = 0 OR r.kind = ANY($5::text[]))
 			  AND (COALESCE(cardinality($6::uuid[]), 0) = 0 OR r.integration_id = ANY($6::uuid[]))
-			  AND ($7 = -1 OR ($7 = 1) = (COALESCE(ch.state, 'unknown') = 'stale'))
+			  AND ($7 = -1 OR ($7 = 1) = (mw.id IS NULL AND COALESCE(ch.state, 'unknown') = 'stale'))
 		)
 		SELECT * FROM candidates
 		WHERE ($3 = '' OR (ordered_at, resource_id::uuid) < ($2, NULLIF($3, '')::uuid))
@@ -273,7 +311,10 @@ func (service *ReadService) Resource(ctx context.Context, id string) (ResourceVi
 			r.id::text, r.integration_id::text, i.display_name,
 			r.external_id, r.kind, r.display_name, r.attributes::text,
 			COALESCE(r.source_url, ''), r.first_seen_at, r.last_seen_at,
+			CASE WHEN mw.id IS NOT NULL THEN 'maintenance' ELSE COALESCE(ch.state, 'unknown') END,
+			CASE WHEN mw.id IS NOT NULL THEN 'Maintenance: '||mw.reason ELSE COALESCE(ch.reason, 'no valid observation') END,
 			COALESCE(ch.state, 'unknown'), COALESCE(ch.reason, 'no valid observation'),
+			mw.id::text, mw.reason, mw.ends_at,
 			COALESCE(ch.observation_id::text, ''), ch.observed_at, ch.last_success_at,
 			ch.stale_at, ch.unknown_at, COALESCE(ch.updated_at, r.last_seen_at),
 			lo.id::text, lo.check_type, lo.observed_state, lo.summary,
@@ -287,6 +328,16 @@ func (service *ReadService) Resource(ctx context.Context, id string) (ResourceVi
 			SELECT o.* FROM observations o WHERE o.resource_id = r.id
 			ORDER BY o.observed_at DESC, o.received_at DESC, o.id DESC LIMIT 1
 		) lo ON true
+		LEFT JOIN LATERAL (
+			SELECT id,reason,ends_at FROM maintenance_windows
+			WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
+			 AND (integration_id IS NULL OR integration_id=r.integration_id)
+			 AND (resource_id IS NULL OR resource_id=r.id)
+			 AND (check_type IS NULL OR check_type=lo.check_type)
+			ORDER BY (resource_id IS NOT NULL) DESC,
+			 ((integration_id IS NOT NULL)::int+(check_type IS NOT NULL)::int) DESC,
+			 starts_at DESC,id LIMIT 1
+		) mw ON true
 		WHERE r.id = $1
 	`, id)
 	result, _, err := scanResource(row)
@@ -306,12 +357,15 @@ func scanResource(row scanner) (ResourceView, time.Time, error) {
 	var observationObserved, observationReceived pgtype.Timestamptz
 	var observationCheck, observationSummary, measurements, metadata pgtype.Text
 	var expectedRefresh pgtype.Int4
+	var maintenanceID, maintenanceReason pgtype.Text
+	var maintenanceEnds pgtype.Timestamptz
 	var orderedAt time.Time
 	if err := row.Scan(
 		&item.ID, &item.IntegrationID, &item.IntegrationName,
 		&item.ExternalID, &item.Kind, &item.DisplayName, &attributes,
 		&item.SourceURL, &item.FirstSeenAt, &item.LastSeenAt,
-		&item.Health.State, &item.Health.Reason, &item.Health.ObservationID,
+		&item.Health.State, &item.Health.Reason, &item.Health.RawState, &item.Health.RawReason,
+		&maintenanceID, &maintenanceReason, &maintenanceEnds, &item.Health.ObservationID,
 		&item.Health.ObservedAt, &item.Health.LastSuccessAt, &item.Health.StaleAt,
 		&item.Health.UnknownAt, &item.Health.UpdatedAt,
 		&observationID, &observationCheck, &observationState, &observationSummary,
@@ -324,6 +378,9 @@ func scanResource(row scanner) (ResourceView, time.Time, error) {
 	item.FirstSeenAt = item.FirstSeenAt.UTC()
 	item.LastSeenAt = item.LastSeenAt.UTC()
 	normalizeCurrent(&item.Health)
+	if maintenanceID.Valid {
+		item.Health.Maintenance = &MaintenanceHealthView{ID: maintenanceID.String, Reason: maintenanceReason.String, EndsAt: maintenanceEnds.Time.UTC()}
+	}
 	if observationID.Valid {
 		item.LatestObservation = &ObservationView{
 			ID: observationID.String, CheckType: observationCheck.String,

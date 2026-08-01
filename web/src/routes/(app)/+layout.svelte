@@ -29,7 +29,15 @@
     {
       label: 'Alerts',
       href: '/alerts',
-      children: [{ label: 'History', href: '/alerts/history' }],
+      children: [
+        { label: 'History', href: '/alerts/history' },
+        ...(data.session?.user.permissions.includes('incident_rules:manage')
+          ? [{ label: 'Rules', href: '/alerts/rules' }]
+          : []),
+        ...(data.session?.user.permissions.includes('suppressions:manage')
+          ? [{ label: 'Suppressions', href: '/alerts/suppressions' }]
+          : []),
+      ],
     },
     {
       label: 'Datacenter',
@@ -221,8 +229,7 @@
                   aria-label={`${item.label} sections`}
                   aria-expanded={activeNav === item.label}
                   aria-controls={`nav-panel-${item.label.toLowerCase()}`}
-                  onclick={() =>
-                    (activeNav = activeNav === item.label ? null : item.label)}
+                  onclick={() => (activeNav = item.label)}
                 >
                   <span aria-hidden="true">⌄</span>
                 </button>

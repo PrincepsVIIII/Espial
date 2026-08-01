@@ -160,6 +160,13 @@ erDiagram
     INCIDENTS ||--o{ INCIDENT_TIMELINE : records
     INCIDENTS ||--o{ INCIDENT_ACTION_IDEMPOTENCY : receipts
     MONITORING_SIGNALS ||--o| INCIDENT_TIMELINE : explains
+    MONITORING_SIGNALS ||--o| INCIDENT_EVALUATION_EVIDENCE : explains
+    MAINTENANCE_WINDOWS ||--o{ INCIDENT_EVALUATION_EVIDENCE : suppresses
+    INCIDENTS ||--o{ SILENCES : targets
+    INCIDENT_RULES ||--o{ SILENCES : targets
+    RESOURCES ||--o{ SILENCES : targets
+    USERS ||--o{ MAINTENANCE_WINDOWS : creates
+    USERS ||--o{ SILENCES : creates
 ```
 
 - `monitoring_signals.source_key` is unique and is committed atomically with its
@@ -177,6 +184,17 @@ erDiagram
 - `incident_action_idempotency` binds actor, incident, action, and key to the
   request hash and original result/timeline/correlation receipt. It is written in
   the same transaction as the incident, timeline, and redacted audit event.
+- `maintenance_windows` stores bounded, start-inclusive/end-exclusive one-time
+  UTC controls over integration/resource/check scopes. It never replaces raw
+  `current_health`; effective read models join the active winning window.
+- `incident_evaluation_evidence` stores the winning rule, optional maintenance
+  window, outcome, and bounded explanation for each processed signal.
+- `silences` has exactly one incident/rule/resource target and a strict expiry.
+  Matching is read-only with respect to incidents and is consumed by the later
+  notification-intent transaction.
+- `administrative_mutation_idempotency` binds actor, target type, operation, and
+  key to a request hash and original version/correlation receipt for rule and
+  suppression mutations.
 - Incident and timeline rows are retained; later retention policy must not remove
   evidence earlier than the audit retention boundary.
 

@@ -94,12 +94,12 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-**Status:** In progress. Slices 2.0 and 2.1 are implemented; operator workflow,
-suppression, notification, website, and certificate slices remain planned.
+**Status:** In progress. Slices 2.0 through 2.3 are implemented; notification,
+website, certificate, and phase-acceptance slices remain planned.
 
 **Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
 
-Implemented Phase 2 groundwork and automatic incident read path:
+Implemented Phase 2 groundwork, incident workflow, and suppression controls:
 
 - monitoring observations/freshness commit a durable signal journal consumed by a
   bounded restart-safe evaluator;
@@ -107,8 +107,12 @@ Implemented Phase 2 groundwork and automatic incident read path:
   append-only timelines;
 - Viewer-authorized incident list/detail/timeline APIs back Dashboard active
   summaries and Alerts active/history/direct-detail routes;
-- `incidents:operate` remains the authorization boundary for Slice 2.2 actions,
-  which are not exposed yet;
+- `incidents:operate` gates complete acknowledge/investigate/assignment/note/
+  resolution workflows with optimistic concurrency and immutable evidence;
+- administrators can manage deterministic incident rules, one-time maintenance
+  windows, and expiring notification silences with audit-linked receipts;
+- effective maintenance health retains raw failures, the evaluator suppresses
+  planned noise, and window expiry triggers restart-safe re-evaluation;
 - administrator Audit and Users routes provide inspectable request-correlated
   evidence for access changes; and
 - the shell accepts only implemented dropdown children, so Phase 2 destinations

@@ -19,7 +19,7 @@ does not make a slice complete.
 | 2.0 Contracts, permissions, and durable work foundations | Implemented | [Slice 2.1 record](SLICE_2_1_AUTOMATIC_INCIDENTS.md) and [ADR 0007](../adr/0007-durable-monitoring-signal-journal.md) |
 | 2.1 Automatic incident creation and read path | Implemented | [Slice 2.1 implementation record](SLICE_2_1_AUTOMATIC_INCIDENTS.md) |
 | 2.2 Operator incident workflow | Implemented | [Slice 2.2 record](SLICE_2_2_OPERATOR_INCIDENT_WORKFLOW.md) |
-| 2.3 Rules, maintenance windows, and silences | Planned | — |
+| 2.3 Rules, maintenance windows, and silences | Implemented | [Slice 2.3 record](SLICE_2_3_RULES_AND_SUPPRESSIONS.md) |
 | 2.4 Notification routing and Mattermost delivery | Planned | — |
 | 2.5 Website availability monitoring | Planned | — |
 | 2.6 Certificate monitoring and Webpages experience | Planned | — |

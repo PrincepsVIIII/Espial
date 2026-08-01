@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	KindObservation = "observation"
-	KindFreshness   = "freshness"
+	KindObservation       = "observation"
+	KindFreshness         = "freshness"
+	KindMaintenanceExpiry = "maintenance_expiry"
 )
 
 type Signal struct {

@@ -91,7 +91,13 @@ const server = http.createServer((request, response) => {
           'incidents:read',
           ...(sessionMode === 'viewer'
             ? []
-            : ['incidents:operate', 'audit:read', 'users:manage']),
+            : [
+                'incidents:operate',
+                'audit:read',
+                'users:manage',
+                'incident_rules:manage',
+                'suppressions:manage',
+              ]),
         ],
       },
       expires_at: '2026-07-31T18:00:00Z',
@@ -201,6 +207,54 @@ const server = http.createServer((request, response) => {
       ],
     });
   }
+  if (url.pathname === '/api/v1/incident-rules') {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to manage incident rules.',
+      );
+    return json(response, 200, {
+      items: [
+        {
+          id: '20000000-0000-4000-8000-000000000001',
+          name: 'Default resource health',
+          enabled: true,
+          priority: 100,
+          conditions: [
+            {
+              state: 'critical',
+              severity: 'critical',
+              min_occurrences: 1,
+              for_seconds: 0,
+            },
+          ],
+          recovery_state: 'healthy',
+          recovery_min_occurrences: 2,
+          recovery_for_seconds: 0,
+          version: 1,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+    });
+  }
+  if (
+    sessionMode === 'viewer' &&
+    (url.pathname === '/api/v1/maintenance-windows' ||
+      url.pathname === '/api/v1/silences')
+  )
+    return apiError(
+      response,
+      403,
+      'forbidden',
+      'You do not have permission to manage suppressions.',
+    );
+  if (url.pathname === '/api/v1/maintenance-windows')
+    return json(response, 200, { items: [] });
+  if (url.pathname === '/api/v1/silences')
+    return json(response, 200, { items: [] });
   if (url.pathname === '/api/v1/incidents' && request.method === 'GET') {
     const active = url.searchParams.get('active') !== 'false';
     const items = active ? [incidentSummary()] : [recoveredIncidentSummary()];

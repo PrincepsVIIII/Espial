@@ -14,6 +14,7 @@ const (
 	IntegrationChanged = "integration_changed"
 	CollectionChanged  = "collection_changed"
 	IncidentChanged    = "incident_changed"
+	SuppressionChanged = "suppression_changed"
 	ResyncRequired     = "resync_required"
 
 	DefaultReplayCapacity     = 1024

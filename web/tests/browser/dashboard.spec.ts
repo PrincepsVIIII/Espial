@@ -67,6 +67,8 @@ for (const viewport of [
         'Dashboard',
         'Alerts',
         'History',
+        'Rules',
+        'Suppressions',
         'Datacenter',
         'Hypervisor',
         'Webpages',
@@ -228,6 +230,86 @@ test('primary navigation links directly and its real child menu closes with Esca
   await expect(page.getByRole('link', { name: 'Users' })).toHaveCount(0);
   await expect(trigger).toBeFocused();
 });
+
+test('administrator alert controls are discoverable and viewer navigation hides them', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/dashboard');
+  await waitForHydration(page);
+  const alertTrigger = page.getByRole('button', { name: 'Alerts sections' });
+  await alertTrigger.click();
+  await expect(
+    page.getByRole('link', { name: 'Rules', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Suppressions', exact: true }),
+  ).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(alertTrigger).toBeFocused();
+
+  await request.get(`${mockCore}/__test/control?session=viewer`);
+  await page.goto('/alerts');
+  await waitForHydration(page);
+  await page.getByRole('button', { name: 'Alerts sections' }).click();
+  await expect(
+    page.getByRole('link', { name: 'Rules', exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Suppressions', exact: true }),
+  ).toHaveCount(0);
+
+  await page.goto('/alerts/rules');
+  await waitForHydration(page);
+  await expect(page.getByRole('alert')).toContainText(
+    'You do not have permission to manage incident rules.',
+  );
+  await expect(page.getByRole('button', { name: 'Create rule' })).toHaveCount(
+    0,
+  );
+});
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`rule and suppression administration remains usable at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/alerts/rules');
+    await waitForHydration(page);
+    await expect(
+      page.getByRole('heading', { name: 'Alert rules' }),
+    ).toBeVisible();
+    await expect(page.getByText('Default resource health')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Explain rule precedence' }),
+    ).toBeVisible();
+
+    await page.goto('/alerts/suppressions');
+    await waitForHydration(page);
+    await expect(
+      page.getByRole('heading', { name: 'Suppressions' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Maintenance windows' }),
+    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Silences' })).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`suppressions-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  });
+}
 
 test('SSE reconnects, refreshes REST, and respects reduced motion', async ({
   page,

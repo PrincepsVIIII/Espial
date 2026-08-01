@@ -811,6 +811,399 @@
         }
       }
     },
+    "/incident-rules": {
+      "get": {
+        "operationId": "listIncidentRules",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Bounded rule list in deterministic administrative order.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/IncidentRuleList" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "operationId": "createIncidentRule",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-rule-write.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/incident-rules/preview": {
+      "post": {
+        "operationId": "previewIncidentRulePrecedence",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "integration_id",
+                  "resource_id",
+                  "check_type",
+                  "state"
+                ],
+                "properties": {
+                  "integration_id": { "type": "string", "format": "uuid" },
+                  "resource_id": { "type": "string", "format": "uuid" },
+                  "check_type": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+                  },
+                  "state": {
+                    "enum": [
+                      "healthy",
+                      "warning",
+                      "critical",
+                      "unknown",
+                      "stale",
+                      "maintenance",
+                      "disabled"
+                    ]
+                  },
+                  "reason_code": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_.-]{0,126}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Winning rule and ordered overlap explanation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/v1/incident-rule-preview.schema.json"
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/incident-rules/{id}": {
+      "get": {
+        "operationId": "getIncidentRule",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Authoritative incident rule with ETag.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/v1/incident-rule.schema.json" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "replaceIncidentRule",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/incident-rule-write.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/maintenance-windows": {
+      "get": {
+        "operationId": "listMaintenanceWindows",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Bounded maintenance window list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MaintenanceWindowList"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "operationId": "createMaintenanceWindow",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/maintenance-window-write.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/maintenance-windows/{id}": {
+      "get": {
+        "operationId": "getMaintenanceWindow",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Maintenance window with ETag.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "../schemas/v1/maintenance-window.schema.json"
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "replaceMaintenanceWindow",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "../schemas/v1/maintenance-window-write.schema.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/maintenance-windows/{id}/revoke": {
+      "post": {
+        "operationId": "revokeMaintenanceWindow",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/silences": {
+      "get": {
+        "operationId": "listSilences",
+        "security": [{ "cookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Bounded notification silence list.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SilenceList" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      },
+      "post": {
+        "operationId": "createSilence",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "../schemas/v1/silence-write.schema.json" }
+            }
+          }
+        },
+        "responses": {
+          "201": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/silences/{id}": {
+      "get": {
+        "operationId": "getSilence",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Notification silence with ETag.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "../schemas/v1/silence.schema.json" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "put": {
+        "operationId": "replaceSilence",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "../schemas/v1/silence-write.schema.json" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
+    "/silences/{id}/revoke": {
+      "post": {
+        "operationId": "revokeSilence",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" },
+          { "$ref": "#/components/parameters/IdempotencyKey" }
+        ],
+        "responses": {
+          "200": { "$ref": "#/components/responses/AdministrativeMutation" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "428": { "$ref": "#/components/responses/PreconditionRequired" }
+        }
+      }
+    },
     "/roles": {
       "get": {
         "operationId": "listManagedRoles",
@@ -1083,6 +1476,45 @@
       "IncidentAssignee": {
         "$ref": "../schemas/v1/incident-assignee.schema.json"
       },
+      "AdministrativeMutationReceipt": {
+        "$ref": "../schemas/v1/administrative-mutation-receipt.schema.json"
+      },
+      "IncidentRuleList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/incident-rule.schema.json" }
+          }
+        }
+      },
+      "MaintenanceWindowList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/maintenance-window.schema.json" }
+          }
+        }
+      },
+      "SilenceList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["items"],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 200,
+            "items": { "$ref": "../schemas/v1/silence.schema.json" }
+          }
+        }
+      },
       "ResourceList": {
         "type": "object",
         "additionalProperties": false,
@@ -1283,6 +1715,20 @@
       }
     },
     "responses": {
+      "AdministrativeMutation": {
+        "description": "Administrative mutation committed atomically with an audit receipt.",
+        "headers": {
+          "ETag": { "schema": { "type": "string" } },
+          "X-Request-ID": { "schema": { "type": "string" } }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "../schemas/v1/administrative-mutation-receipt.schema.json"
+            }
+          }
+        }
+      },
       "IncidentMutated": {
         "description": "Incident mutation committed with an immutable timeline event and redacted audit record.",
         "headers": {

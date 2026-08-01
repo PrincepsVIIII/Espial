@@ -12,6 +12,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/observations"
 	"github.com/PrincepsVIIII/Espial/core/internal/scheduler"
+	"github.com/PrincepsVIIII/Espial/core/internal/suppressions"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -34,10 +35,12 @@ type RuntimeOptions struct {
 // Runtime owns the bounded collection, freshness, and incident evaluator
 // goroutines plus their shared invalidation hub.
 type Runtime struct {
-	coordinator *scheduler.Coordinator
-	freshness   *FreshnessWorker
-	incidents   *incidents.Evaluator
-	hub         *events.Hub
+	coordinator        *scheduler.Coordinator
+	freshness          *FreshnessWorker
+	incidents          *incidents.Evaluator
+	suppressions       *suppressions.Worker
+	suppressionService *suppressions.Service
+	hub                *events.Hub
 }
 
 func NewRuntime(
@@ -75,25 +78,31 @@ func NewRuntime(
 			}
 		},
 	})
-	return &Runtime{coordinator: coordinator, freshness: freshness, incidents: incidentEvaluator, hub: hub}
+	suppressionService := suppressions.NewService(pool, hub, nil)
+	return &Runtime{coordinator: coordinator, freshness: freshness, incidents: incidentEvaluator,
+		suppressions:       suppressions.NewWorker(suppressionService, time.Second),
+		suppressionService: suppressionService, hub: hub}
 }
 
-func (runtime *Runtime) Hub() *events.Hub { return runtime.hub }
+func (runtime *Runtime) Hub() *events.Hub                    { return runtime.hub }
+func (runtime *Runtime) Suppressions() *suppressions.Service { return runtime.suppressionService }
 
 func (runtime *Runtime) Run(ctx context.Context) error {
 	runContext, cancel := context.WithCancel(ctx)
 	defer cancel()
-	errorsChannel := make(chan error, 3)
+	errorsChannel := make(chan error, 4)
 	go func() { errorsChannel <- runtime.coordinator.Run(runContext) }()
 	go func() { errorsChannel <- runtime.freshness.Run(runContext) }()
 	go func() { errorsChannel <- runtime.incidents.Run(runContext) }()
+	go func() { errorsChannel <- runtime.suppressions.Run(runContext) }()
 
 	first := <-errorsChannel
 	cancel()
 	second := <-errorsChannel
 	third := <-errorsChannel
+	fourth := <-errorsChannel
 	if ctx.Err() != nil || errors.Is(first, context.Canceled) &&
-		errors.Is(second, context.Canceled) && errors.Is(third, context.Canceled) {
+		errors.Is(second, context.Canceled) && errors.Is(third, context.Canceled) && errors.Is(fourth, context.Canceled) {
 		return ctx.Err()
 	}
 	if first != nil && !errors.Is(first, context.Canceled) {
@@ -102,5 +111,8 @@ func (runtime *Runtime) Run(ctx context.Context) error {
 	if second != nil && !errors.Is(second, context.Canceled) {
 		return second
 	}
-	return third
+	if third != nil && !errors.Is(third, context.Canceled) {
+		return third
+	}
+	return fourth
 }

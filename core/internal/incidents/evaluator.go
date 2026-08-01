@@ -171,6 +171,9 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 
 	rule, resourceName, err := matchingRule(ctx, tx, signal)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if err := appendEvaluationEvidence(ctx, tx, signal.ID, "", "", "no_rule", "No enabled incident rule matched the normalized signal.", now); err != nil {
+			return incidentChange{}, err
+		}
 		if err := signals.MarkProcessed(ctx, tx, signal.ID, now); err != nil {
 			return incidentChange{}, err
 		}
@@ -184,6 +187,32 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 		return incidentChange{}, err
 	}
 	if state.LastSignalAt != nil && state.LastSignalAt.After(signal.OccurredAt) {
+		if err := appendEvaluationEvidence(ctx, tx, signal.ID, rule.ID, "", "debounced", "An older out-of-order signal was recorded without changing rule state.", now); err != nil {
+			return incidentChange{}, err
+		}
+		if err := signals.MarkProcessed(ctx, tx, signal.ID, now); err != nil {
+			return incidentChange{}, err
+		}
+		return incidentChange{}, tx.Commit(ctx)
+	}
+	maintenance, err := activeMaintenance(ctx, tx, signal, signal.OccurredAt)
+	if err != nil {
+		return incidentChange{}, err
+	}
+	if maintenance.ID != "" {
+		state.MatchingSince, state.RecoverySince, state.DeadlineAt = nil, nil, nil
+		state.MatchingOccurrences, state.RecoveryOccurrences = 0, 0
+		state.LastSignalID = signal.ID
+		occurredAt := signal.OccurredAt.UTC()
+		state.LastSignalAt = &occurredAt
+		state.LastState = health.Maintenance
+		state.LastReason = "Maintenance: " + maintenance.Reason
+		if err := saveRuleState(ctx, tx, rule.ID, signal.ResourceID, signal.CheckType, state, now); err != nil {
+			return incidentChange{}, err
+		}
+		if err := appendEvaluationEvidence(ctx, tx, signal.ID, rule.ID, maintenance.ID, "maintenance", "Raw failure preserved; incident evaluation suppressed by maintenance window.", now); err != nil {
+			return incidentChange{}, err
+		}
 		if err := signals.MarkProcessed(ctx, tx, signal.ID, now); err != nil {
 			return incidentChange{}, err
 		}
@@ -202,6 +231,16 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 	if err := saveRuleState(ctx, tx, rule.ID, signal.ResourceID, signal.CheckType, state, now); err != nil {
 		return incidentChange{}, err
 	}
+	outcome, explanation := "debounced", "The matching rule did not yet satisfy its occurrence or duration threshold."
+	if rule.Condition == nil {
+		outcome, explanation = "no_condition", "The winning rule has no condition for this health state."
+	}
+	if change.Changed {
+		outcome, explanation = "incident_changed", "The winning rule changed the authoritative incident lifecycle."
+	}
+	if err := appendEvaluationEvidence(ctx, tx, signal.ID, rule.ID, "", outcome, explanation, now); err != nil {
+		return incidentChange{}, err
+	}
 	if err := signals.MarkProcessed(ctx, tx, signal.ID, now); err != nil {
 		return incidentChange{}, err
 	}
@@ -209,6 +248,42 @@ func (evaluator *Evaluator) processSignal(ctx context.Context, signal signals.Si
 		return incidentChange{}, fmt.Errorf("commit incident evaluation: %w", err)
 	}
 	return change, nil
+}
+
+type maintenanceMatch struct{ ID, Reason string }
+
+func activeMaintenance(ctx context.Context, tx pgx.Tx, signal signals.Signal, at time.Time) (maintenanceMatch, error) {
+	var result maintenanceMatch
+	err := tx.QueryRow(ctx, `
+		SELECT id::text, reason FROM maintenance_windows
+		WHERE enabled AND revoked_at IS NULL AND starts_at <= $4 AND ends_at > $4
+		  AND (integration_id IS NULL OR integration_id = $1)
+		  AND (resource_id IS NULL OR resource_id = $2)
+		  AND (check_type IS NULL OR check_type = $3)
+		ORDER BY (resource_id IS NOT NULL) DESC,
+		 ((integration_id IS NOT NULL)::int + (check_type IS NOT NULL)::int) DESC,
+		 starts_at DESC, id LIMIT 1
+	`, signal.IntegrationID, signal.ResourceID, signal.CheckType, at.UTC()).Scan(&result.ID, &result.Reason)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return maintenanceMatch{}, nil
+	}
+	if err != nil {
+		return maintenanceMatch{}, fmt.Errorf("match maintenance window: %w", err)
+	}
+	return result, nil
+}
+
+func appendEvaluationEvidence(ctx context.Context, tx pgx.Tx, signalID, ruleID, windowID, outcome, explanation string, at time.Time) error {
+	_, err := tx.Exec(ctx, `
+		INSERT INTO incident_evaluation_evidence (
+			signal_id, rule_id, maintenance_window_id, outcome, explanation, evaluated_at
+		) VALUES ($1, NULLIF($2, '')::uuid, NULLIF($3, '')::uuid, $4, $5, $6)
+		ON CONFLICT (signal_id) DO NOTHING
+	`, signalID, ruleID, windowID, outcome, boundedText(explanation, 1024), at.UTC())
+	if err != nil {
+		return fmt.Errorf("append incident evaluation evidence: %w", err)
+	}
+	return nil
 }
 
 func matchingRule(ctx context.Context, tx pgx.Tx, signal signals.Signal) (rule, string, error) {
@@ -242,6 +317,40 @@ func matchingRule(ctx context.Context, tx pgx.Tx, signal signals.Signal) (rule, 
 		signal.ReasonCode, signal.State).Scan(
 		&result.ID, &result.Name, &recoveryState,
 		&result.RecoveryMinOccurrences, &recoverySeconds,
+		&severity, &minimum, &conditionSeconds, &resourceName,
+	)
+	if err != nil {
+		return rule{}, "", err
+	}
+	result.RecoveryState = health.State(recoveryState)
+	result.RecoveryFor = time.Duration(recoverySeconds) * time.Second
+	if severity.Valid {
+		result.Condition = &condition{Severity: Severity(severity.String), MinOccurrences: int(minimum.Int32), For: time.Duration(conditionSeconds.Int32) * time.Second}
+	}
+	return result, resourceName, nil
+}
+
+func matchingRuleByID(ctx context.Context, tx pgx.Tx, id string, signal signals.Signal) (rule, string, error) {
+	var result rule
+	var resourceName string
+	var severity pgtype.Text
+	var minimum, conditionSeconds pgtype.Int4
+	var recoverySeconds int
+	var recoveryState string
+	err := tx.QueryRow(ctx, `
+		SELECT ir.id::text, ir.name, ir.recovery_state,
+			ir.recovery_min_occurrences, ir.recovery_for_seconds,
+			irc.severity, irc.min_occurrences, irc.for_seconds, r.display_name
+		FROM incident_rules ir JOIN resources r ON r.id=$3
+		LEFT JOIN incident_rule_conditions irc ON irc.rule_id=ir.id AND irc.state=$6
+		WHERE ir.id=$1 AND ir.enabled
+		 AND (ir.integration_id IS NULL OR ir.integration_id=$2)
+		 AND (ir.resource_id IS NULL OR ir.resource_id=$3)
+		 AND (ir.resource_kind IS NULL OR ir.resource_kind=r.kind)
+		 AND (ir.check_type IS NULL OR ir.check_type=$4)
+		 AND (ir.reason_code IS NULL OR ir.reason_code=NULLIF($5,''))
+	`, id, signal.IntegrationID, signal.ResourceID, signal.CheckType, signal.ReasonCode, signal.State).Scan(
+		&result.ID, &result.Name, &recoveryState, &result.RecoveryMinOccurrences, &recoverySeconds,
 		&severity, &minimum, &conditionSeconds, &resourceName,
 	)
 	if err != nil {
@@ -545,9 +654,35 @@ func (evaluator *Evaluator) processOneDue(ctx context.Context, now time.Time) (i
 	); err != nil {
 		return incidentChange{}, false, err
 	}
-	rule, resourceName, err := matchingRule(ctx, tx, signal)
+	rule, resourceName, err := matchingRuleByID(ctx, tx, ruleID, signal)
+	if errors.Is(err, pgx.ErrNoRows) {
+		state.DeadlineAt = nil
+		if err := saveRuleState(ctx, tx, ruleID, resourceID, checkType, state, now); err != nil {
+			return incidentChange{}, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return incidentChange{}, false, err
+		}
+		return incidentChange{}, true, nil
+	}
 	if err != nil {
 		return incidentChange{}, false, err
+	}
+	maintenance, err := activeMaintenance(ctx, tx, signal, now)
+	if err != nil {
+		return incidentChange{}, false, err
+	}
+	if maintenance.ID != "" {
+		state.MatchingSince, state.RecoverySince, state.DeadlineAt = nil, nil, nil
+		state.MatchingOccurrences, state.RecoveryOccurrences = 0, 0
+		state.LastState, state.LastReason = health.Maintenance, "Maintenance: "+maintenance.Reason
+		if err := saveRuleState(ctx, tx, ruleID, resourceID, checkType, state, now); err != nil {
+			return incidentChange{}, false, err
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return incidentChange{}, false, err
+		}
+		return incidentChange{}, true, nil
 	}
 	change, err := evaluate(ctx, tx, signal, rule, &state, resourceName, now, true)
 	if err != nil {

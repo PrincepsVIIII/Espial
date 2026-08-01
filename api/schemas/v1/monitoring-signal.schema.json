@@ -16,7 +16,7 @@
   ],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
-    "kind": { "enum": ["observation", "freshness"] },
+    "kind": { "enum": ["observation", "freshness", "maintenance_expiry"] },
     "integration_id": { "type": "string", "format": "uuid" },
     "resource_id": { "type": "string", "format": "uuid" },
     "observation_id": { "type": "string", "format": "uuid" },

@@ -376,3 +376,45 @@ recovery at 1440×900, 1280×800, and 500×900 against the
   findings.
 - Backend integration evidence proves the controls correspond to authorized,
   atomic, idempotent Core mutations rather than client-side capability claims.
+
+## 2026-07-31 — Slice 2.3 rule and suppression administration review
+
+### Scope
+
+Reviewed Alert rule authoring and precedence preview, maintenance-window and
+silence administration, effective-versus-raw health presentation, permission
+boundaries, receipts, and responsive layouts against the
+[general UI guidance](UI_GUIDANCE.md), [design system](DESIGN_SYSTEM.md), and
+Phase 2 implementation contract.
+
+### Material decisions
+
+- Added Rules and Suppressions only as real, permission-gated Alerts destinations
+  backed by authoritative reads and mutations. Direct unauthorized requests retain
+  the application shell, show Core's denial, and expose no administrative controls.
+- Kept rule editing, overlap explanation, maintenance windows, and silences in flat
+  bordered sections and compact tables/forms. No decorative icons, badges,
+  gradients, glows, filled hover tiles, or ornamental motion were introduced.
+- Kept maintenance and silencing visibly distinct: maintenance changes effective
+  health while preserving the displayed raw state; silencing is labeled as a
+  future notification decision and never claims to hide or mutate an incident.
+- Displayed date inputs in browser-local time with explicit copy and converted
+  their values to one-time UTC API timestamps. Existing UTC values round-trip
+  through the same conversion without timezone drift.
+- Every successful administrative mutation shows its request ID and, for an Audit
+  reader, a direct link to the matching audit record.
+
+### Viewport and verification evidence
+
+- At 1440px and 1280px, tables and four-column control forms remain compact within
+  the detached canvas. At 500px, controls stack in source order with no clipped
+  fields or horizontal page overflow; the collapsed top menu remains available.
+- The complete Chromium suite passed 25 scenarios, including three rule/suppression
+  viewport cases, Viewer navigation omission and direct-route denial, dropdown
+  pointer/click/keyboard behavior, reduced motion, and zero serious/critical
+  accessibility findings.
+- Svelte diagnostics reported zero errors and warnings, all 47 frontend unit tests
+  passed, and the production SvelteKit build completed successfully.
+- Database-backed Core and race suites prove rule, maintenance, silence, audit,
+  idempotency, expiry, and immediate re-evaluation behavior behind the rendered
+  capability.

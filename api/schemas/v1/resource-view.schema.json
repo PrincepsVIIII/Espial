@@ -34,7 +34,7 @@
     "health": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["state", "reason", "updated_at"],
+      "required": ["state", "reason", "raw_state", "raw_reason", "updated_at"],
       "properties": {
         "state": {
           "enum": [
@@ -48,6 +48,20 @@
           ]
         },
         "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "raw_state": {
+          "enum": ["healthy", "warning", "critical", "unknown", "stale", "maintenance", "disabled"]
+        },
+        "raw_reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "maintenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "reason", "ends_at"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "ends_at": { "type": "string", "format": "date-time" }
+          }
+        },
         "observation_id": { "type": "string", "format": "uuid" },
         "observed_at": { "type": "string", "format": "date-time" },
         "last_success_at": { "type": "string", "format": "date-time" },

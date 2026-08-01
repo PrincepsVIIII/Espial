@@ -13,6 +13,7 @@
     "recovery_state",
     "recovery_min_occurrences",
     "recovery_for_seconds",
+    "version",
     "created_at",
     "updated_at"
   ],
@@ -76,6 +77,7 @@
       "minimum": 0,
       "maximum": 2592000
     },
+    "version": { "type": "integer", "minimum": 1 },
     "created_at": { "type": "string", "format": "date-time" },
     "updated_at": { "type": "string", "format": "date-time" }
   }

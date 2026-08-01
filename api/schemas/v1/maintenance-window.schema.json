@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/maintenance-window.schema.json",
+  "title": "Maintenance window",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "reason", "starts_at", "ends_at", "enabled", "created_by_name", "version", "created_at", "updated_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "check_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "starts_at": { "type": "string", "format": "date-time" },
+    "ends_at": { "type": "string", "format": "date-time" },
+    "enabled": { "type": "boolean" },
+    "revoked_at": { "type": "string", "format": "date-time" },
+    "expired_at": { "type": "string", "format": "date-time" },
+    "created_by_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "version": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-rule-write.schema.json",
+  "title": "Incident rule write",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "enabled", "priority", "conditions", "recovery_state", "recovery_min_occurrences", "recovery_for_seconds"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "enabled": { "type": "boolean" },
+    "priority": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "resource_kind": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "check_type": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "reason_code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "conditions": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["state", "severity", "min_occurrences", "for_seconds"],
+        "properties": {
+          "state": { "enum": ["warning", "critical", "unknown", "stale"] },
+          "severity": { "enum": ["warning", "critical"] },
+          "min_occurrences": { "type": "integer", "minimum": 1, "maximum": 1000 },
+          "for_seconds": { "type": "integer", "minimum": 0, "maximum": 2592000 }
+        }
+      }
+    },
+    "recovery_state": { "enum": ["healthy", "warning", "critical", "unknown", "stale", "maintenance", "disabled"] },
+    "recovery_min_occurrences": { "type": "integer", "minimum": 1, "maximum": 1000 },
+    "recovery_for_seconds": { "type": "integer", "minimum": 0, "maximum": 2592000 }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/silence-write.schema.json",
+  "title": "Notification silence write",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason", "starts_at", "expires_at", "enabled"],
+  "properties": {
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512 },
+    "incident_id": { "type": "string", "format": "uuid" },
+    "rule_id": { "type": "string", "format": "uuid" },
+    "resource_id": { "type": "string", "format": "uuid" },
+    "starts_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "enabled": { "type": "boolean" }
+  }
+}

@@ -167,6 +167,44 @@ func TestReadServiceOverviewFiltersDetailsAndStablePagination(t *testing.T) {
 	}
 }
 
+func TestReadServiceExposesEffectiveMaintenanceAlongsideRawFailure(t *testing.T) {
+	pool := monitoringTestPool(t)
+	insertPipelineIntegration(t, pool)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	clock := &mutableClock{now: now}
+	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
+	if _, err := ingestor.Ingest(context.Background(), pipelineIntegrationID, observations.Batch{
+		Resources:    []observations.ResourceInput{{ExternalID: "maintenance-read", Kind: "host", DisplayName: "Maintenance read", ObservedAt: now, Attributes: map[string]any{}}},
+		Observations: []observations.ObservationInput{{ExternalResourceID: "maintenance-read", CheckType: "availability", State: health.Critical, Summary: "raw host failure", ObservedAt: now, ExpectedRefreshSeconds: 300, Measurements: map[string]any{}, Metadata: map[string]any{}}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	var resourceID string
+	if err := pool.QueryRow(context.Background(), `SELECT id::text FROM resources WHERE external_id='maintenance-read'`).Scan(&resourceID); err != nil {
+		t.Fatal(err)
+	}
+	windowID := "70000000-0000-4000-8000-000000000041"
+	if _, err := pool.Exec(context.Background(), `
+		INSERT INTO maintenance_windows (id,reason,resource_id,check_type,starts_at,ends_at,created_by_name)
+		VALUES ($1,'Planned read test',$2,'availability',$3,$4,'Test administrator')
+	`, windowID, resourceID, now.Add(-time.Minute), now.Add(time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	service := NewReadService(pool)
+	detail, err := service.Resource(context.Background(), resourceID)
+	if err != nil || detail.Health.State != health.Maintenance || detail.Health.RawState != health.Critical || detail.Health.RawReason != "raw host failure" || detail.Health.Maintenance == nil || detail.Health.Maintenance.ID != windowID {
+		t.Fatalf("maintenance resource = %#v, %v", detail.Health, err)
+	}
+	page, err := service.Resources(context.Background(), ResourceFilter{States: []health.State{health.Maintenance}})
+	if err != nil || len(page.Items) != 1 || page.Items[0].ID != resourceID {
+		t.Fatalf("maintenance filter = %#v, %v", page, err)
+	}
+	overview, err := service.Overview(context.Background())
+	if err != nil || len(overview.ResourceCounts) != 1 || overview.ResourceCounts[0].State != health.Maintenance || overview.RecentChanges[0].State != health.Maintenance {
+		t.Fatalf("maintenance overview = %#v, %v", overview, err)
+	}
+}
+
 func TestAuditReadUsesBoundedStableCursorAndRecordsAdministrativeRead(t *testing.T) {
 	pool := monitoringTestPool(t)
 	insertPipelineIntegration(t, pool)

@@ -29,7 +29,7 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 10 {
+	if migrationCount != 11 {
 		t.Fatalf("migration count = %d", migrationCount)
 	}
 
@@ -42,6 +42,15 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 		  AND column_name = 'expected_refresh_seconds'
 	`).Scan(&expectedRefreshNullable); err != nil {
 		t.Fatalf("inspect expected refresh column: %v", err)
+	}
+
+	var suppressionTablesExist bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.maintenance_windows') IS NOT NULL
+			AND to_regclass(current_schema() || '.silences') IS NOT NULL
+			AND to_regclass(current_schema() || '.incident_evaluation_evidence') IS NOT NULL
+	`).Scan(&suppressionTablesExist); err != nil || !suppressionTablesExist {
+		t.Fatalf("alert control migration = %v, %v", suppressionTablesExist, err)
 	}
 	if expectedRefreshNullable != "NO" {
 		t.Fatalf("expected_refresh_seconds nullable = %q", expectedRefreshNullable)
@@ -166,7 +175,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (11, '000011_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (12, '000012_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

@@ -54,14 +54,23 @@ type Overview struct {
 }
 
 type CurrentHealthView struct {
-	State         health.State `json:"state"`
-	Reason        string       `json:"reason"`
-	ObservationID string       `json:"observation_id,omitempty"`
-	ObservedAt    *time.Time   `json:"observed_at,omitempty"`
-	LastSuccessAt *time.Time   `json:"last_success_at,omitempty"`
-	StaleAt       *time.Time   `json:"stale_at,omitempty"`
-	UnknownAt     *time.Time   `json:"unknown_at,omitempty"`
-	UpdatedAt     time.Time    `json:"updated_at"`
+	State         health.State           `json:"state"`
+	Reason        string                 `json:"reason"`
+	RawState      health.State           `json:"raw_state"`
+	RawReason     string                 `json:"raw_reason"`
+	Maintenance   *MaintenanceHealthView `json:"maintenance,omitempty"`
+	ObservationID string                 `json:"observation_id,omitempty"`
+	ObservedAt    *time.Time             `json:"observed_at,omitempty"`
+	LastSuccessAt *time.Time             `json:"last_success_at,omitempty"`
+	StaleAt       *time.Time             `json:"stale_at,omitempty"`
+	UnknownAt     *time.Time             `json:"unknown_at,omitempty"`
+	UpdatedAt     time.Time              `json:"updated_at"`
+}
+
+type MaintenanceHealthView struct {
+	ID     string    `json:"id"`
+	Reason string    `json:"reason"`
+	EndsAt time.Time `json:"ends_at"`
 }
 
 type ObservationView struct {

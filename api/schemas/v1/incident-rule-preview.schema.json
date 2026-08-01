@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/incident-rule-preview.schema.json",
+  "title": "Incident rule precedence preview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["candidates", "explanation"],
+  "properties": {
+    "winner": { "$ref": "#/$defs/candidate" },
+    "candidates": { "type": "array", "maxItems": 200, "items": { "$ref": "#/$defs/candidate" } },
+    "explanation": { "type": "string", "minLength": 1, "maxLength": 1024 }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "priority", "specificity", "winner", "explanation"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "priority": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "specificity": { "type": "integer", "minimum": 0, "maximum": 5 },
+        "winner": { "type": "boolean" },
+        "explanation": { "type": "string", "minLength": 1, "maxLength": 1024 }
+      }
+    }
+  }
+}

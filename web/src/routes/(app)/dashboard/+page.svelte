@@ -253,6 +253,12 @@
               </td>
               <td data-label="Current reason" class="reason-cell">
                 {resource.health.reason}
+                {#if resource.health.state === 'maintenance'}
+                  <small class="raw-health">
+                    Raw: {resource.health.raw_state} — {resource.health
+                      .raw_reason}
+                  </small>
+                {/if}
               </td>
             </tr>
           {/each}

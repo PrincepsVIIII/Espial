@@ -15,10 +15,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/PrincepsVIIII/Espial/core/internal/adminops"
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
+	"github.com/PrincepsVIIII/Espial/core/internal/suppressions"
 )
 
 const (
@@ -62,6 +64,27 @@ type IncidentWorkflow interface {
 	Mutate(context.Context, incidents.Mutation) (incidents.MutationResult, error)
 }
 
+type IncidentRuleManager interface {
+	List(context.Context) (incidents.RuleList, error)
+	Detail(context.Context, string) (incidents.RuleView, error)
+	Create(context.Context, incidents.RuleWrite) (adminops.Receipt, error)
+	Replace(context.Context, string, incidents.RuleWrite) (adminops.Receipt, error)
+	Preview(context.Context, incidents.RulePreviewInput) (incidents.RulePreview, error)
+}
+
+type SuppressionManager interface {
+	MaintenanceWindows(context.Context) (suppressions.MaintenanceList, error)
+	MaintenanceWindow(context.Context, string) (suppressions.MaintenanceWindow, error)
+	CreateMaintenance(context.Context, suppressions.MaintenanceDefinition, suppressions.MutationMetadata) (adminops.Receipt, error)
+	ReplaceMaintenance(context.Context, string, suppressions.MaintenanceDefinition, suppressions.MutationMetadata) (adminops.Receipt, error)
+	RevokeMaintenance(context.Context, string, suppressions.MutationMetadata) (adminops.Receipt, error)
+	Silences(context.Context) (suppressions.SilenceList, error)
+	Silence(context.Context, string) (suppressions.Silence, error)
+	CreateSilence(context.Context, suppressions.SilenceDefinition, suppressions.MutationMetadata) (adminops.Receipt, error)
+	ReplaceSilence(context.Context, string, suppressions.SilenceDefinition, suppressions.MutationMetadata) (adminops.Receipt, error)
+	RevokeSilence(context.Context, string, suppressions.MutationMetadata) (adminops.Receipt, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -83,6 +106,8 @@ type Dependencies struct {
 	Monitoring       MonitoringReader
 	Incidents        IncidentReader
 	IncidentWorkflow IncidentWorkflow
+	IncidentRules    IncidentRuleManager
+	Suppressions     SuppressionManager
 	Integrations     IntegrationManager
 	Users            UserAdministrator
 	Events           EventSource
@@ -131,6 +156,21 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/incidents/{id}/notes", server.addIncidentNote)
 	mux.HandleFunc("POST /api/v1/incidents/{id}/resolve", server.resolveIncident)
 	mux.HandleFunc("GET /api/v1/incident-assignees", server.incidentAssignees)
+	mux.HandleFunc("GET /api/v1/incident-rules", server.incidentRuleList)
+	mux.HandleFunc("POST /api/v1/incident-rules", server.createIncidentRule)
+	mux.HandleFunc("POST /api/v1/incident-rules/preview", server.previewIncidentRule)
+	mux.HandleFunc("GET /api/v1/incident-rules/{id}", server.incidentRuleDetail)
+	mux.HandleFunc("PUT /api/v1/incident-rules/{id}", server.replaceIncidentRule)
+	mux.HandleFunc("GET /api/v1/maintenance-windows", server.maintenanceWindowList)
+	mux.HandleFunc("POST /api/v1/maintenance-windows", server.createMaintenanceWindow)
+	mux.HandleFunc("GET /api/v1/maintenance-windows/{id}", server.maintenanceWindowDetail)
+	mux.HandleFunc("PUT /api/v1/maintenance-windows/{id}", server.replaceMaintenanceWindow)
+	mux.HandleFunc("POST /api/v1/maintenance-windows/{id}/revoke", server.revokeMaintenanceWindow)
+	mux.HandleFunc("GET /api/v1/silences", server.silenceList)
+	mux.HandleFunc("POST /api/v1/silences", server.createSilence)
+	mux.HandleFunc("GET /api/v1/silences/{id}", server.silenceDetail)
+	mux.HandleFunc("PUT /api/v1/silences/{id}", server.replaceSilence)
+	mux.HandleFunc("POST /api/v1/silences/{id}/revoke", server.revokeSilence)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

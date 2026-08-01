@@ -58,6 +58,8 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		SecureCookies: secureCookies(cfg), Monitoring: monitoring.NewReadService(pool),
 		Incidents:        incidents.NewReader(pool),
 		IncidentWorkflow: incidentWorkflow,
+		IncidentRules:    incidents.NewRuleService(pool, nil),
+		Suppressions:     monitoringRuntime.Suppressions(),
 		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,

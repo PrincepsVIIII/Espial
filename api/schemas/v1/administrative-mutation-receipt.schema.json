@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/administrative-mutation-receipt.schema.json",
+  "title": "Administrative mutation receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "version", "request_id", "replayed"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "version": { "type": "integer", "minimum": 1 },
+    "request_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "replayed": { "type": "boolean" },
+    "audit_url": { "type": "string", "pattern": "^/audit\\?correlation_id=" }
+  }
+}

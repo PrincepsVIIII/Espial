@@ -11,8 +11,8 @@
     <p class="eyebrow">Operational attention</p>
     <h1>Alerts</h1>
     <p class="page-description">
-      Authoritative incidents detected from resource health. This view is
-      read-only in Phase 2.1.
+      Authoritative incidents detected from resource health. This view is backed
+      by durable evaluation and lifecycle evidence.
     </p>
   </div>
 </header>
