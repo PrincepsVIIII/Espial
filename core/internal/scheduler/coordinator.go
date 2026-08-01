@@ -21,9 +21,10 @@ type CoordinatorOptions struct {
 }
 
 type Coordinator struct {
-	lister  IntegrationLister
-	runner  IntegrationRunner
-	options CoordinatorOptions
+	lister   IntegrationLister
+	runner   IntegrationRunner
+	options  CoordinatorOptions
+	restarts chan string
 }
 
 type managedRun struct {
@@ -44,7 +45,14 @@ func NewCoordinator(lister IntegrationLister, runner IntegrationRunner, options 
 	if options.NewTimer == nil {
 		options.NewTimer = func(delay time.Duration) Timer { return systemTimer{timer: time.NewTimer(delay)} }
 	}
-	return &Coordinator{lister: lister, runner: runner, options: options}
+	return &Coordinator{lister: lister, runner: runner, options: options, restarts: make(chan string, 64)}
+}
+
+func (coordinator *Coordinator) Restart(integrationID string) {
+	select {
+	case coordinator.restarts <- integrationID:
+	default:
+	}
 }
 
 func (coordinator *Coordinator) Run(ctx context.Context) error {
@@ -101,6 +109,10 @@ func (coordinator *Coordinator) Run(ctx context.Context) error {
 			}
 			if exit.err != nil && coordinator.options.OnError != nil && ctx.Err() == nil {
 				coordinator.options.OnError(exit.id, exit.err)
+			}
+		case id := <-coordinator.restarts:
+			if run := managed[id]; run != nil {
+				run.cancel()
 			}
 		case <-timer.Channel():
 			if err := reconcile(); err != nil {

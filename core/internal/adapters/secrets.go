@@ -28,7 +28,7 @@ func ResolveConfig(
 		if _, exists := nonsecret[field]; exists {
 			return nil, nil, runtimeError("secret_in_nonsecret_config")
 		}
-		if strings.TrimSpace(references[field]) == "" {
+		if strings.TrimSpace(references[field]) == "" && !optionalSecretField(manifest, field) {
 			return nil, nil, runtimeError("secret_reference_missing")
 		}
 	}
@@ -56,6 +56,19 @@ func ResolveConfig(
 		}
 	}
 	return resolved, redactions, nil
+}
+
+func optionalSecretField(manifest Manifest, field string) bool {
+	properties, ok := manifest.ConfigSchema["properties"].(map[string]any)
+	if !ok {
+		return false
+	}
+	definition, ok := properties[field].(map[string]any)
+	if !ok {
+		return false
+	}
+	value, _ := definition["x-espial-optional-secret"].(bool)
+	return value
 }
 
 func Redact(value string, secrets []string) string {

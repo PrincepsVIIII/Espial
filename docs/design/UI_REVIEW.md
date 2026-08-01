@@ -450,3 +450,36 @@ all three sizes, direct Viewer denial, labeled-test receipt/audit linkage, and z
 serious/critical accessibility findings. Svelte diagnostics and generated-contract
 checks remain clean; PostgreSQL/race and Mattermost security tests prove the paths
 behind the rendered capability.
+
+## 2026-08-01 — Slice 2.5 website availability review
+
+### Scope and material decisions
+
+Reviewed authoritative website availability, direct detail, administrator monitor
+configuration, manual checks, live invalidation refetch, and failure/empty states
+against the general guidance, design system, and Phase 2 contract.
+
+- Replaced the Webpages unavailable state only after Core exposed permission-gated
+  webpage reads and typed monitor mutations. Added Monitors as a real Webpages child
+  only for `website_monitors:manage`; no Certificates destination is exposed early.
+- Used compact tables, definition rows, thin dividers, and the established textual
+  status component. No icons, badges, gradients, glow, filled hover tiles, or
+  ornamental motion were added.
+- Preserved effective and raw state, safe reason text, completed DNS/TCP/TLS/HTTP/
+  body stages, factual timing, and `Unknown`/`Not reported` treatment. The UI does
+  not reconstruct health or display response content.
+- Kept exact-content values and secret references write-only. Replacement copy
+  explicitly requires protected values again, while the redacted table exposes only
+  configured header names and a content-match boolean.
+- Every create, replace, and manual-check success presents a request ID and the exact
+  Audit link when authorized. Viewer reads remain independent from direct monitor
+  administration denial.
+
+### Viewport and verification evidence
+
+At 1440×900 and 1280×800 the availability and monitor tables remain compact; at
+500×900 the editor stacks in source order and the collapsed navigation includes the
+permission-gated Monitors child. All three Webpages list/detail scenarios have zero
+serious/critical axe findings. The 32-scenario Chromium suite, 48 frontend unit
+tests, generated-contract checks, and zero-error/zero-warning Svelte diagnostics
+pass.

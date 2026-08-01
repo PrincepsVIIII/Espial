@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -45,6 +46,8 @@ type Scheduler struct {
 	maximum   atomic.Int64
 	completed atomic.Uint64
 	coalesced atomic.Uint64
+	triggerMu sync.RWMutex
+	triggers  map[string]chan struct{}
 }
 
 func New(executor Executor, options Options) *Scheduler {
@@ -57,7 +60,24 @@ func New(executor Executor, options Options) *Scheduler {
 	if options.NewTimer == nil {
 		options.NewTimer = func(delay time.Duration) Timer { return systemTimer{timer: time.NewTimer(delay)} }
 	}
-	return &Scheduler{executor: executor, options: options, tokens: make(chan struct{}, options.GlobalConcurrency)}
+	return &Scheduler{executor: executor, options: options, tokens: make(chan struct{}, options.GlobalConcurrency), triggers: map[string]chan struct{}{}}
+}
+
+// Request schedules one bounded manual collection through the same per-integration
+// and global concurrency controls as periodic work. Repeated requests coalesce.
+func (scheduler *Scheduler) Request(integrationID string) bool {
+	scheduler.triggerMu.RLock()
+	trigger := scheduler.triggers[integrationID]
+	scheduler.triggerMu.RUnlock()
+	if trigger == nil {
+		return false
+	}
+	select {
+	case trigger <- struct{}{}:
+	default:
+		scheduler.coalesced.Add(1)
+	}
+	return true
 }
 
 // Run implements adapters.Workload for one healthy process generation.
@@ -66,6 +86,17 @@ func (scheduler *Scheduler) Run(ctx context.Context, integration adapters.Integr
 		return &Error{Code: "invalid_collection_interval"}
 	}
 	sequence := uint64(0)
+	trigger := make(chan struct{}, 1)
+	scheduler.triggerMu.Lock()
+	scheduler.triggers[integration.ID] = trigger
+	scheduler.triggerMu.Unlock()
+	defer func() {
+		scheduler.triggerMu.Lock()
+		if scheduler.triggers[integration.ID] == trigger {
+			delete(scheduler.triggers, integration.ID)
+		}
+		scheduler.triggerMu.Unlock()
+	}()
 	timer := scheduler.options.NewTimer(scheduler.delay(integration, sequence))
 	defer timer.Stop()
 	var active, pending bool
@@ -99,6 +130,15 @@ func (scheduler *Scheduler) Run(ctx context.Context, integration adapters.Integr
 		case <-timer.Channel():
 			sequence++
 			timer.Reset(scheduler.delay(integration, sequence))
+			if active {
+				if !pending {
+					pending = true
+					scheduler.coalesced.Add(1)
+				}
+				continue
+			}
+			start()
+		case <-trigger:
 			if active {
 				if !pending {
 					pending = true

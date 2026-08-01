@@ -1,0 +1,20 @@
+{
+  "schema": "website-monitor",
+  "data": {
+    "id": "not-an-id",
+    "display_name": "",
+    "enabled": true,
+    "url": "https://status.example.invalid/",
+    "interval_seconds": 0,
+    "timeout_ms": 5,
+    "allowed_statuses": [],
+    "content_match_configured": false,
+    "follow_redirects": false,
+    "max_redirects": 9,
+    "secret_header_names": [],
+    "runtime_state": "invented",
+    "version": 0,
+    "created_at": "now",
+    "updated_at": "now"
+  }
+}

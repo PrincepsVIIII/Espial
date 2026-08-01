@@ -348,6 +348,7 @@ export interface LiveInvalidationData {
   integration_id?: string;
   incident_id?: string;
   delivery_id?: string;
+  monitor_id?: string;
   state?: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
   result?: string;
   changed_at: string;
@@ -602,6 +603,109 @@ export interface NotificationSilence {
   revoked_at?: string;
   expired_at?: string;
   created_by_name: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebpageAvailabilityDetail {
+  id: string;
+  monitor_id: string;
+  display_name: string;
+  url: string;
+  state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  raw_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  reason: string;
+  reason_code?: string;
+  observed_at?: string;
+  updated_at: string;
+  active_incident_id?: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  stages: {
+    completed: ("dns" | "tcp" | "tls" | "http" | "body")[];
+    dns_ms: number;
+    tcp_ms: number;
+    tls_ms: number;
+    http_ms: number;
+    total_ms: number;
+    http_status?: number;
+    body_bytes: number;
+    redirects: number;
+  };
+}
+
+export interface WebpageAvailabilitySummary {
+  id: string;
+  monitor_id: string;
+  display_name: string;
+  url: string;
+  state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  raw_state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
+  reason: string;
+  reason_code?: string;
+  observed_at?: string;
+  updated_at: string;
+  active_incident_id?: string;
+  stages: {
+    completed: ("dns" | "tcp" | "tls" | "http" | "body")[];
+    dns_ms: number;
+    tcp_ms: number;
+    tls_ms: number;
+    http_ms: number;
+    total_ms: number;
+    http_status?: number;
+    body_bytes: number;
+    redirects: number;
+  };
+  [k: string]: unknown;
+}
+
+export interface WebsiteMonitorReplacement {
+  display_name: string;
+  enabled: boolean;
+  url: string;
+  interval_seconds: number;
+  timeout_ms: number;
+  warning_latency_ms: number;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  allowed_statuses: number[];
+  content_match: string;
+  follow_redirects: boolean;
+  max_redirects: number;
+  /**
+   * @maxItems 4
+   */
+  secret_headers: {
+    name: string;
+    secret_reference: string;
+  }[];
+}
+
+export interface RedactedWebsiteMonitorAPIView {
+  id: string;
+  display_name: string;
+  enabled: boolean;
+  url: string;
+  interval_seconds: number;
+  timeout_ms: number;
+  warning_latency_ms?: number;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  allowed_statuses: number[];
+  content_match_configured: boolean;
+  follow_redirects: boolean;
+  max_redirects: number;
+  /**
+   * @maxItems 4
+   */
+  secret_header_names: string[];
+  runtime_state: "disabled" | "not_started" | "starting" | "healthy" | "unhealthy" | "stopped";
   version: number;
   created_at: string;
   updated_at: string;

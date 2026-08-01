@@ -14,3 +14,4 @@ history.
 | [0006](0006-authentication-transition.md) | Local authentication now, provider-based SSO transition later | Accepted |
 | [0007](0007-durable-monitoring-signal-journal.md) | Durable PostgreSQL monitoring-signal journal for incident evaluation | Accepted |
 | [0008](0008-durable-notification-outbox.md) | Durable notification outbox and in-process Mattermost driver | Accepted |
+| [0009](0009-website-monitor-integration-projection.md) | Website monitors are typed integration projections | Accepted |

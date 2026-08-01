@@ -23,6 +23,9 @@ The release operator must record:
 - adapter-specific egress allowlists and secret ownership;
 - Mattermost exact host, every expected resolved CIDR, HTTPS port, certificate
   trust, webhook owner, and mounted token-file path;
+- website-monitor exact hosts, every possible resolved IPv4/IPv6 CIDR, allowed
+  ports, redirect ceiling, response limits, timeout policy, and protected-header
+  secret-file ownership;
 - memory/disk headroom against the measured Phase 1 baseline;
 - a named rollback decision-maker and maintenance window.
 
@@ -51,6 +54,27 @@ only the proxy publishes ports, `private` is internal, Core has
 During shutdown, Core cancels new claims and allows active HTTP calls to return under
 their configured timeout. Expired leases are reclaimed after restart. Do not edit
 intent/attempt tables or reset attempts to force replay.
+
+## Website monitor allowlists and diagnosis
+
+1. Set `ESPIAL_WEBCHECK_APPROVED_HOSTS` to exact lower-case destination names,
+   `ESPIAL_WEBCHECK_APPROVED_CIDRS` to the narrow networks containing every expected
+   DNS answer, and `ESPIAL_WEBCHECK_ALLOWED_PORTS` to the required ports. An empty
+   host or CIDR list fails closed. Do not add a broad private network merely to make
+   a check pass.
+2. Put each protected header value in its own mode-`0600` file beneath
+   `ESPIAL_WEBCHECK_SECRET_DIRECTORY`. Configure only its opaque file name through
+   `/webpages/monitors`; never put the value in the URL, API JSON, or a ticket.
+3. Follow the mutation receipt to Audit, request a manual check, then inspect the
+   Webpages detail stages and safe reason code. DNS policy rejection, TCP refusal,
+   TLS verification failure, response timeout, status mismatch, body/header limit,
+   and content mismatch remain distinct without retaining response content.
+4. When DNS changes, approve every new answer deliberately before replacing the
+   monitor configuration or deployment allowlist. Redirect targets require their
+   own host/address/port approval; protected headers cannot cross origins.
+5. Adapter failure remains isolated. Use integration runtime evidence to diagnose
+   the process; normal freshness will make the webpage stale and then unknown. Do
+   not edit observation, signal, or incident rows to mask the failure.
 
 ## Upgrade or rollback
 

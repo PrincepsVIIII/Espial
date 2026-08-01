@@ -1,0 +1,18 @@
+{
+  "schema": "website-monitor-write",
+  "data": {
+    "display_name": "Status site",
+    "enabled": true,
+    "url": "https://status.example.invalid/health",
+    "interval_seconds": 60,
+    "timeout_ms": 5000,
+    "warning_latency_ms": 1000,
+    "allowed_statuses": [200],
+    "content_match": "ready",
+    "follow_redirects": false,
+    "max_redirects": 0,
+    "secret_headers": [
+      { "name": "Authorization", "secret_reference": "status-auth" }
+    ]
+  }
+}

@@ -193,9 +193,18 @@ describe('primary route skeletons', () => {
   it.each([
     ['Datacenter', datacenterPage],
     ['Hypervisor', hypervisorPage],
-    ['Webpages', webpagesPage],
   ])('%s exposes an honest unavailable state', (name, page) => {
     expect(page).toContain(`title="${name}"`);
     expect(page).toMatch(/not implemented|not configured|no .* configured/i);
+  });
+
+  it('exposes authoritative website availability without retaining protected content', () => {
+    expect(webpagesPage).toContain('<h1>Webpages</h1>');
+    expect(webpagesPage).toContain(
+      'Authoritative DNS, TCP, TLS, and HTTP evidence',
+    );
+    expect(webpagesPage).toContain('/webpages/${webpage.id}');
+    expect(webpagesPage).toContain('No website observations yet.');
+    expect(webpagesPage).not.toContain('UnavailableSection');
   });
 });

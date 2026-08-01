@@ -17,6 +17,7 @@ const (
 	SuppressionChanged             = "suppression_changed"
 	NotificationDestinationChanged = "notification_destination_changed"
 	NotificationDeliveryChanged    = "notification_delivery_changed"
+	WebpageChanged                 = "webpage_changed"
 	ResyncRequired                 = "resync_required"
 
 	DefaultReplayCapacity     = 1024
@@ -32,6 +33,7 @@ type Event struct {
 	IntegrationID string
 	IncidentID    string
 	DeliveryID    string
+	MonitorID     string
 	State         health.State
 	Result        string
 	ChangedAt     time.Time

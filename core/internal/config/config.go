@@ -29,6 +29,7 @@ type Config struct {
 	Auth          Auth
 	Adapters      Adapters
 	Notifications Notifications
+	Webcheck      Webcheck
 }
 
 type Server struct {
@@ -80,6 +81,18 @@ type Notifications struct {
 	ApprovedCIDRs     []string
 	AllowedPorts      []int
 	SecretDirectory   string
+}
+
+type Webcheck struct {
+	Executable      string
+	MaxRedirects    int
+	BodyLimit       int64
+	HeaderLimit     int64
+	ResolveTimeout  time.Duration
+	ApprovedHosts   []string
+	ApprovedCIDRs   []string
+	AllowedPorts    []int
+	SecretDirectory string
 }
 
 // Load applies defaults, an optional JSON file, then environment overrides.
@@ -136,6 +149,9 @@ func defaults() Config {
 			ApprovedHosts: []string{}, ApprovedCIDRs: []string{}, AllowedPorts: []int{443},
 			SecretDirectory: "/run/secrets",
 		},
+		Webcheck: Webcheck{MaxRedirects: 0, BodyLimit: 262144, HeaderLimit: 32768,
+			ResolveTimeout: 2 * time.Second, ApprovedHosts: []string{}, ApprovedCIDRs: []string{},
+			AllowedPorts: []int{80, 443}, SecretDirectory: "/run/secrets"},
 	}
 }
 
@@ -187,6 +203,17 @@ type fileConfig struct {
 		AllowedPorts      []int    `json:"allowed_ports"`
 		SecretDirectory   string   `json:"secret_directory"`
 	} `json:"notifications"`
+	Webcheck struct {
+		Executable      string   `json:"executable"`
+		MaxRedirects    *int     `json:"max_redirects"`
+		BodyLimit       *int64   `json:"response_body_limit_bytes"`
+		HeaderLimit     *int64   `json:"response_header_limit_bytes"`
+		ResolveTimeout  string   `json:"resolve_timeout"`
+		ApprovedHosts   []string `json:"approved_hosts"`
+		ApprovedCIDRs   []string `json:"approved_cidrs"`
+		AllowedPorts    []int    `json:"allowed_ports"`
+		SecretDirectory string   `json:"secret_directory"`
+	} `json:"webcheck"`
 }
 
 func applyFile(cfg *Config, name string) error {
@@ -374,6 +401,37 @@ func applyFile(cfg *Config, name string) error {
 			cfg.Notifications.ResolveTimeout = duration
 		}
 	}
+	if values.Webcheck.Executable != "" {
+		cfg.Webcheck.Executable = values.Webcheck.Executable
+	}
+	if values.Webcheck.MaxRedirects != nil {
+		cfg.Webcheck.MaxRedirects = *values.Webcheck.MaxRedirects
+	}
+	if values.Webcheck.BodyLimit != nil {
+		cfg.Webcheck.BodyLimit = *values.Webcheck.BodyLimit
+	}
+	if values.Webcheck.HeaderLimit != nil {
+		cfg.Webcheck.HeaderLimit = *values.Webcheck.HeaderLimit
+	}
+	if values.Webcheck.ResolveTimeout != "" {
+		duration, err := time.ParseDuration(values.Webcheck.ResolveTimeout)
+		if err != nil {
+			return fmt.Errorf("parse webcheck.resolve_timeout: %w", err)
+		}
+		cfg.Webcheck.ResolveTimeout = duration
+	}
+	if values.Webcheck.ApprovedHosts != nil {
+		cfg.Webcheck.ApprovedHosts = append([]string(nil), values.Webcheck.ApprovedHosts...)
+	}
+	if values.Webcheck.ApprovedCIDRs != nil {
+		cfg.Webcheck.ApprovedCIDRs = append([]string(nil), values.Webcheck.ApprovedCIDRs...)
+	}
+	if values.Webcheck.AllowedPorts != nil {
+		cfg.Webcheck.AllowedPorts = append([]int(nil), values.Webcheck.AllowedPorts...)
+	}
+	if values.Webcheck.SecretDirectory != "" {
+		cfg.Webcheck.SecretDirectory = values.Webcheck.SecretDirectory
+	}
 	return nil
 }
 
@@ -406,6 +464,9 @@ func (cfg Config) SafeSummary() map[string]any {
 		"notification_approved_host_count":         len(cfg.Notifications.ApprovedHosts),
 		"notification_approved_cidr_count":         len(cfg.Notifications.ApprovedCIDRs),
 		"notification_secret_directory_configured": cfg.Notifications.SecretDirectory != "",
+		"webcheck_adapter_configured":              cfg.Webcheck.Executable != "",
+		"webcheck_approved_host_count":             len(cfg.Webcheck.ApprovedHosts),
+		"webcheck_approved_cidr_count":             len(cfg.Webcheck.ApprovedCIDRs),
 	}
 }
 
@@ -487,6 +548,56 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_SAMPLE_ADAPTER_EXECUTABLE")); value != "" {
 		cfg.Adapters.SampleExecutable = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_EXECUTABLE")); value != "" {
+		cfg.Webcheck.Executable = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_MAX_REDIRECTS")); value != "" {
+		parsed, err := strconv.Atoi(value)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_WEBCHECK_MAX_REDIRECTS: %w", err)
+		}
+		cfg.Webcheck.MaxRedirects = parsed
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_RESPONSE_BODY_LIMIT_BYTES")); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_WEBCHECK_RESPONSE_BODY_LIMIT_BYTES: %w", err)
+		}
+		cfg.Webcheck.BodyLimit = parsed
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_RESPONSE_HEADER_LIMIT_BYTES")); value != "" {
+		parsed, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_WEBCHECK_RESPONSE_HEADER_LIMIT_BYTES: %w", err)
+		}
+		cfg.Webcheck.HeaderLimit = parsed
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_RESOLVE_TIMEOUT")); value != "" {
+		parsed, err := time.ParseDuration(value)
+		if err != nil {
+			return fmt.Errorf("parse ESPIAL_WEBCHECK_RESOLVE_TIMEOUT: %w", err)
+		}
+		cfg.Webcheck.ResolveTimeout = parsed
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_APPROVED_HOSTS")); value != "" {
+		cfg.Webcheck.ApprovedHosts = splitCommaValues(value)
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_APPROVED_CIDRS")); value != "" {
+		cfg.Webcheck.ApprovedCIDRs = splitCommaValues(value)
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_ALLOWED_PORTS")); value != "" {
+		cfg.Webcheck.AllowedPorts = nil
+		for _, item := range splitCommaValues(value) {
+			parsed, err := strconv.Atoi(item)
+			if err != nil {
+				return fmt.Errorf("parse ESPIAL_WEBCHECK_ALLOWED_PORTS: %w", err)
+			}
+			cfg.Webcheck.AllowedPorts = append(cfg.Webcheck.AllowedPorts, parsed)
+		}
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_SECRET_DIRECTORY")); value != "" {
+		cfg.Webcheck.SecretDirectory = value
 	}
 	for name, destination := range map[string]*time.Duration{
 		"ESPIAL_ADAPTER_RECONCILE_INTERVAL": &cfg.Adapters.ReconcileInterval,
@@ -642,6 +753,20 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Adapters.SampleExecutable != "" && !filepath.IsAbs(cfg.Adapters.SampleExecutable) {
 		return errors.New("sample adapter executable must be an absolute path")
+	}
+	if cfg.Webcheck.Executable != "" && !filepath.IsAbs(cfg.Webcheck.Executable) {
+		return errors.New("webcheck executable must be an absolute path")
+	}
+	if cfg.Webcheck.MaxRedirects < 0 || cfg.Webcheck.MaxRedirects > 5 || cfg.Webcheck.BodyLimit < 1 || cfg.Webcheck.BodyLimit > 4*1024*1024 || cfg.Webcheck.HeaderLimit < 1024 || cfg.Webcheck.HeaderLimit > 128*1024 || cfg.Webcheck.ResolveTimeout < 100*time.Millisecond || cfg.Webcheck.ResolveTimeout > 10*time.Second {
+		return errors.New("webcheck bounds are invalid")
+	}
+	if !filepath.IsAbs(cfg.Webcheck.SecretDirectory) || len(cfg.Webcheck.ApprovedHosts) > 256 || len(cfg.Webcheck.ApprovedCIDRs) > 256 || len(cfg.Webcheck.AllowedPorts) < 1 || len(cfg.Webcheck.AllowedPorts) > 32 {
+		return errors.New("webcheck network policy is outside safe bounds")
+	}
+	for _, port := range cfg.Webcheck.AllowedPorts {
+		if port < 1 || port > 65535 {
+			return errors.New("webcheck network policy contains an invalid port")
+		}
 	}
 	if cfg.Adapters.GlobalConcurrency < 1 || cfg.Adapters.GlobalConcurrency > 64 {
 		return errors.New("adapter global concurrency must be between 1 and 64")

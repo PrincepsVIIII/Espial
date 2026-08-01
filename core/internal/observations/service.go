@@ -128,11 +128,12 @@ func (service *Service) IngestWithCommit(
 		}
 		if inserted {
 			result.ObservationsInserted++
+			reasonCode, _ := observation.Metadata["reason_code"].(string)
 			if err := service.signals.Append(ctx, tx, signals.Input{
 				SourceKey: signals.ObservationSourceKey(stored.ID), Kind: signals.KindObservation,
 				IntegrationID: integrationID, ResourceID: resourceID,
 				ObservationID: stored.ID, CheckType: stored.CheckType,
-				State: stored.State, Reason: stored.Summary, OccurredAt: stored.ObservedAt,
+				State: stored.State, Reason: stored.Summary, ReasonCode: reasonCode, OccurredAt: stored.ObservedAt,
 				AvailableAt: receivedAt,
 			}); err != nil {
 				return Result{}, err

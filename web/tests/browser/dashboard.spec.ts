@@ -73,6 +73,7 @@ for (const viewport of [
         'Datacenter',
         'Hypervisor',
         'Webpages',
+        'Monitors',
         'Audit',
         'Users',
       ]);
@@ -87,6 +88,58 @@ for (const viewport of [
     });
   });
 }
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`Webpages preserves availability evidence at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/webpages');
+    await waitForHydration(page);
+    await expect(page.getByRole('heading', { name: 'Webpages' })).toBeVisible();
+    await expect(
+      page.getByRole('link', { name: 'status.example.invalid/health' }),
+    ).toBeVisible();
+    await page
+      .getByRole('link', { name: 'status.example.invalid/health' })
+      .click();
+    await expect(
+      page.getByRole('heading', { name: 'Current evidence' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Check stages' }),
+    ).toBeVisible();
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`webpages-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+  });
+}
+
+test('website manual check returns an audit-linked receipt', async ({
+  page,
+}) => {
+  await page.goto('/webpages/monitors');
+  await waitForHydration(page);
+  await page.getByRole('button', { name: 'Check now' }).click();
+  await expect(page.locator('.mutation-receipt')).toContainText(
+    'Manual check accepted',
+  );
+  await expect(
+    page.getByRole('link', { name: 'View matching audit record' }),
+  ).toBeVisible();
+});
 
 for (const viewport of [
   { name: 'large', width: 1440, height: 900 },

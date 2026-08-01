@@ -5,13 +5,15 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -o /out/espial ./cmd/espial \
-    && CGO_ENABLED=0 go build -trimpath -o /out/espial-sample-adapter ./cmd/espial-sample-adapter
+    && CGO_ENABLED=0 go build -trimpath -o /out/espial-sample-adapter ./cmd/espial-sample-adapter \
+    && CGO_ENABLED=0 go build -trimpath -o /out/espial-webcheck-adapter ./cmd/espial-webcheck-adapter
 
 FROM scratch
 
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /out/espial /espial
 COPY --from=build /out/espial-sample-adapter /espial-sample-adapter
+COPY --from=build /out/espial-webcheck-adapter /espial-webcheck-adapter
 USER 65532:65532
 ENTRYPOINT ["/espial"]
 CMD ["serve"]

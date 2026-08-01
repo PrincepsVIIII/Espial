@@ -46,7 +46,7 @@ func (collector *Collector) Collect(ctx context.Context, integration adapters.In
 			if recordErr := collector.store.RecordOutcome(ctx, attempt); recordErr != nil {
 				return &Error{Code: "collection_record_failed"}
 			}
-			collector.publishAttempt(attempt)
+			collector.publishAttempt(attempt, integration.AdapterID)
 		}
 		if failure := session.Process.Failure(); failure != nil {
 			return failure
@@ -72,7 +72,7 @@ func (collector *Collector) Collect(ctx context.Context, integration adapters.In
 			if recordErr := collector.store.RecordOutcome(ctx, attempt); recordErr != nil {
 				return &Error{Code: "collection_record_failed"}
 			}
-			collector.publishAttempt(attempt)
+			collector.publishAttempt(attempt, integration.AdapterID)
 		}
 		return nil
 	}
@@ -80,11 +80,11 @@ func (collector *Collector) Collect(ctx context.Context, integration adapters.In
 	if attempt.CompletedAt.IsZero() {
 		attempt.CompletedAt = collector.nowAfter(startedAt)
 	}
-	collector.publishAttempt(attempt)
+	collector.publishAttempt(attempt, integration.AdapterID)
 	return nil
 }
 
-func (collector *Collector) publishAttempt(attempt Attempt) {
+func (collector *Collector) publishAttempt(attempt Attempt, adapterID string) {
 	if collector.hub == nil {
 		return
 	}
@@ -92,6 +92,12 @@ func (collector *Collector) publishAttempt(attempt Attempt) {
 		Kind: events.CollectionChanged, IntegrationID: attempt.IntegrationID,
 		Result: attempt.Result, ChangedAt: attempt.CompletedAt,
 	})
+	// Webpage consumers refetch their authoritative projection after every
+	// completed or failed collection attempt.
+	if adapterID == "org.ubnetdef.espial.webcheck" {
+		collector.hub.Publish(events.Event{Kind: events.WebpageChanged, MonitorID: attempt.IntegrationID,
+			IntegrationID: attempt.IntegrationID, Result: attempt.Result, ChangedAt: attempt.CompletedAt})
+	}
 }
 
 func (collector *Collector) nowAfter(startedAt time.Time) time.Time {

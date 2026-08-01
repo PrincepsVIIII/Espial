@@ -57,7 +57,11 @@
     {
       label: 'Webpages',
       href: '/webpages',
-      children: [],
+      children: data.session?.user.permissions.includes(
+        'website_monitors:manage',
+      )
+        ? [{ label: 'Monitors', href: '/webpages/monitors' }]
+        : [],
     },
     ...(data.session?.user.permissions.includes('audit:read')
       ? [

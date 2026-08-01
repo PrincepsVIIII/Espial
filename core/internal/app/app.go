@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
@@ -19,6 +21,8 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications/mattermost"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
+	"github.com/PrincepsVIIII/Espial/core/internal/webcheck"
+	"github.com/PrincepsVIIII/Espial/core/internal/webpages"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -46,7 +50,8 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
 	intentWriter := notifications.NewIntentWriter()
-	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger, intentWriter)
+	adapterSecrets := notifications.FileSecretResolver{Root: cfg.Webcheck.SecretDirectory}
+	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger, intentWriter, adapterSecrets)
 	if err != nil {
 		return fmt.Errorf("initialize adapter runtime: %w", err)
 	}
@@ -72,6 +77,14 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Secrets: notificationSecrets, Drivers: map[string]notifications.Driver{notifications.DestinationMattermost: mattermostDriver},
 		OnError: func(err error) { logger.Error("notification worker exited", "error", err) },
 	})
+	websitePolicy, err := webcheck.NewPolicy(webcheck.PolicyOptions{ApprovedHosts: cfg.Webcheck.ApprovedHosts,
+		ApprovedCIDRs: cfg.Webcheck.ApprovedCIDRs, AllowedPorts: cfg.Webcheck.AllowedPorts,
+		ResolveTimeout: cfg.Webcheck.ResolveTimeout, BodyLimit: cfg.Webcheck.BodyLimit,
+		HeaderLimit: cfg.Webcheck.HeaderLimit, MaxRedirects: cfg.Webcheck.MaxRedirects})
+	if err != nil {
+		return fmt.Errorf("initialize website network policy: %w", err)
+	}
+	websiteService := webpages.NewService(pool, monitoringRuntime.Hub(), monitoringRuntime, websitePolicy, nil)
 
 	incidentWorkflow := incidents.NewWorkflow(pool, monitoringRuntime.Hub(), nil)
 	handler := api.New(api.Dependencies{
@@ -82,6 +95,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		IncidentRules:    incidents.NewRuleService(pool, nil),
 		Suppressions:     monitoringRuntime.Suppressions(),
 		Notifications:    notificationService,
+		Websites:         websiteService,
 		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
@@ -126,13 +140,25 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	}
 }
 
-func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, intents incidents.IntentWriter) (*monitoring.Runtime, *adapters.Registry, error) {
-	descriptors := make([]adapters.Descriptor, 0, 1)
+func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, intents incidents.IntentWriter, secrets adapters.SecretResolver) (*monitoring.Runtime, *adapters.Registry, error) {
+	descriptors := make([]adapters.Descriptor, 0, 2)
 	if cfg.Adapters.SampleExecutable != "" {
 		descriptors = append(descriptors, adapters.Descriptor{
 			AdapterID:  "org.ubnetdef.espial.sample",
 			Executable: cfg.Adapters.SampleExecutable,
 		})
+	}
+	if cfg.Webcheck.Executable != "" {
+		descriptors = append(descriptors, adapters.Descriptor{AdapterID: "org.ubnetdef.espial.webcheck",
+			Executable: cfg.Webcheck.Executable, Environment: map[string]string{
+				"ESPIAL_WEBCHECK_APPROVED_HOSTS":     strings.Join(cfg.Webcheck.ApprovedHosts, ","),
+				"ESPIAL_WEBCHECK_APPROVED_CIDRS":     strings.Join(cfg.Webcheck.ApprovedCIDRs, ","),
+				"ESPIAL_WEBCHECK_ALLOWED_PORTS":      joinInts(cfg.Webcheck.AllowedPorts),
+				"ESPIAL_WEBCHECK_RESOLVE_TIMEOUT":    cfg.Webcheck.ResolveTimeout.String(),
+				"ESPIAL_WEBCHECK_BODY_LIMIT_BYTES":   strconv.FormatInt(cfg.Webcheck.BodyLimit, 10),
+				"ESPIAL_WEBCHECK_HEADER_LIMIT_BYTES": strconv.FormatInt(cfg.Webcheck.HeaderLimit, 10),
+				"ESPIAL_WEBCHECK_MAX_REDIRECTS":      strconv.Itoa(cfg.Webcheck.MaxRedirects),
+			}})
 	}
 	registry, err := adapters.NewRegistry(descriptors...)
 	if err != nil {
@@ -145,10 +171,19 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, 
 		FreshnessBatchSize: cfg.Adapters.FreshnessBatchSize,
 		EventReplaySize:    cfg.Adapters.EventReplaySize,
 		IncidentIntents:    intents,
+		Secrets:            secrets,
 		OnError: func(integrationID string, err error) {
 			logger.Error("integration supervisor exited", "integration_id", integrationID, "error", err)
 		},
 	}), registry, nil
+}
+
+func joinInts(values []int) string {
+	items := make([]string, len(values))
+	for index, value := range values {
+		items[index] = strconv.Itoa(value)
+	}
+	return strings.Join(items, ",")
 }
 
 // BootstrapAdmin creates the one-time local administrator account.

@@ -15,6 +15,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/audit"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
+	"github.com/PrincepsVIIII/Espial/core/internal/webcheck"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -63,6 +64,9 @@ func (service *IntegrationConfigService) Create(ctx context.Context, create Crea
 		create.DisplayName == "" || utf8.RuneCountInString(create.DisplayName) > 128 ||
 		create.Interval < time.Second || create.Interval > 24*time.Hour || create.Interval%time.Second != 0 {
 		return "", time.Time{}, &Error{Code: "invalid_integration_config"}
+	}
+	if create.AdapterID == webcheck.AdapterID {
+		return "", time.Time{}, &Error{Code: "typed_integration_required"}
 	}
 	if _, err := service.registry.Lookup(create.AdapterID); err != nil {
 		return "", time.Time{}, &Error{Code: "adapter_not_registered"}
@@ -157,16 +161,20 @@ func (service *IntegrationConfigService) Update(ctx context.Context, update Inte
 	var beforeNonsecret map[string]any
 	var beforeReferences map[string]string
 	var previousUpdatedAt time.Time
+	var adapterID string
 	if err := tx.QueryRow(ctx, `
-		SELECT enabled, interval_seconds, config_nonsecret, secret_references, updated_at
+		SELECT adapter_id, enabled, interval_seconds, config_nonsecret, secret_references, updated_at
 		FROM integrations WHERE id = $1 FOR UPDATE
 	`, update.IntegrationID).Scan(
-		&beforeEnabled, &beforeInterval, &beforeNonsecret, &beforeReferences, &previousUpdatedAt,
+		&adapterID, &beforeEnabled, &beforeInterval, &beforeNonsecret, &beforeReferences, &previousUpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return time.Time{}, &Error{Code: "integration_not_found"}
 		}
 		return time.Time{}, fmt.Errorf("load integration config: %w", err)
+	}
+	if adapterID == webcheck.AdapterID {
+		return time.Time{}, &Error{Code: "typed_integration_required"}
 	}
 	if !update.ExpectedUpdatedAt.IsZero() && !previousUpdatedAt.Equal(update.ExpectedUpdatedAt) {
 		return time.Time{}, &Error{Code: "integration_config_conflict"}

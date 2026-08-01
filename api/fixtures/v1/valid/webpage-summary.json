@@ -1,0 +1,26 @@
+{
+  "schema": "webpage-summary",
+  "data": {
+    "id": "71000000-0000-4000-8000-000000000001",
+    "monitor_id": "70000000-0000-4000-8000-000000000001",
+    "display_name": "status.example.invalid/health",
+    "url": "https://status.example.invalid/health",
+    "state": "healthy",
+    "raw_state": "healthy",
+    "reason": "Website completed the configured availability check.",
+    "reason_code": "available",
+    "observed_at": "2026-08-01T12:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z",
+    "stages": {
+      "completed": ["dns", "tcp", "tls", "http", "body"],
+      "dns_ms": 1,
+      "tcp_ms": 2,
+      "tls_ms": 3,
+      "http_ms": 4,
+      "total_ms": 10,
+      "http_status": 200,
+      "body_bytes": 5,
+      "redirects": 0
+    }
+  }
+}

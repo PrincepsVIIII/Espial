@@ -1,0 +1,14 @@
+{
+  "schema": "webpage-summary",
+  "data": {
+    "id": "bad",
+    "monitor_id": "bad",
+    "display_name": "site",
+    "url": "secret",
+    "state": "ok",
+    "raw_state": "ok",
+    "reason": "",
+    "updated_at": "now",
+    "stages": {}
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "website-monitor",
+  "data": {
+    "id": "70000000-0000-4000-8000-000000000001",
+    "display_name": "Status site",
+    "enabled": true,
+    "url": "https://status.example.invalid/health",
+    "interval_seconds": 60,
+    "timeout_ms": 5000,
+    "allowed_statuses": [200, 204],
+    "content_match_configured": false,
+    "follow_redirects": false,
+    "max_redirects": 0,
+    "secret_header_names": [],
+    "runtime_state": "healthy",
+    "version": 1,
+    "created_at": "2026-08-01T12:00:00Z",
+    "updated_at": "2026-08-01T12:00:00Z"
+  }
+}

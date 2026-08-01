@@ -1,0 +1,17 @@
+{
+  "schema": "website-monitor-write",
+  "data": {
+    "display_name": "Status",
+    "enabled": true,
+    "url": "not-a-url",
+    "interval_seconds": 60,
+    "timeout_ms": 5000,
+    "warning_latency_ms": 0,
+    "allowed_statuses": [200],
+    "content_match": "",
+    "follow_redirects": false,
+    "max_redirects": 0,
+    "secret_headers": [],
+    "secret_value": "leak"
+  }
+}

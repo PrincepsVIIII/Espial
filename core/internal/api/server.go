@@ -22,6 +22,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
 	"github.com/PrincepsVIIII/Espial/core/internal/suppressions"
+	"github.com/PrincepsVIIII/Espial/core/internal/webpages"
 )
 
 const (
@@ -95,6 +96,16 @@ type NotificationManager interface {
 	Deliveries(context.Context, notifications.DeliveryFilter) (notifications.DeliveryList, error)
 }
 
+type WebsiteManager interface {
+	Monitors(context.Context, webpages.ListFilter) (webpages.MonitorList, error)
+	Monitor(context.Context, string) (webpages.Monitor, error)
+	Create(context.Context, webpages.MonitorDefinition, webpages.MutationMetadata) (adminops.Receipt, error)
+	Replace(context.Context, string, webpages.MonitorDefinition, webpages.MutationMetadata) (adminops.Receipt, error)
+	Check(context.Context, string, webpages.MutationMetadata) (adminops.Receipt, error)
+	Webpages(context.Context, webpages.ListFilter) (webpages.List, error)
+	Webpage(context.Context, string) (webpages.Detail, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -119,6 +130,7 @@ type Dependencies struct {
 	IncidentRules    IncidentRuleManager
 	Suppressions     SuppressionManager
 	Notifications    NotificationManager
+	Websites         WebsiteManager
 	Integrations     IntegrationManager
 	Users            UserAdministrator
 	Events           EventSource
@@ -189,6 +201,13 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/notification-destinations/{id}/test", server.testNotificationDestination)
 	mux.HandleFunc("GET /api/v1/notification-deliveries", server.notificationDeliveryList)
 	mux.HandleFunc("GET /api/v1/incidents/{id}/deliveries", server.incidentDeliveryList)
+	mux.HandleFunc("GET /api/v1/website-monitors", server.websiteMonitorList)
+	mux.HandleFunc("POST /api/v1/website-monitors", server.createWebsiteMonitor)
+	mux.HandleFunc("GET /api/v1/website-monitors/{id}", server.websiteMonitorDetail)
+	mux.HandleFunc("PUT /api/v1/website-monitors/{id}", server.replaceWebsiteMonitor)
+	mux.HandleFunc("POST /api/v1/website-monitors/{id}/check", server.checkWebsiteMonitor)
+	mux.HandleFunc("GET /api/v1/webpages", server.webpageList)
+	mux.HandleFunc("GET /api/v1/webpages/{id}", server.webpageDetail)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

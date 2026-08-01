@@ -37,6 +37,7 @@ type RuntimeOptions struct {
 // goroutines plus their shared invalidation hub.
 type Runtime struct {
 	coordinator        *scheduler.Coordinator
+	dispatcher         *scheduler.Scheduler
 	freshness          *FreshnessWorker
 	incidents          *incidents.Evaluator
 	suppressions       *suppressions.Worker
@@ -80,13 +81,19 @@ func NewRuntime(
 		},
 	})
 	suppressionService := suppressions.NewService(pool, hub, nil)
-	return &Runtime{coordinator: coordinator, freshness: freshness, incidents: incidentEvaluator,
+	return &Runtime{coordinator: coordinator, dispatcher: dispatcher, freshness: freshness, incidents: incidentEvaluator,
 		suppressions:       suppressions.NewWorker(suppressionService, time.Second),
 		suppressionService: suppressionService, hub: hub}
 }
 
 func (runtime *Runtime) Hub() *events.Hub                    { return runtime.hub }
 func (runtime *Runtime) Suppressions() *suppressions.Service { return runtime.suppressionService }
+func (runtime *Runtime) RequestCollection(integrationID string) bool {
+	return runtime.dispatcher.Request(integrationID)
+}
+func (runtime *Runtime) RestartIntegration(integrationID string) {
+	runtime.coordinator.Restart(integrationID)
+}
 
 func (runtime *Runtime) Run(ctx context.Context) error {
 	runContext, cancel := context.WithCancel(ctx)

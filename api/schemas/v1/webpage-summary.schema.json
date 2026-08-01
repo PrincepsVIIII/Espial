@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/webpage-summary.schema.json",
+  "title": "Webpage availability summary",
+  "type": "object",
+  "required": [
+    "id",
+    "monitor_id",
+    "display_name",
+    "url",
+    "state",
+    "raw_state",
+    "reason",
+    "updated_at",
+    "stages"
+  ],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "monitor_id": { "type": "string", "format": "uuid" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "url": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "raw_state": {
+      "enum": [
+        "healthy",
+        "warning",
+        "critical",
+        "unknown",
+        "stale",
+        "maintenance",
+        "disabled"
+      ]
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 1024 },
+    "reason_code": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,126}$" },
+    "observed_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "active_incident_id": { "type": "string", "format": "uuid" },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "completed",
+        "dns_ms",
+        "tcp_ms",
+        "tls_ms",
+        "http_ms",
+        "total_ms",
+        "body_bytes",
+        "redirects"
+      ],
+      "properties": {
+        "completed": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["dns", "tcp", "tls", "http", "body"] }
+        },
+        "dns_ms": { "type": "integer", "minimum": 0 },
+        "tcp_ms": { "type": "integer", "minimum": 0 },
+        "tls_ms": { "type": "integer", "minimum": 0 },
+        "http_ms": { "type": "integer", "minimum": 0 },
+        "total_ms": { "type": "integer", "minimum": 0 },
+        "http_status": { "type": "integer", "minimum": 100, "maximum": 599 },
+        "body_bytes": { "type": "integer", "minimum": 0 },
+        "redirects": { "type": "integer", "minimum": 0, "maximum": 5 }
+      }
+    }
+  }
+}

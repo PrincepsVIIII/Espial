@@ -21,6 +21,7 @@ import (
 )
 
 const incidentIntegrationID = "50000000-0000-4000-8000-000000000021"
+const websiteIncidentIntegrationID = "50000000-0000-4000-8000-000000000025"
 
 type testClock struct {
 	mu  sync.Mutex
@@ -194,6 +195,52 @@ func TestAutomaticIncidentLifecycleIsDurableAndIdempotent(t *testing.T) {
 	}
 	if kinds := intentWriter.eventKinds(); fmt.Sprint(kinds) != "[detected recovered recurrence]" {
 		t.Fatalf("notification event policy = %v", kinds)
+	}
+}
+
+func TestWebsiteAvailabilityOutageCreatesOneIncidentAndRecovers(t *testing.T) {
+	pool := incidentTestPool(t)
+	ctx := context.Background()
+	start := time.Now().UTC().Add(-5 * time.Minute).Truncate(time.Microsecond)
+	clock := &testClock{now: start}
+	if _, err := pool.Exec(ctx, `
+		INSERT INTO integrations (id, adapter_id, display_name, enabled, interval_seconds)
+		VALUES ($1, 'org.ubnetdef.espial.webcheck', 'Website monitor', true, 60)
+	`, websiteIncidentIntegrationID); err != nil {
+		t.Fatal(err)
+	}
+	ingestor := observations.NewService(pool, observations.Options{Clock: clock})
+	evaluator := NewEvaluator(pool, nil, Options{Clock: clock})
+
+	for index := 0; index < 2; index++ {
+		clock.Set(start.Add(time.Duration(index) * time.Minute))
+		if _, err := ingestor.Ingest(ctx, websiteIncidentIntegrationID, websiteObservationBatch(
+			fmt.Sprintf("website-critical-%d", index), health.Critical, "status_unexpected", clock.Now(), index == 0,
+		)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := evaluator.ProcessOnce(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if count := incidentCount(t, pool, "https://status.example.test/health"); count != 1 {
+		t.Fatalf("website outage incident count = %d", count)
+	}
+
+	for index := 0; index < 2; index++ {
+		clock.Set(start.Add(time.Duration(index+2) * time.Minute))
+		if _, err := ingestor.Ingest(ctx, websiteIncidentIntegrationID, websiteObservationBatch(
+			fmt.Sprintf("website-healthy-%d", index), health.Healthy, "available", clock.Now(), false,
+		)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := evaluator.ProcessOnce(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+	incident := singleIncident(t, pool, "https://status.example.test/health")
+	if incident.Status != StatusRecovered || incident.RecoveredAt == nil {
+		t.Fatalf("website incident did not recover = %#v", incident)
 	}
 }
 
@@ -418,6 +465,22 @@ func observationBatch(externalID, displayName, observationID string, state healt
 		batch.Resources = []observations.ResourceInput{{
 			ExternalID: externalID, Kind: "host", DisplayName: displayName,
 			ObservedAt: observedAt, Attributes: map[string]any{},
+		}}
+	}
+	return batch
+}
+
+func websiteObservationBatch(observationID string, state health.State, reasonCode string, observedAt time.Time, includeResource bool) observations.Batch {
+	const target = "https://status.example.test/health"
+	batch := observations.Batch{Observations: []observations.ObservationInput{{
+		ID: stableObservationID(observationID), ExternalResourceID: target, CheckType: "website.availability",
+		State: state, Summary: "Website availability changed.", ObservedAt: observedAt,
+		ExpectedRefreshSeconds: 60, Measurements: map[string]any{}, Metadata: map[string]any{"reason_code": reasonCode},
+	}}}
+	if includeResource {
+		batch.Resources = []observations.ResourceInput{{
+			ExternalID: target, Kind: "webpage", DisplayName: "Status endpoint",
+			ObservedAt: observedAt, Attributes: map[string]any{}, SourceURL: target,
 		}}
 	}
 	return batch

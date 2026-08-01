@@ -11,6 +11,7 @@
     "integration_id": { "type": "string", "format": "uuid" },
     "incident_id": { "type": "string", "format": "uuid" },
     "delivery_id": { "type": "string", "format": "uuid" },
+    "monitor_id": { "type": "string", "format": "uuid" },
     "state": {
       "enum": [
         "healthy",

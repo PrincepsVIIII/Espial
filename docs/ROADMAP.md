@@ -94,8 +94,8 @@ inputs and upstream base-image findings in the
 
 ## Phase 2: Incidents, notifications, and certificates
 
-**Status:** In progress. Slices 2.0 through 2.4 are implemented; website,
-certificate, and phase-acceptance slices remain planned.
+**Status:** In progress. Slices 2.0 through 2.5 are implemented; certificate and
+phase-acceptance slices remain planned.
 
 **Implementation plan:** [Phase 2 Incidents, Notifications, and Certificates](plans/PHASE_2_IMPLEMENTATION.md)
 
@@ -117,6 +117,10 @@ Implemented Phase 2 groundwork, incident workflow, and suppression controls:
   durable Mattermost outbox; bounded retries, silence evidence, redacted destination
   controls, labeled tests, incident delivery history, and strict egress policy are
   implemented;
+- supervised website checks enforce explicit host, address, port, redirect, proxy,
+  response-size, and deadline policy; authoritative Webpages list/detail and
+  administrator monitor controls expose partial-stage evidence, incident links, and
+  audit-linked mutation receipts;
 - administrator Audit and Users routes provide inspectable request-correlated
   evidence for access changes; and
 - the shell accepts only implemented dropdown children, so Phase 2 destinations

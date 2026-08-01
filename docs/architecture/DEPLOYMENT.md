@@ -37,9 +37,13 @@ destination access. Core's Mattermost client additionally requires exact host,
 resolved-CIDR, and port allowlists, pins validated DNS answers, uses HTTPS, and
 ignores ambient proxies and redirects. The production `private` network is internal;
 an internal Mattermost service must join an explicitly managed reachable network.
-Future sandboxing should deny filesystem and network access by default where the
-runtime supports it. The proxy preserves the originating address only from trusted
-proxy hops.
+The supervised webcheck adapter uses the same fail-closed shape: exact approved
+hosts, approval of every resolved address, allowed ports, pinned dialing, and
+per-hop redirect revalidation. Its process receives only explicit policy variables,
+so host proxy variables cannot change the destination. Empty webcheck host or CIDR
+allowlists leave monitor creation disabled. Future sandboxing should deny filesystem
+and network access by default where the runtime supports it. The proxy preserves the
+originating address only from trusted proxy hops.
 
 ## Configuration and secrets
 
@@ -48,7 +52,10 @@ Secret configuration is represented by references to mounted files or an approve
 secret provider. Startup logs list sources and overridden key names, never values.
 Core fails closed on unknown configuration keys in production. Mattermost tokens are
 individual files beneath `/run/secrets`; destination JSON stores only the opaque file
-name. Empty notification host/CIDR allowlists disable destination configuration.
+name. Website protected-header values follow the same model beneath the configured
+webcheck secret directory; monitor JSON stores only the opaque file name and redacted
+reads expose only header names. Empty notification or webcheck host/CIDR allowlists
+disable their respective configuration paths.
 
 ## Startup and shutdown
 

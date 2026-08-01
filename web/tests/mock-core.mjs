@@ -13,6 +13,8 @@ let incidentVersion = 1;
 const now = '2026-07-31T12:00:00Z';
 const integrationID = '60000000-0000-4000-8000-000000000001';
 const incidentID = '80000000-0000-4000-8000-000000000021';
+const websiteMonitorID = '70000000-0000-4000-8000-000000000025';
+const webpageID = '71000000-0000-4000-8000-000000000025';
 let incidentTimeline = initialIncidentTimeline();
 let users = initialUsers();
 let auditEvents = initialAuditEvents();
@@ -89,6 +91,7 @@ const server = http.createServer((request, response) => {
           'resources:read',
           'integrations:read',
           'incidents:read',
+          'webpages:read',
           ...(sessionMode === 'viewer'
             ? []
             : [
@@ -98,6 +101,7 @@ const server = http.createServer((request, response) => {
                 'incident_rules:manage',
                 'suppressions:manage',
                 'notification_destinations:manage',
+                'website_monitors:manage',
               ]),
         ],
       },
@@ -114,7 +118,9 @@ const server = http.createServer((request, response) => {
     url.pathname.startsWith('/api/v1/overview') ||
     url.pathname.startsWith('/api/v1/resources') ||
     url.pathname.startsWith('/api/v1/integrations') ||
-    url.pathname.startsWith('/api/v1/incidents')
+    url.pathname.startsWith('/api/v1/incidents') ||
+    url.pathname.startsWith('/api/v1/webpages') ||
+    url.pathname.startsWith('/api/v1/website-monitors')
   ) {
     monitoringReads += 1;
     if (apiMode === 'forbidden')
@@ -290,6 +296,35 @@ const server = http.createServer((request, response) => {
       );
     return json(response, 200, { items: notificationDeliveries() });
   }
+  if (url.pathname === '/api/v1/webpages') {
+    return json(response, 200, { items: [webpageSummary()] });
+  }
+  if (url.pathname === `/api/v1/webpages/${webpageID}`) {
+    return json(response, 200, {
+      ...webpageSummary(),
+      first_seen_at: '2026-07-31T10:00:00Z',
+      last_seen_at: now,
+    });
+  }
+  if (url.pathname === '/api/v1/website-monitors' && request.method === 'GET') {
+    if (sessionMode === 'viewer')
+      return apiError(
+        response,
+        403,
+        'forbidden',
+        'You do not have permission to perform this action.',
+      );
+    return json(response, 200, { items: [websiteMonitor()] });
+  }
+  if (url.pathname === '/api/v1/website-monitors' && request.method === 'POST')
+    return mutationReceipt(response, request, websiteMonitorID, 1, 201);
+  if (
+    url.pathname === `/api/v1/website-monitors/${websiteMonitorID}` &&
+    request.method === 'PUT'
+  )
+    return mutationReceipt(response, request, websiteMonitorID, 2);
+  if (url.pathname === `/api/v1/website-monitors/${websiteMonitorID}/check`)
+    return mutationReceipt(response, request, websiteMonitorID, 1, 202);
   if (url.pathname.match(/^\/api\/v1\/notification-destinations\/[^/]+$/))
     return json(response, 200, administrativeReceipt('destination-replace'));
   if (url.pathname.match(/^\/api\/v1\/notification-destinations\/[^/]+\/test$/))
@@ -732,6 +767,70 @@ function notificationDeliveries() {
       updated_at: now,
     },
   ];
+}
+
+function websiteMonitor() {
+  return {
+    id: websiteMonitorID,
+    display_name: 'UBNetDef status',
+    enabled: true,
+    url: 'https://status.example.invalid/health',
+    interval_seconds: 60,
+    timeout_ms: 5000,
+    warning_latency_ms: 1000,
+    allowed_statuses: [200],
+    content_match_configured: true,
+    follow_redirects: false,
+    max_redirects: 0,
+    secret_header_names: [],
+    runtime_state: 'healthy',
+    version: 1,
+    created_at: '2026-07-31T10:00:00Z',
+    updated_at: now,
+  };
+}
+
+function webpageSummary() {
+  return {
+    id: webpageID,
+    monitor_id: websiteMonitorID,
+    display_name: 'status.example.invalid/health',
+    url: 'https://status.example.invalid/health',
+    state: 'healthy',
+    raw_state: 'healthy',
+    reason: 'Website completed the configured availability check.',
+    reason_code: 'available',
+    observed_at: now,
+    updated_at: now,
+    stages: {
+      completed: ['dns', 'tcp', 'tls', 'http', 'body'],
+      dns_ms: 2,
+      tcp_ms: 3,
+      tls_ms: 5,
+      http_ms: 7,
+      total_ms: 18,
+      http_status: 200,
+      body_bytes: 5,
+      redirects: 0,
+    },
+  };
+}
+
+function mutationReceipt(response, request, id, version, status = 200) {
+  const requestID = request.headers['x-request-id'] ?? 'browser-test-request';
+  return json(
+    response,
+    status,
+    {
+      id,
+      version,
+      request_id: requestID,
+      replayed: false,
+      audit_url: `/audit?correlation_id=${requestID}`,
+    },
+    requestID,
+    `"v${version.toString(16)}"`,
+  );
 }
 
 function administrativeReceipt(requestID) {
