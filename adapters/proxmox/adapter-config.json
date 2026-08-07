@@ -1,0 +1,8 @@
+{
+  "base_url": "https://cdr-debug.cse.buffalo.edu:8006",
+  "deployment_id": "ubnetdef-debug",
+  "token_id": "root@pam!espial",
+  "token_secret": "b20d05bf-d257-46b3-b75a-511c9d7dfecc",
+  "expected_refresh_seconds": 60,
+  "request_timeout_seconds": 10
+}

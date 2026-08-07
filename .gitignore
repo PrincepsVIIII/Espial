@@ -17,3 +17,6 @@ tmp/
 
 # Local runtime data
 deployments/local/data/
+
+# adpater configs
+adapters/proxmox/proxmox-adapter.cfg
