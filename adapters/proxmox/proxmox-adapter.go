@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"encoding/json"
 )
 
 type AdapterConfig struct {
@@ -24,6 +25,18 @@ const (
 	ClusterResourcesEndpoint = "/api2/json/cluster/resources"
 )
 
+func main() {
+	_, err := gatherProxmoxResources()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func gatherProxmoxResources() ([]byte, error) {
+	return queryProxmox(ClusterResourcesEndpoint)
+}
+
 func loadAdapterConfig() (AdapterConfig, error) {
 	data, err := os.ReadFile(ConfigFilePath)
 	if err != nil {
@@ -33,11 +46,6 @@ func loadAdapterConfig() (AdapterConfig, error) {
 	var config AdapterConfig
 	err = json.Unmarshal(data, &config)
 	return config, err
-}
-
-func gatherProxmoxResources() ([]byte, error) {
-	data := queryProxmox("/api2/json/cluster/resources")
-	return data, nil
 }
 
 func queryProxmox(endpoint string) ([]byte, error) {

@@ -20,4 +20,4 @@ deployments/local/data/
 
 # adpater configs
 adapters/proxmox/adapter-config.json
-adapters/proxmox/adapter-config.json
+
