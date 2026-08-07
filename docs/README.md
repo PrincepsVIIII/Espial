@@ -14,6 +14,7 @@ intentions into implementable contracts.
 | [Phase 1 plan](plans/PHASE_1_IMPLEMENTATION.md) | Work sequencing, acceptance tests, ownership boundaries, and exit criteria |
 | [Phase 2 plan](plans/PHASE_2_IMPLEMENTATION.md) | Incident, notification, website, and certificate delivery slices and acceptance gates |
 | [Phase 3 pre-planning](plans/PHASE_3_PREPLANNING.md) | Discovery gates, provisional ordering, and boundaries for infrastructure integrations |
+| [Proxmox adapter reference](architecture/PROXMOX_ADAPTER.md) | Student authoring guide, discovery inputs, normalized mappings, security boundaries, and verification matrix for the first Phase 3 adapter |
 | [Slice 2.1 record](plans/SLICE_2_1_AUTOMATIC_INCIDENTS.md) | Durable signals, automatic lifecycle, incident read APIs, Dashboard/Alerts UI, and verification evidence |
 | [Slice 1.3 plan](plans/SLICE_1_3_NORMALIZED_HEALTH.md) | Transactional ingestion, freshness semantics, package boundaries, and test matrix |
 | [Slice 1.4 plan](plans/SLICE_1_4_ADAPTER_RUNTIME.md) | Trusted process runtime, protocol negotiation, sample adapter, and conformance gates |
@@ -29,6 +30,7 @@ intentions into implementable contracts.
 - [Architecture index](architecture/README.md)
 - [API conventions](architecture/API_CONVENTIONS.md)
 - [Adapter protocol](architecture/ADAPTER_PROTOCOL.md)
+- [Proxmox adapter authoring reference](architecture/PROXMOX_ADAPTER.md)
 - [Authentication and authorization](architecture/AUTHENTICATION.md)
 - [Operational data model](architecture/DATA_MODEL.md)
 - [Deployment baseline](architecture/DEPLOYMENT.md)

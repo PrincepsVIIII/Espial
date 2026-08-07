@@ -1,10 +1,11 @@
 # Architecture documents
 
-These documents specify the Phase 1 and Phase 2 boundaries shared by Espial Core, Espial Web,
+These documents specify the boundaries shared by Espial Core, Espial Web,
 adapters, and deployment tooling.
 
 - [API conventions](API_CONVENTIONS.md)
 - [Adapter protocol](ADAPTER_PROTOCOL.md)
+- [Proxmox adapter authoring reference](PROXMOX_ADAPTER.md)
 - [Authentication and authorization](AUTHENTICATION.md)
 - [Initial data model](DATA_MODEL.md)
 - [Deployment baseline](DEPLOYMENT.md)

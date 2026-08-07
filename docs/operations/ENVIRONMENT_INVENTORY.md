@@ -21,9 +21,9 @@ These values are implementation inputs, not reasons to hard-code sample assumpti
 
 | Source/destination | Direction | Candidate mechanisms | Phase | Current decision or question |
 |---|---|---|---|---|
-| UBNetDef SSO | Auth inbound | OIDC preferred if supported; protocol TBD | 1/3 | External dependency. Need issuer/protocol, claims, groups, logout, test tenant. Local auth is Phase 1 fallback. **Production blocker for SSO mode.** |
+| UBNetDef SSO | Auth inbound | OIDC preferred if supported; protocol TBD | 1/3 | Deferred behind Proxmox for Phase 3 development sequencing on 2026-08-06. Need issuer/protocol, claims, groups, logout, test tenant. Local auth is Phase 1 fallback. **Production blocker for SSO mode.** |
 | Sample adapter | Health inbound | Supervised NDJSON stdio | 1 | Deterministic reference implementation; accepted transport |
-| Proxmox | Health/inventory inbound | REST API, event/log facilities TBD | 3 | Confirm cluster version, token scope, events, rate limits, deep-link format |
+| Proxmox | Health/inventory inbound | REST API collection; event input remains disabled | 3 | Selected as first Phase 3 adapter. Complete the [authoring reference](../architecture/PROXMOX_ADAPTER.md) discovery record: cluster version/topology/scale, read-only token scope, stable IDs, limits, egress, deep links, and sanitized fixtures |
 | TrueNAS | Health/inventory inbound | REST/WebSocket/alerts depending edition | 3 | Confirm edition/version, API auth, events, pool and drive identifiers |
 | iDRAC | Health/inventory inbound | Redfish preferred; SNMP/events if useful | 3 | Inventory versions/licenses and Redfish/event availability |
 | Grafana or metric source | Health inbound/deep links | HTTP APIs, Alertmanager/webhook, source API | 3 | Identify authoritative data source; avoid duplicating all metrics |

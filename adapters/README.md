@@ -11,3 +11,9 @@ TCP, TLS, HTTP status/latency, redirect, and exact-content availability checks. 
 uses explicit host/address/port policy, pinned connections, no ambient proxy, and
 secret references; it never emits response bodies or protected header values.
 Machine-readable contracts live under [`api/`](../api/README.md).
+
+Phase 3 begins its infrastructure-adapter work with Proxmox while UBNetDef SSO is
+deferred in development sequencing. Students building or changing that adapter
+must follow the [Proxmox adapter authoring reference](../docs/architecture/PROXMOX_ADAPTER.md).
+The reference is guidance and discovery scope; it does not claim that a Proxmox
+adapter or Hypervisor capability is implemented.

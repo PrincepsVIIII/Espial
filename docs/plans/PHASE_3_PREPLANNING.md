@@ -1,6 +1,7 @@
 # Phase 3 pre-planning: core infrastructure integrations
 
-**Status:** Pre-planning only (2026-08-01); no implementation slice is active  
+**Status:** Pre-planning; Proxmox selected as the first adapter (2026-08-06); no
+implementation slice is active
 **Inputs:** [Roadmap](../ROADMAP.md),
 [adapter protocol](../architecture/ADAPTER_PROTOCOL.md),
 [authentication contract](../architecture/AUTHENTICATION.md),
@@ -73,11 +74,13 @@ The roadmap order remains provisional until owners provide evidence:
 | Grafana or metric source | Identify the authoritative source and alert interface; define which health signals Espial needs without copying full time series | A narrow alert/health/deep-link contract and retention decision |
 | pfSense | Confirm edition/version and approved API, SNMP, or syslog mechanism, credential scope, stable IDs, and rate limits | A selected read-only mechanism and normalized health mapping |
 
-SSO discovery stays first because it is already a production input. Proxmox remains
-the tentative first vendor monitoring adapter because it is first in the roadmap,
-but neither ordering decision authorizes implementation. If an earlier candidate
-lacks its owner-supplied evidence, discovery may continue in parallel without
-shipping a later candidate's route or capability claim.
+On 2026-08-06 the project explicitly deferred SSO implementation behind Proxmox for
+development sequencing. SSO remains a production input and its readiness contract
+is not waived. Proxmox is now the proposed first adapter, but that decision does not
+authorize implementation until its owner-supplied discovery evidence and the
+[adapter authoring reference](../architecture/PROXMOX_ADAPTER.md) gates are closed.
+Discovery may continue without shipping a route, navigation child, or capability
+claim.
 
 ## 5. Questions every monitoring integration must answer
 
