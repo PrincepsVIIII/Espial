@@ -12,13 +12,9 @@ type VersionResponse struct {
 }
 
 type ClusterStatusItem struct {
-	Type    string  `json:"type"`
-	Name    string  `json:"name"`
-	NodeID  string  `json:"nodeid"`
-	Online  *int    `json:"online,omitempty"`
-	Quorate *int    `json:"quorate,omitempty"`
-	IP      string  `json:"ip,omitempty"`
-	Votes   float64 `json:"votes,omitempty"`
+	Type    string `json:"type"`
+	Name    string `json:"name"`
+	Quorate *int   `json:"quorate,omitempty"`
 }
 
 type ClusterResource struct {

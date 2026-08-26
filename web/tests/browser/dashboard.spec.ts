@@ -324,6 +324,11 @@ for (const viewport of [
         name: /Trust this cluster’s self-signed certificate/,
       }),
     ).toBeVisible();
+    await expect(
+      dialog.getByText(
+        /Not recommended\. The API token will travel without TLS\./,
+      ),
+    ).toBeVisible();
     await expect(dialog.getByText('Read-only API token')).toBeVisible();
     await expect(
       dialog.getByText('Warning and critical thresholds'),

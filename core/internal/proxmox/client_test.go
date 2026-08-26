@@ -40,6 +40,32 @@ func TestClientUsesOnlyApprovedEndpointPathsAndTokenHeader(t *testing.T) {
 	}
 }
 
+func TestClientDecodesClusterStatusWithNumericNodeID(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeData(t, w, []map[string]any{
+			{"type": "cluster", "name": "lab", "nodes": 1, "quorate": 1, "version": 1},
+			{"type": "node", "name": "pve-a", "id": "node/pve-a", "nodeid": 1, "online": 1, "level": nil},
+		})
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	client, err := NewClient(Config{
+		BaseURL: server.URL, DeploymentID: "lab", TokenID: "user@pve!espial", TokenSecret: "secret",
+	}, ClientOptions{
+		HTTPClient: server.Client(), ApprovedHosts: []string{target.Hostname()}, AllowedPorts: []int{mustPort(t, target.Port())},
+	})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	status, err := client.GetClusterStatus(context.Background())
+	if err != nil {
+		t.Fatalf("GetClusterStatus: %v", err)
+	}
+	if len(status) != 2 || status[0].Quorate == nil || *status[0].Quorate != 1 || status[1].Name != "pve-a" {
+		t.Fatalf("status = %#v", status)
+	}
+}
+
 func TestClientRejectsUnapprovedTarget(t *testing.T) {
 	_, err := NewClient(Config{
 		BaseURL: "https://proxmox.example:8006", DeploymentID: "lab",

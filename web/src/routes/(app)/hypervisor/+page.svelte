@@ -501,9 +501,9 @@
             <label class="check-row">
               <input name="approve_target" type="checkbox" required />
               <span>
-                <strong>Approve this exact target</strong>
+                <strong>Approve this target</strong>
                 <small
-                  >Allow read-only collection from the host and port above.</small
+                  >Required. Allow read-only collection from the host and port above.</small
                 >
               </span>
             </label>
@@ -517,13 +517,13 @@
                 >
               </span>
             </label>
-            <label class="check-row check-row-warning">
+            <label class="check-row">
               <input name="allow_insecure_http" type="checkbox" />
               <span>
                 <strong>Allow insecure HTTP</strong>
                 <small
-                  >The API token will travel without TLS. Use only for a
-                  temporary, isolated cluster.</small
+                  >Not recommended. The API token will travel without TLS. Use
+                  only for a temporary, isolated cluster.</small
                 >
               </span>
             </label>
@@ -1014,10 +1014,6 @@
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
     cursor: pointer;
-  }
-
-  .cluster-form .check-row-warning {
-    border-left: 3px solid var(--warning);
   }
 
   .check-row > span {

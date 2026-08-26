@@ -161,7 +161,10 @@ normalized mapping.
 The author should first determine whether `/cluster/resources` alone provides the
 required first-version state. Proxmox responses normally wrap results under
 `data`; the adapter should validate required fields and their types while tolerating
-unrelated additive response fields.
+unrelated additive response fields. In particular, `/cluster/status` reports
+`nodeid` as a number; Espial does not consume that field and its decoder deliberately
+does not bind it, so this source metadata cannot invalidate the quorum and node-name
+fields used by the adapter. A regression fixture preserves that compatibility.
 
 ## 6. Resource identity and mapping
 
