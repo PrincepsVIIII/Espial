@@ -21,6 +21,8 @@ func Manifest() adapters.Manifest {
 			"required": []string{"base_url", "deployment_id", "token_id", "token_secret"},
 			"properties": map[string]any{
 				"base_url":                 map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
+				"approved_host":            map[string]any{"type": "string", "minLength": 1, "maxLength": 253},
+				"approved_port":            map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},
 				"deployment_id":            map[string]any{"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
 				"token_id":                 map[string]any{"type": "string", "minLength": 3, "maxLength": 160},
 				"token_secret":             map[string]any{"type": "string", "maxLength": 4096},
@@ -82,7 +84,7 @@ func Run(input io.Reader, output io.Writer, policy Policy) error {
 				continue
 			}
 			ctx, cancel := envelopeContext(request, RequestTimeout(config))
-			client, err := NewClient(config, ClientOptions{ApprovedHosts: policy.ApprovedHosts, AllowedPorts: policy.AllowedPorts})
+			client, err := NewClient(config, clientOptions(policy, config))
 			if err == nil {
 				payload, err := Collect(ctx, config, client, time.Now().UTC())
 				cancel()
@@ -118,12 +120,24 @@ func Run(input io.Reader, output io.Writer, policy Policy) error {
 func ValidateLive(request adapters.Envelope, config Config, policy Policy) error {
 	ctx, cancel := envelopeContext(request, RequestTimeout(config))
 	defer cancel()
-	client, err := NewClient(config, ClientOptions{ApprovedHosts: policy.ApprovedHosts, AllowedPorts: policy.AllowedPorts})
+	client, err := NewClient(config, clientOptions(policy, config))
 	if err != nil {
 		return err
 	}
 	_, err = Collect(ctx, config, client, time.Now().UTC())
 	return err
+}
+
+func clientOptions(policy Policy, config Config) ClientOptions {
+	hosts := append([]string(nil), policy.ApprovedHosts...)
+	if len(hosts) == 0 && config.ApprovedHost != "" {
+		hosts = []string{config.ApprovedHost}
+	}
+	ports := append([]int(nil), policy.AllowedPorts...)
+	if len(ports) == 0 && config.ApprovedPort > 0 {
+		ports = []int{config.ApprovedPort}
+	}
+	return ClientOptions{ApprovedHosts: hosts, AllowedPorts: ports}
 }
 
 func envelopeContext(request adapters.Envelope, fallback time.Duration) (context.Context, context.CancelFunc) {

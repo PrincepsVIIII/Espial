@@ -15,6 +15,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/audit"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
+	"github.com/PrincepsVIIII/Espial/core/internal/proxmox"
 	"github.com/PrincepsVIIII/Espial/core/internal/webcheck"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -65,7 +66,7 @@ func (service *IntegrationConfigService) Create(ctx context.Context, create Crea
 		create.Interval < time.Second || create.Interval > 24*time.Hour || create.Interval%time.Second != 0 {
 		return "", time.Time{}, &Error{Code: "invalid_integration_config"}
 	}
-	if create.AdapterID == webcheck.AdapterID {
+	if !create.Typed && (create.AdapterID == webcheck.AdapterID || create.AdapterID == proxmox.AdapterID) {
 		return "", time.Time{}, &Error{Code: "typed_integration_required"}
 	}
 	if _, err := service.registry.Lookup(create.AdapterID); err != nil {
@@ -173,7 +174,7 @@ func (service *IntegrationConfigService) Update(ctx context.Context, update Inte
 		}
 		return time.Time{}, fmt.Errorf("load integration config: %w", err)
 	}
-	if adapterID == webcheck.AdapterID {
+	if adapterID == webcheck.AdapterID || adapterID == proxmox.AdapterID {
 		return time.Time{}, &Error{Code: "typed_integration_required"}
 	}
 	if !update.ExpectedUpdatedAt.IsZero() && !previousUpdatedAt.Equal(update.ExpectedUpdatedAt) {

@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -35,7 +37,7 @@ func NewService(pool *pgxpool.Pool, creator IntegrationCreator, secrets adapters
 	return &Service{
 		pool: pool, creator: creator, secrets: secrets, policy: policy, now: now,
 		newClient: func(config proxmox.Config) (proxmox.API, error) {
-			return proxmox.NewClient(config, proxmox.ClientOptions{ApprovedHosts: policy.ApprovedHosts, AllowedPorts: policy.AllowedPorts})
+			return proxmox.NewClient(config, proxmoxClientOptions(policy, config))
 		},
 	}
 }
@@ -57,17 +59,26 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 		IOWaitCriticalPercent:  definition.IOWaitCriticalPercent,
 		ExpectedRunningGuests:  definition.ExpectedRunningGuests,
 	})
+	if !definition.ApproveTarget {
+		return adminops.Receipt{}, &monitoring.Error{Code: "target_approval_required"}
+	}
+	host, port, err := approvedTarget(config.BaseURL)
+	if err != nil {
+		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_proxmox_config"}
+	}
+	config.ApprovedHost = host
+	config.ApprovedPort = port
 	if err := proxmox.ValidateConfig(config); err != nil {
 		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_proxmox_config"}
 	}
 	client, err := service.newClient(config)
 	if err != nil {
-		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_proxmox_config"}
+		return adminops.Receipt{}, &monitoring.Error{Code: proxmoxCreateErrorCode(err)}
 	}
 	validationContext, cancel := context.WithTimeout(ctx, proxmox.RequestTimeout(config))
 	defer cancel()
 	if _, err := proxmox.Collect(validationContext, config, client, service.now()); err != nil {
-		return adminops.Receipt{}, &monitoring.Error{Code: "proxmox_validation_failed"}
+		return adminops.Receipt{}, &monitoring.Error{Code: proxmoxCreateErrorCode(err)}
 	}
 	tokenSecretReference := tokenReference(config.DeploymentID, definition.CorrelationID)
 	if err := service.secrets.Write(ctx, tokenSecretReference, config.TokenSecret); err != nil {
@@ -75,6 +86,8 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	}
 	nonsecret := map[string]any{
 		"base_url":                 config.BaseURL,
+		"approved_host":            config.ApprovedHost,
+		"approved_port":            config.ApprovedPort,
 		"deployment_id":            config.DeploymentID,
 		"token_id":                 config.TokenID,
 		"expected_refresh_seconds": config.ExpectedRefreshSeconds,
@@ -88,7 +101,7 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 		"expected_running_guests":  config.ExpectedRunningGuests,
 	}
 	id, updatedAt, err := service.creator.Create(ctx, monitoring.CreateIntegration{
-		AdapterID: proxmox.AdapterID, DisplayName: strings.TrimSpace(definition.DisplayName), Enabled: true,
+		AdapterID: proxmox.AdapterID, DisplayName: strings.TrimSpace(definition.DisplayName), Enabled: true, Typed: true,
 		Interval:        time.Duration(intervalSeconds(definition.IntervalSeconds)) * time.Second,
 		ConfigNonsecret: nonsecret, SecretReferences: map[string]string{"token_secret": tokenSecretReference},
 		ActorUserID: definition.ActorUserID, SourceAddress: definition.SourceAddress, CorrelationID: definition.CorrelationID,
@@ -101,6 +114,34 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 		receipt.AuditURL = "/audit?correlation_id=" + definition.CorrelationID
 	}
 	return receipt, nil
+}
+
+func approvedTarget(baseURL string) (string, int, error) {
+	target, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil || target.Hostname() == "" {
+		return "", 0, fmt.Errorf("invalid proxmox target")
+	}
+	port := target.Port()
+	if port == "" {
+		port = "443"
+	}
+	parsed, err := strconv.Atoi(port)
+	if err != nil {
+		return "", 0, err
+	}
+	return strings.ToLower(target.Hostname()), parsed, nil
+}
+
+func proxmoxClientOptions(policy proxmox.Policy, config proxmox.Config) proxmox.ClientOptions {
+	hosts := append([]string(nil), policy.ApprovedHosts...)
+	if len(hosts) == 0 && config.ApprovedHost != "" {
+		hosts = []string{config.ApprovedHost}
+	}
+	ports := append([]int(nil), policy.AllowedPorts...)
+	if len(ports) == 0 && config.ApprovedPort > 0 {
+		ports = []int{config.ApprovedPort}
+	}
+	return proxmox.ClientOptions{ApprovedHosts: hosts, AllowedPorts: ports}
 }
 
 func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error) {
@@ -203,6 +244,18 @@ func tokenReference(deploymentID, correlationID string) string {
 		suffix = fmt.Sprint(time.Now().UTC().UnixNano())
 	}
 	return "proxmox_" + strings.ReplaceAll(deploymentID, "-", "_") + "_" + suffix + "_token"
+}
+
+func proxmoxCreateErrorCode(err error) string {
+	if err == nil {
+		return ""
+	}
+	switch err.Error() {
+	case "target_not_approved", "unauthorized", "forbidden", "throttled", "timeout", "temporary_upstream_failure", "malformed_data", "oversized_response":
+		return err.Error()
+	default:
+		return "proxmox_validation_failed"
+	}
 }
 
 func object(value []byte) map[string]any {

@@ -218,6 +218,7 @@ type CreateIntegration struct {
 	AdapterID        string
 	DisplayName      string
 	Enabled          bool
+	Typed            bool
 	Interval         time.Duration
 	ConfigNonsecret  map[string]any
 	SecretReferences map[string]string

@@ -2,9 +2,10 @@ import { dev } from '$app/environment';
 import { redirect } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 import { problemFrom, requestJSON, type ClientProblem } from '$lib/api/client';
-import type { ProxmoxClusterList } from '$lib/api/generated';
+import type { ProxmoxClusterCard } from '$lib/api/generated';
 
 type Loaded<T> = { value: T | null; problem: ClientProblem | null };
+type ProxmoxClusterList = { items: ProxmoxClusterCard[] };
 
 export const load = (async ({ depends, fetch, parent, url }) => {
   depends('espial:monitoring');

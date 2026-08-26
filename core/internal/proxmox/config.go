@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -46,6 +47,8 @@ type Config struct {
 	DeploymentID           string   `json:"deployment_id"`
 	TokenID                string   `json:"token_id"`
 	TokenSecret            string   `json:"token_secret"`
+	ApprovedHost           string   `json:"approved_host,omitempty"`
+	ApprovedPort           int      `json:"approved_port,omitempty"`
 	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
 	RequestTimeoutSeconds  int      `json:"request_timeout_seconds"`
 	ExpectedRunningGuests  []string `json:"expected_running_guests"`
@@ -55,6 +58,11 @@ type Config struct {
 	SwapCriticalPercent    float64  `json:"swap_critical_percent"`
 	IOWaitWarningPercent   float64  `json:"io_wait_warning_percent"`
 	IOWaitCriticalPercent  float64  `json:"io_wait_critical_percent"`
+}
+
+type ConfigFieldError struct {
+	Field string
+	Code  string
 }
 
 func DecodeConfig(payload json.RawMessage) (Config, error) {
@@ -77,6 +85,13 @@ func DecodeConfig(payload json.RawMessage) (Config, error) {
 }
 
 func WithDefaults(config Config) Config {
+	config.BaseURL = strings.TrimSpace(config.BaseURL)
+	config.DeploymentID = strings.TrimSpace(config.DeploymentID)
+	config.TokenID = strings.TrimSpace(config.TokenID)
+	config.ApprovedHost = strings.ToLower(strings.TrimSpace(config.ApprovedHost))
+	for index, guest := range config.ExpectedRunningGuests {
+		config.ExpectedRunningGuests[index] = strings.TrimSpace(guest)
+	}
 	if config.ExpectedRefreshSeconds == 0 {
 		config.ExpectedRefreshSeconds = DefaultExpectedRefreshSeconds
 	}
@@ -105,30 +120,56 @@ func WithDefaults(config Config) Config {
 }
 
 func ValidateConfig(config Config) error {
+	if len(ValidateConfigFields(config)) > 0 {
+		return errors.New("invalid proxmox config")
+	}
+	return nil
+}
+
+func ValidateConfigFields(config Config) []ConfigFieldError {
 	config = WithDefaults(config)
+	var fields []ConfigFieldError
 	target, err := url.Parse(config.BaseURL)
 	if err != nil || target.Scheme != "https" || target.Hostname() == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
-		return errors.New("invalid proxmox config")
+		fields = append(fields, ConfigFieldError{Field: "base_url", Code: "invalid"})
 	}
-	if !deploymentPattern.MatchString(config.DeploymentID) || !tokenIDPattern.MatchString(config.TokenID) ||
-		strings.TrimSpace(config.TokenSecret) == "" || strings.ContainsAny(config.TokenSecret, "\r\n\x00") {
-		return errors.New("invalid proxmox config")
+	if err == nil && config.ApprovedHost != "" && !strings.EqualFold(config.ApprovedHost, target.Hostname()) {
+		fields = append(fields, ConfigFieldError{Field: "approved_target", Code: "mismatch"})
 	}
-	if config.ExpectedRefreshSeconds < 1 || config.ExpectedRefreshSeconds > 86400 ||
-		config.RequestTimeoutSeconds < 1 || config.RequestTimeoutSeconds > 60 {
-		return errors.New("invalid proxmox config")
+	if err == nil && config.ApprovedPort != 0 && config.ApprovedPort != targetPort(target) {
+		fields = append(fields, ConfigFieldError{Field: "approved_target", Code: "mismatch"})
 	}
-	if !validThresholds(config.StorageWarningPercent, config.StorageCriticalPercent) ||
-		!validThresholds(config.SwapWarningPercent, config.SwapCriticalPercent) ||
-		!validThresholds(config.IOWaitWarningPercent, config.IOWaitCriticalPercent) {
-		return errors.New("invalid proxmox config")
+	if !deploymentPattern.MatchString(config.DeploymentID) {
+		fields = append(fields, ConfigFieldError{Field: "deployment_id", Code: "invalid"})
+	}
+	if !tokenIDPattern.MatchString(config.TokenID) {
+		fields = append(fields, ConfigFieldError{Field: "token_id", Code: "invalid"})
+	}
+	if strings.TrimSpace(config.TokenSecret) == "" || strings.ContainsAny(config.TokenSecret, "\r\n\x00") {
+		fields = append(fields, ConfigFieldError{Field: "token_secret", Code: "invalid"})
+	}
+	if config.ExpectedRefreshSeconds < 1 || config.ExpectedRefreshSeconds > 86400 {
+		fields = append(fields, ConfigFieldError{Field: "expected_refresh_seconds", Code: "out_of_range"})
+	}
+	if config.RequestTimeoutSeconds < 1 || config.RequestTimeoutSeconds > 60 {
+		fields = append(fields, ConfigFieldError{Field: "request_timeout_seconds", Code: "out_of_range"})
+	}
+	if !validThresholds(config.StorageWarningPercent, config.StorageCriticalPercent) {
+		fields = append(fields, ConfigFieldError{Field: "storage_thresholds", Code: "invalid_range"})
+	}
+	if !validThresholds(config.SwapWarningPercent, config.SwapCriticalPercent) {
+		fields = append(fields, ConfigFieldError{Field: "swap_thresholds", Code: "invalid_range"})
+	}
+	if !validThresholds(config.IOWaitWarningPercent, config.IOWaitCriticalPercent) {
+		fields = append(fields, ConfigFieldError{Field: "io_wait_thresholds", Code: "invalid_range"})
 	}
 	for _, guest := range config.ExpectedRunningGuests {
 		if !guestPattern.MatchString(guest) {
-			return errors.New("invalid proxmox config")
+			fields = append(fields, ConfigFieldError{Field: "expected_running_guests", Code: "invalid"})
+			break
 		}
 	}
-	return nil
+	return fields
 }
 
 func RequestTimeout(config Config) time.Duration {
@@ -138,4 +179,19 @@ func RequestTimeout(config Config) time.Duration {
 
 func validThresholds(warning, critical float64) bool {
 	return warning >= 0 && warning <= 100 && critical >= 0 && critical <= 100 && warning < critical
+}
+
+func targetPort(target *url.URL) int {
+	if target == nil {
+		return 0
+	}
+	port := target.Port()
+	if port == "" {
+		return 443
+	}
+	parsed, err := strconv.Atoi(port)
+	if err != nil {
+		return 0
+	}
+	return parsed
 }

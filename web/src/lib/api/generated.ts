@@ -369,67 +369,6 @@ export interface IntegrationAPIView {
   updated_at: string;
 }
 
-export interface ProxmoxClusterList {
-  items: ProxmoxClusterCard[];
-}
-
-export interface ProxmoxClusterCard {
-  id: string;
-  integration_id: string;
-  name: string;
-  state: string;
-  freshness: string;
-  last_observed_at?: string;
-  last_collection_at?: string;
-  hosts: {
-    id: string;
-    cpu_percent: number;
-    ram_percent: number;
-    cpu_cores: number;
-    ram_bytes: number;
-    swap_percent: number;
-    swap_indicator: string;
-    health_state: string;
-  }[];
-  storage: {
-    id: string;
-    scope: string;
-    used_bytes: number;
-    total_bytes: number;
-    used_percent: number;
-    io_wait_percent: number;
-    io_wait_indicator: string;
-    health_state: string;
-  }[];
-  totals: {
-    cpu_percent: number;
-    ram_percent: number;
-    storage_percent: number;
-  };
-  load_nodes: {
-    id: string;
-    active_vms: number;
-  }[];
-}
-
-export interface ProxmoxClusterCreateRequest {
-  display_name: string;
-  base_url: string;
-  deployment_id: string;
-  token_id: string;
-  token_secret: string;
-  interval_seconds: number;
-  expected_refresh_seconds: number;
-  request_timeout_seconds: number;
-  storage_warning_percent: number;
-  storage_critical_percent: number;
-  swap_warning_percent: number;
-  swap_critical_percent: number;
-  io_wait_warning_percent: number;
-  io_wait_critical_percent: number;
-  expected_running_guests: string[];
-}
-
 export type IntegrationWriteRequest = CreateIntegrationRequest | ReplaceIntegrationConfigurationRequest;
 
 export interface CreateIntegrationRequest {
@@ -633,6 +572,67 @@ export interface MonitoringOverview {
     state: "healthy" | "warning" | "critical" | "unknown" | "stale" | "maintenance" | "disabled";
     reason: string;
     changed_at: string;
+  }[];
+}
+
+export interface ProxmoxClusterCreateRequest {
+  display_name: string;
+  base_url: string;
+  approve_target: true;
+  deployment_id: string;
+  token_id: string;
+  token_secret: string;
+  interval_seconds: number;
+  expected_refresh_seconds: number;
+  request_timeout_seconds: number;
+  storage_warning_percent: number;
+  storage_critical_percent: number;
+  swap_warning_percent: number;
+  swap_critical_percent: number;
+  io_wait_warning_percent: number;
+  io_wait_critical_percent: number;
+  /**
+   * @maxItems 10000
+   */
+  expected_running_guests: string[];
+}
+
+export interface ProxmoxClusterCard {
+  id: string;
+  integration_id: string;
+  name: string;
+  state: string;
+  freshness: string;
+  last_observed_at?: string;
+  last_collection_at?: string;
+  hosts: {
+    id: string;
+    cpu_percent: number;
+    ram_percent: number;
+    cpu_cores: number;
+    ram_bytes: number;
+    swap_percent: number;
+    swap_indicator: string;
+    health_state: string;
+  }[];
+  storage: {
+    id: string;
+    scope: string;
+    used_bytes: number;
+    total_bytes: number;
+    used_percent: number;
+    io_wait_percent: number;
+    io_wait_indicator: string;
+    health_state: string;
+  }[];
+  totals: {
+    cpu_percent: number;
+    ram_percent: number;
+    storage_percent: number;
+  };
+  load_nodes: {
+    id: string;
+    active_vms: number;
   }[];
 }
 

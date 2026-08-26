@@ -7,6 +7,7 @@
   "required": [
     "display_name",
     "base_url",
+    "approve_target",
     "deployment_id",
     "token_id",
     "token_secret",
@@ -24,6 +25,7 @@
   "properties": {
     "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
     "base_url": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "approve_target": { "type": "boolean", "const": true },
     "deployment_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,62}$"
@@ -31,6 +33,7 @@
     "token_id": { "type": "string", "minLength": 3, "maxLength": 160 },
     "token_secret": {
       "type": "string",
+      "writeOnly": true,
       "minLength": 1,
       "maxLength": 4096
     },

@@ -26,6 +26,7 @@
     const body: ProxmoxClusterCreateRequest = {
       display_name: text(form, 'display_name'),
       base_url: text(form, 'base_url'),
+      approve_target: true,
       deployment_id: text(form, 'deployment_id'),
       token_id: text(form, 'token_id'),
       token_secret: text(form, 'token_secret'),
@@ -302,6 +303,10 @@
       <form class="cluster-form" onsubmit={createCluster}>
         <label>Cluster name <input name="display_name" required maxlength="128" /></label>
         <label>Base URL <input name="base_url" required placeholder="https://proxmox.example:8006" /></label>
+        <label class="check-row">
+          <input name="approve_target" type="checkbox" required />
+          <span>Approve this Proxmox target for read-only collection</span>
+        </label>
         <label>Deployment ID <input name="deployment_id" required pattern="[a-z][a-z0-9-]+" minlength="2" maxlength="63" /></label>
         <label>Token ID <input name="token_id" required /></label>
         <label>Token secret <input name="token_secret" type="password" required autocomplete="new-password" /></label>
@@ -562,6 +567,19 @@
     border: 1px solid rgba(151, 176, 190, 0.36);
     color: inherit;
     padding: 0.55rem;
+  }
+
+  .cluster-form .check-row {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+  }
+
+  .cluster-form .check-row input {
+    min-width: 1rem;
+    width: 1rem;
+    height: 1rem;
+    padding: 0;
   }
 
   .threshold-grid {

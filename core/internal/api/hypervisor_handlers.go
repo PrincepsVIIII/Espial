@@ -7,6 +7,7 @@ import (
 
 	"github.com/PrincepsVIIII/Espial/core/internal/hypervisor"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
+	"github.com/PrincepsVIIII/Espial/core/internal/proxmox"
 )
 
 func (server *server) proxmoxClusterList(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +38,7 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 	var body struct {
 		DisplayName            string   `json:"display_name"`
 		BaseURL                string   `json:"base_url"`
+		ApproveTarget          bool     `json:"approve_target"`
 		DeploymentID           string   `json:"deployment_id"`
 		TokenID                string   `json:"token_id"`
 		TokenSecret            string   `json:"token_secret"`
@@ -61,8 +63,16 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 		server.validationError(w, r, []APIFieldError{{Field: "body", Code: "required_fields"}})
 		return
 	}
+	if !body.ApproveTarget {
+		server.validationError(w, r, []APIFieldError{{Field: "approve_target", Code: "required"}})
+		return
+	}
+	if fields := proxmoxConfigFields(body); len(fields) > 0 {
+		server.validationError(w, r, fields)
+		return
+	}
 	receipt, err := server.dependencies.Hypervisor.CreateProxmoxCluster(r.Context(), hypervisor.ProxmoxClusterDefinition{
-		DisplayName: body.DisplayName, BaseURL: body.BaseURL, DeploymentID: body.DeploymentID,
+		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, DeploymentID: body.DeploymentID,
 		TokenID: body.TokenID, TokenSecret: body.TokenSecret,
 		IntervalSeconds: body.IntervalSeconds, ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds: body.RequestTimeoutSeconds, StorageWarningPercent: body.StorageWarningPercent,
@@ -83,4 +93,42 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 	}
 	w.Header().Set("Location", "/api/v1/integrations/"+receipt.ID)
 	writeJSON(w, http.StatusCreated, receipt)
+}
+
+func proxmoxConfigFields(body struct {
+	DisplayName            string   `json:"display_name"`
+	BaseURL                string   `json:"base_url"`
+	ApproveTarget          bool     `json:"approve_target"`
+	DeploymentID           string   `json:"deployment_id"`
+	TokenID                string   `json:"token_id"`
+	TokenSecret            string   `json:"token_secret"`
+	IntervalSeconds        int      `json:"interval_seconds"`
+	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
+	RequestTimeoutSeconds  int      `json:"request_timeout_seconds"`
+	StorageWarningPercent  float64  `json:"storage_warning_percent"`
+	StorageCriticalPercent float64  `json:"storage_critical_percent"`
+	SwapWarningPercent     float64  `json:"swap_warning_percent"`
+	SwapCriticalPercent    float64  `json:"swap_critical_percent"`
+	IOWaitWarningPercent   float64  `json:"io_wait_warning_percent"`
+	IOWaitCriticalPercent  float64  `json:"io_wait_critical_percent"`
+	ExpectedRunningGuests  []string `json:"expected_running_guests"`
+}) []APIFieldError {
+	configFields := proxmox.ValidateConfigFields(proxmox.Config{
+		BaseURL: body.BaseURL, DeploymentID: body.DeploymentID,
+		TokenID: body.TokenID, TokenSecret: body.TokenSecret,
+		ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
+		RequestTimeoutSeconds:  body.RequestTimeoutSeconds,
+		StorageWarningPercent:  body.StorageWarningPercent,
+		StorageCriticalPercent: body.StorageCriticalPercent,
+		SwapWarningPercent:     body.SwapWarningPercent,
+		SwapCriticalPercent:    body.SwapCriticalPercent,
+		IOWaitWarningPercent:   body.IOWaitWarningPercent,
+		IOWaitCriticalPercent:  body.IOWaitCriticalPercent,
+		ExpectedRunningGuests:  body.ExpectedRunningGuests,
+	})
+	fields := make([]APIFieldError, 0, len(configFields))
+	for _, field := range configFields {
+		fields = append(fields, APIFieldError{Field: field.Field, Code: field.Code})
+	}
+	return fields
 }

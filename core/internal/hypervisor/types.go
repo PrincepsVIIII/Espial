@@ -6,6 +6,7 @@ import "time"
 type ProxmoxClusterDefinition struct {
 	DisplayName            string
 	BaseURL                string
+	ApproveTarget          bool
 	DeploymentID           string
 	TokenID                string
 	TokenSecret            string

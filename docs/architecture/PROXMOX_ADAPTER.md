@@ -119,8 +119,14 @@ The proposed Espial integration configuration treats the API URL, deployment ID,
 and token ID as non-secret values. The Add Cluster UI may accept the token secret
 once in a password field, but Core immediately writes it to the configured adapter
 secret store and persists only a generated Core-resolved secret reference. The
-adapter must never persist or log the combined authorization header, token secret,
-raw credential error, or resolved secret value.
+same typed Add Cluster flow also requires the administrator to explicitly approve
+the Proxmox target URL; Core records the resulting host and port as non-secret
+integration policy and includes only those approved values in later adapter
+validation and collection requests. A deployment-level
+`ESPIAL_PROXMOX_APPROVED_HOSTS` list may further restrict targets, but normal
+cluster onboarding does not require manually editing that environment variable.
+The adapter must never persist or log the combined authorization header, token
+secret, raw credential error, or resolved secret value.
 
 Start with `PVEAuditor` on only the required ACL paths. If the initial role exposes
 more than the approved endpoints require, define and document a narrower custom
@@ -219,6 +225,8 @@ A bounded first configuration can include:
 
 ```text
 base_url
+approved_host                 # derived from the explicitly approved Add Cluster URL
+approved_port                 # derived from the explicitly approved Add Cluster URL
 deployment_id
 token_id
 token_secret                  # secret field; UI accepts once, stored by reference
@@ -229,10 +237,11 @@ storage_warning_percent
 storage_critical_percent
 ```
 
-An approved TLS trust bundle, target host/address/port allowlist, response-size
-cap, and any future endpoint-failover list belong to trusted deployment/adapter
-policy. An integration API must not be able to select arbitrary executable paths,
-CA files, proxy settings, or egress targets.
+An approved TLS trust bundle, response-size cap, and any future endpoint-failover
+list belong to trusted deployment/adapter policy. The target host/port is approved
+only by the typed, audited Add Cluster flow and may be further bounded by
+deployment-level environment allowlists. A generic integration API must not be able
+to select arbitrary executable paths, CA files, proxy settings, or egress targets.
 
 ## 9. Espial process behavior
 
