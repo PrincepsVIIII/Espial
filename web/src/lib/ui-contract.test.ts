@@ -254,12 +254,20 @@ describe('primary route skeletons', () => {
     expect(alertsPage).not.toContain('UnavailableSection');
   });
 
-  it.each([
-    ['Datacenter', datacenterPage],
-    ['Hypervisor', hypervisorPage],
-  ])('%s exposes an honest unavailable state', (name, page) => {
+  it.each([['Datacenter', datacenterPage]])(
+    '%s exposes an honest unavailable state',
+    (name, page) => {
     expect(page).toContain(`title="${name}"`);
     expect(page).toMatch(/not implemented|not configured|no .* configured/i);
+    },
+  );
+
+  it('exposes Proxmox-backed Hypervisor clusters without production placeholder data', () => {
+    expect(hypervisorPage).toContain('<h1>Hypervisor</h1>');
+    expect(hypervisorPage).toContain('+ Add Cluster');
+    expect(hypervisorPage).toContain('No Proxmox clusters are configured.');
+    expect(hypervisorPage).toContain('Development fixture.');
+    expect(hypervisorPage).not.toContain('UnavailableSection');
   });
 
   it('exposes authoritative website availability without retaining protected content', () => {

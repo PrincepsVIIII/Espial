@@ -185,6 +185,13 @@ The manifest should declare:
 - supported controlled actions
 - read-only or action-capable status
 
+Dashboard widget hints are presentation metadata, not frontend logic. They should
+help Core and Web choose a default display for normalized stats by declaring stable
+stat identifiers, labels, descriptions, units, value types, preferred default
+views, source-system deep links, freshness expectations, and whether higher,
+lower, or neutral values are operationally desirable. These hints must not contain
+executable code or vendor-specific rendering instructions.
+
 ### 4.2 Normalized adapter output
 
 Adapters should emit normalized objects instead of vendor-specific blobs wherever possible.
@@ -202,6 +209,15 @@ Core object categories:
 - `notification_delivery_result`
 
 Vendor-specific raw data may be stored as optional metadata for troubleshooting, but central logic should rely on normalized fields.
+
+`metric_sample` and later metric-summary models should support both generic and
+custom presentation paths. Core should preserve enough normalized metadata for the
+frontend to render a safe default view without custom code: metric identity,
+resource identity, observed time, unit, value type, scalar or series value,
+freshness, optional threshold/status interpretation, and bounded source evidence.
+If an integration later needs a custom Svelte view or specialized graphic, that
+custom view should consume the same authoritative read model rather than bypassing
+normalization, authorization, retention, or stale-data semantics.
 
 ## 5. Health-state model
 

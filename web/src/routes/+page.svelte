@@ -27,7 +27,8 @@
       <p>
         Espial is UBNetDef’s operations interface for monitoring infrastructure,
         understanding what needs attention, and moving from a system-level
-        signal to its physical location.
+        signal to its physical location and contains no live status or
+        environment details.
       </p>
       <a class="text-link" href="/login"
         >Continue to authenticated access <span aria-hidden="true">→</span></a
@@ -65,18 +66,6 @@
           </dd>
         </div>
       </dl>
-    </section>
-
-    <section class="public-access" aria-labelledby="access-title">
-      <div>
-        <h2 id="access-title">
-          Operational details stay behind authentication.
-        </h2>
-      </div>
-      <p>
-        This temporary public page contains no live status or environment
-        details. Local access is audited while UBNetDef SSO is completed.
-      </p>
     </section>
   </main>
 

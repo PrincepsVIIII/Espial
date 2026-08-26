@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/proxmox-cluster.schema.json",
+  "title": "Proxmox cluster card",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "integration_id",
+    "name",
+    "state",
+    "freshness",
+    "hosts",
+    "storage",
+    "totals",
+    "load_nodes"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "integration_id": { "type": "string", "format": "uuid" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "state": { "type": "string" },
+    "freshness": { "type": "string" },
+    "last_observed_at": { "type": "string", "format": "date-time" },
+    "last_collection_at": { "type": "string", "format": "date-time" },
+    "hosts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "cpu_percent",
+          "ram_percent",
+          "cpu_cores",
+          "ram_bytes",
+          "swap_percent",
+          "swap_indicator",
+          "health_state"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "cpu_percent": { "type": "number" },
+          "ram_percent": { "type": "number" },
+          "cpu_cores": { "type": "number" },
+          "ram_bytes": { "type": "number" },
+          "swap_percent": { "type": "number" },
+          "swap_indicator": { "type": "string" },
+          "health_state": { "type": "string" }
+        }
+      }
+    },
+    "storage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "scope",
+          "used_bytes",
+          "total_bytes",
+          "used_percent",
+          "io_wait_percent",
+          "io_wait_indicator",
+          "health_state"
+        ],
+        "properties": {
+          "id": { "type": "string" },
+          "scope": { "type": "string" },
+          "used_bytes": { "type": "number" },
+          "total_bytes": { "type": "number" },
+          "used_percent": { "type": "number" },
+          "io_wait_percent": { "type": "number" },
+          "io_wait_indicator": { "type": "string" },
+          "health_state": { "type": "string" }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cpu_percent", "ram_percent", "storage_percent"],
+      "properties": {
+        "cpu_percent": { "type": "number" },
+        "ram_percent": { "type": "number" },
+        "storage_percent": { "type": "number" }
+      }
+    },
+    "load_nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "active_vms"],
+        "properties": {
+          "id": { "type": "string" },
+          "active_vms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

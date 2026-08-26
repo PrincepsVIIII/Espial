@@ -26,6 +26,7 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 		"ESPIAL_DATABASE_MIGRATION_TIMEOUT":             "1m",
 		"ESPIAL_AUTH_MODE":                              "local",
 		"ESPIAL_SAMPLE_ADAPTER_EXECUTABLE":              "/opt/espial/sample-adapter",
+		"ESPIAL_ADAPTER_SECRET_DIRECTORY":               "/run/adapter-secrets",
 		"ESPIAL_ADAPTER_GLOBAL_CONCURRENCY":             "7",
 		"ESPIAL_ADAPTER_RECONCILE_INTERVAL":             "3s",
 		"ESPIAL_FRESHNESS_INTERVAL":                     "2s",
@@ -74,6 +75,9 @@ func TestApplyEnvironmentOverridesDefaults(t *testing.T) {
 	}
 	if cfg.Adapters.SampleExecutable != "/opt/espial/sample-adapter" {
 		t.Fatalf("sample executable = %q", cfg.Adapters.SampleExecutable)
+	}
+	if cfg.Adapters.SecretDirectory != "/run/adapter-secrets" {
+		t.Fatalf("adapter secret directory = %q", cfg.Adapters.SecretDirectory)
 	}
 	if cfg.Adapters.GlobalConcurrency != 7 || cfg.Adapters.ReconcileInterval != 3*time.Second ||
 		cfg.Adapters.FreshnessInterval != 2*time.Second || cfg.Adapters.FreshnessBatchSize != 25 ||
@@ -205,6 +209,7 @@ func TestValidateRejectsUnsafeMonitoringBounds(t *testing.T) {
 		"freshness":                func(cfg *Config) { cfg.Adapters.FreshnessInterval = 2 * time.Minute },
 		"batch":                    func(cfg *Config) { cfg.Adapters.FreshnessBatchSize = 1001 },
 		"replay":                   func(cfg *Config) { cfg.Adapters.EventReplaySize = 10001 },
+		"adapter secret path":      func(cfg *Config) { cfg.Adapters.SecretDirectory = "relative" },
 		"sse heartbeat":            func(cfg *Config) { cfg.Server.SSEHeartbeat = time.Millisecond },
 		"sse clients":              func(cfg *Config) { cfg.Server.SSEMaxClients = 0 },
 		"notification concurrency": func(cfg *Config) { cfg.Notifications.WorkerConcurrency = 0 },

@@ -18,11 +18,13 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/certificates"
 	"github.com/PrincepsVIIII/Espial/core/internal/config"
+	"github.com/PrincepsVIIII/Espial/core/internal/hypervisor"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications/mattermost"
 	"github.com/PrincepsVIIII/Espial/core/internal/operations"
+	"github.com/PrincepsVIIII/Espial/core/internal/proxmox"
 	"github.com/PrincepsVIIII/Espial/core/internal/storage"
 	"github.com/PrincepsVIIII/Espial/core/internal/webcheck"
 	"github.com/PrincepsVIIII/Espial/core/internal/webpages"
@@ -53,7 +55,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		return fmt.Errorf("initialize authentication: %w", err)
 	}
 	intentWriter := notifications.NewIntentWriter()
-	adapterSecrets := notifications.FileSecretResolver{Root: cfg.Webcheck.SecretDirectory}
+	adapterSecrets := adapters.FileSecretStore{Root: cfg.Adapters.SecretDirectory}
 	monitoringRuntime, registry, err := adapterRuntime(pool, cfg, logger, intentWriter, adapterSecrets)
 	if err != nil {
 		return fmt.Errorf("initialize adapter runtime: %w", err)
@@ -90,6 +92,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 	websiteService := webpages.NewService(pool, monitoringRuntime.Hub(), monitoringRuntime, websitePolicy, nil)
 	var workersReady atomic.Bool
 
+	integrationManager := monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry)
 	incidentWorkflow := incidents.NewWorkflow(pool, monitoringRuntime.Hub(), nil)
 	handler := api.New(api.Dependencies{
 		Logger: logger, Ready: readyWhenWorkersStarted(pool.Ping, &workersReady), Auth: authService, PublicURL: cfg.Server.PublicURL,
@@ -101,8 +104,9 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Notifications:    notificationService,
 		Websites:         websiteService,
 		Certificates:     certificates.NewService(pool),
+		Hypervisor:       hypervisor.NewService(pool, integrationManager, adapterSecrets, proxmox.Policy{ApprovedHosts: cfg.Adapters.ProxmoxApprovedHosts, AllowedPorts: cfg.Adapters.ProxmoxAllowedPorts}, nil),
 		Metrics:          operations.NewCollector(pool, notificationService, nil),
-		Integrations:     monitoring.NewIntegrationConfigService(pool, monitoringRuntime.Hub(), nil, registry),
+		Integrations:     integrationManager,
 		Users:            authService,
 		Events:           monitoringRuntime.Hub(), SSEHeartbeat: cfg.Server.SSEHeartbeat,
 		SSEMaxClients: cfg.Server.SSEMaxClients,
@@ -163,6 +167,15 @@ func adapterRuntime(pool *pgxpool.Pool, cfg config.Config, logger *slog.Logger, 
 		descriptors = append(descriptors, adapters.Descriptor{
 			AdapterID:  "org.ubnetdef.espial.sample",
 			Executable: cfg.Adapters.SampleExecutable,
+		})
+	}
+	if cfg.Adapters.ProxmoxExecutable != "" {
+		descriptors = append(descriptors, adapters.Descriptor{
+			AdapterID: proxmox.AdapterID, Executable: cfg.Adapters.ProxmoxExecutable,
+			Environment: map[string]string{
+				"ESPIAL_PROXMOX_APPROVED_HOSTS": strings.Join(cfg.Adapters.ProxmoxApprovedHosts, ","),
+				"ESPIAL_PROXMOX_ALLOWED_PORTS":  joinInts(cfg.Adapters.ProxmoxAllowedPorts),
+			},
 		})
 	}
 	if cfg.Webcheck.Executable != "" {

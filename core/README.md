@@ -73,6 +73,10 @@ then by environment variables. Unknown JSON keys are rejected.
 | `ESPIAL_AUTH_LOGIN_RATE_LIMIT` | `10` | Login attempts allowed per source/window |
 | `ESPIAL_AUTH_LOGIN_RATE_WINDOW` | `1m` | Source-address login rate window |
 | `ESPIAL_SAMPLE_ADAPTER_EXECUTABLE` | none | Absolute trusted path to the bundled sample adapter; never supplied by an integration/API |
+| `ESPIAL_PROXMOX_ADAPTER_EXECUTABLE` | none | Absolute trusted path to the read-only Proxmox adapter |
+| `ESPIAL_PROXMOX_APPROVED_HOSTS` | none | Comma-separated Proxmox API hostnames accepted by Add Cluster and the adapter |
+| `ESPIAL_PROXMOX_ALLOWED_PORTS` | `8006` | Comma-separated Proxmox API ports accepted by Add Cluster and the adapter |
+| `ESPIAL_ADAPTER_SECRET_DIRECTORY` | `/run/secrets` | Directory for adapter secret references; local Proxmox creation writes managed token files here |
 | `ESPIAL_ADAPTER_GLOBAL_CONCURRENCY` | `4` | Process-wide collection limit, from 1 through 64 |
 | `ESPIAL_ADAPTER_RECONCILE_INTERVAL` | `10s` | Enabled-integration reconciliation interval |
 | `ESPIAL_FRESHNESS_INTERVAL` | `1s` | Persisted freshness deadline polling interval |

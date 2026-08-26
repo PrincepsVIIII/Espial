@@ -420,6 +420,12 @@ Keyboard focus must reveal the same information as mouse hover.
 ## 13. Frontend extension model
 
 Most integrations should use standard normalized widgets and require no custom frontend code.
+The default path for a new stat is metadata plus authoritative data, not a new
+bespoke page. Espial should be able to render common operational values from a
+small presentation contract that describes the stat label, unit, value type,
+freshness, status semantics, preferred default view, and source-system link.
+Custom graphics remain supported, but they are an override for important or
+spatially meaningful data rather than a requirement for every metric.
 
 Standard presentation options:
 
@@ -431,6 +437,15 @@ Standard presentation options:
 - incident timelines
 - dependency relationships
 
+Default stat rendering should choose the least surprising component from the
+normalized metadata: counts and percentages become compact metric summaries,
+timestamps become freshness labels, bounded enums become status rows, series become
+sparklines or time-series wrappers, and larger result sets become tables. The UI
+must still expose loading, empty/not-configured, stale, permission-denied,
+Core-unavailable, and unexpected-error states for these generated presentations.
+It must not invent values, charts, thresholds, or capability claims when the
+backend has not provided authoritative data.
+
 Advanced integrations may add a custom Svelte page or component. Adding one may require rebuilding the frontend, but it should not require changes to:
 
 - authentication
@@ -440,7 +455,10 @@ Advanced integrations may add a custom Svelte page or component. Adding one may 
 - core navigation patterns
 - backend normalization
 
-Custom pages should use the shared component library and design tokens.
+Custom pages and custom stat graphics should use the shared component library and
+design tokens. They should also provide a compact table, list, or summary fallback
+when the graphic is spatial, animated, dense, or otherwise difficult to inspect
+with keyboard, narrow-screen, reduced-motion, or assistive technology workflows.
 
 ## 14. Data fetching and state
 

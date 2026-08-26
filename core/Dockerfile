@@ -6,7 +6,8 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -o /out/espial ./cmd/espial \
     && CGO_ENABLED=0 go build -trimpath -o /out/espial-sample-adapter ./cmd/espial-sample-adapter \
-    && CGO_ENABLED=0 go build -trimpath -o /out/espial-webcheck-adapter ./cmd/espial-webcheck-adapter
+    && CGO_ENABLED=0 go build -trimpath -o /out/espial-webcheck-adapter ./cmd/espial-webcheck-adapter \
+    && CGO_ENABLED=0 go build -trimpath -o /out/espial-proxmox-adapter ./cmd/espial-proxmox-adapter
 
 FROM scratch
 
@@ -14,6 +15,7 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifica
 COPY --from=build /out/espial /espial
 COPY --from=build /out/espial-sample-adapter /espial-sample-adapter
 COPY --from=build /out/espial-webcheck-adapter /espial-webcheck-adapter
+COPY --from=build /out/espial-proxmox-adapter /espial-proxmox-adapter
 USER 65532:65532
 ENTRYPOINT ["/espial"]
 CMD ["serve"]

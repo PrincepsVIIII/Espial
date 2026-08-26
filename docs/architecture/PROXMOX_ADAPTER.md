@@ -1,7 +1,8 @@
 # Proxmox adapter authoring reference
 
-**Status:** Authoring and discovery reference (2026-08-06); no Proxmox adapter or
-user-visible Proxmox capability is implemented
+**Status:** Initial read-only adapter and Hypervisor cluster summary implementation
+started; live production acceptance still requires owner-supplied discovery,
+allowlist, credential, fixture, and security evidence
 
 **Applies to:** Phase 3 Proxmox discovery, adapter development, conformance,
 security review, and future maintenance
@@ -115,8 +116,9 @@ Authorization: PVEAPIToken=<user>@<realm>!<token-id>=<secret>
 ```
 
 The proposed Espial integration configuration treats the API URL, deployment ID,
-and token ID as non-secret values. The token secret is declared in the manifest's
-`secret_fields` and supplied only through a Core-resolved secret reference. The
+and token ID as non-secret values. The Add Cluster UI may accept the token secret
+once in a password field, but Core immediately writes it to the configured adapter
+secret store and persists only a generated Core-resolved secret reference. The
 adapter must never persist or log the combined authorization header, token secret,
 raw credential error, or resolved secret value.
 
@@ -219,7 +221,7 @@ A bounded first configuration can include:
 base_url
 deployment_id
 token_id
-token_secret                  # secret reference only
+token_secret                  # secret field; UI accepts once, stored by reference
 expected_refresh_seconds
 request_timeout_seconds
 expected_running_guests      # typed values such as qemu:100 or lxc:200

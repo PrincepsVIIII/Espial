@@ -19,6 +19,7 @@ import (
 	"github.com/PrincepsVIIII/Espial/core/internal/auth"
 	"github.com/PrincepsVIIII/Espial/core/internal/certificates"
 	"github.com/PrincepsVIIII/Espial/core/internal/events"
+	"github.com/PrincepsVIIII/Espial/core/internal/hypervisor"
 	"github.com/PrincepsVIIII/Espial/core/internal/incidents"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/notifications"
@@ -113,6 +114,11 @@ type CertificateReader interface {
 	Certificate(context.Context, string) (certificates.Detail, error)
 }
 
+type HypervisorManager interface {
+	ProxmoxClusters(context.Context) (hypervisor.ClusterList, error)
+	CreateProxmoxCluster(context.Context, hypervisor.ProxmoxClusterDefinition) (adminops.Receipt, error)
+}
+
 type UserAdministrator interface {
 	ManagedUsers(context.Context, auth.ManagedUserFilter) (auth.ManagedUserList, error)
 	ManagedRoles(context.Context) ([]auth.RoleView, error)
@@ -143,6 +149,7 @@ type Dependencies struct {
 	Notifications    NotificationManager
 	Websites         WebsiteManager
 	Certificates     CertificateReader
+	Hypervisor       HypervisorManager
 	Metrics          OperationalMetrics
 	Integrations     IntegrationManager
 	Users            UserAdministrator
@@ -224,6 +231,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/webpages/{id}", server.webpageDetail)
 	mux.HandleFunc("GET /api/v1/certificates", server.certificateList)
 	mux.HandleFunc("GET /api/v1/certificates/{id}", server.certificateDetail)
+	mux.HandleFunc("GET /api/v1/hypervisor/proxmox/clusters", server.proxmoxClusterList)
+	mux.HandleFunc("POST /api/v1/hypervisor/proxmox/clusters", server.createProxmoxCluster)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

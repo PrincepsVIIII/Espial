@@ -20,6 +20,7 @@ export type ClientProblem = {
   code: string;
   message: string;
   request_id?: string;
+  fields?: { field: string; code: string }[];
 };
 
 export class ApiFailure extends Error {
@@ -143,6 +144,7 @@ async function responseProblem(response: Response): Promise<ClientProblem> {
     code,
     message,
     ...(requestID ? { request_id: requestID } : {}),
+    ...(body?.error?.fields ? { fields: body.error.fields.slice(0, 64) } : {}),
   };
 }
 

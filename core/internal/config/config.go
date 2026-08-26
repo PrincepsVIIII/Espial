@@ -61,12 +61,16 @@ type Auth struct {
 }
 
 type Adapters struct {
-	SampleExecutable   string
-	GlobalConcurrency  int
-	ReconcileInterval  time.Duration
-	FreshnessInterval  time.Duration
-	FreshnessBatchSize int
-	EventReplaySize    int
+	SampleExecutable     string
+	ProxmoxExecutable    string
+	ProxmoxApprovedHosts []string
+	ProxmoxAllowedPorts  []int
+	SecretDirectory      string
+	GlobalConcurrency    int
+	ReconcileInterval    time.Duration
+	FreshnessInterval    time.Duration
+	FreshnessBatchSize   int
+	EventReplaySize      int
 }
 
 type Incidents struct {
@@ -149,7 +153,8 @@ func defaults() Config {
 		Adapters: Adapters{
 			GlobalConcurrency: 4, ReconcileInterval: 10 * time.Second,
 			FreshnessInterval: time.Second, FreshnessBatchSize: 100,
-			EventReplaySize: 1024,
+			EventReplaySize: 1024, ProxmoxAllowedPorts: []int{8006},
+			SecretDirectory: "/run/secrets",
 		},
 		Incidents: Incidents{
 			WorkerConcurrency: 2, ClaimBatchSize: 50, PollInterval: time.Second,
@@ -195,12 +200,16 @@ type fileConfig struct {
 		LoginRateWindow string `json:"login_rate_window"`
 	} `json:"auth"`
 	Adapters struct {
-		SampleExecutable   string `json:"sample_executable"`
-		GlobalConcurrency  *int   `json:"global_concurrency"`
-		ReconcileInterval  string `json:"reconcile_interval"`
-		FreshnessInterval  string `json:"freshness_interval"`
-		FreshnessBatchSize *int   `json:"freshness_batch_size"`
-		EventReplaySize    *int   `json:"event_replay_size"`
+		SampleExecutable     string   `json:"sample_executable"`
+		ProxmoxExecutable    string   `json:"proxmox_executable"`
+		ProxmoxApprovedHosts []string `json:"proxmox_approved_hosts"`
+		ProxmoxAllowedPorts  []int    `json:"proxmox_allowed_ports"`
+		SecretDirectory      string   `json:"secret_directory"`
+		GlobalConcurrency    *int     `json:"global_concurrency"`
+		ReconcileInterval    string   `json:"reconcile_interval"`
+		FreshnessInterval    string   `json:"freshness_interval"`
+		FreshnessBatchSize   *int     `json:"freshness_batch_size"`
+		EventReplaySize      *int     `json:"event_replay_size"`
 	} `json:"adapters"`
 	Incidents struct {
 		WorkerConcurrency *int   `json:"worker_concurrency"`
@@ -346,6 +355,18 @@ func applyFile(cfg *Config, name string) error {
 	}
 	if values.Adapters.SampleExecutable != "" {
 		cfg.Adapters.SampleExecutable = values.Adapters.SampleExecutable
+	}
+	if values.Adapters.ProxmoxExecutable != "" {
+		cfg.Adapters.ProxmoxExecutable = values.Adapters.ProxmoxExecutable
+	}
+	if values.Adapters.ProxmoxApprovedHosts != nil {
+		cfg.Adapters.ProxmoxApprovedHosts = append([]string(nil), values.Adapters.ProxmoxApprovedHosts...)
+	}
+	if values.Adapters.ProxmoxAllowedPorts != nil {
+		cfg.Adapters.ProxmoxAllowedPorts = append([]int(nil), values.Adapters.ProxmoxAllowedPorts...)
+	}
+	if values.Adapters.SecretDirectory != "" {
+		cfg.Adapters.SecretDirectory = values.Adapters.SecretDirectory
 	}
 	if values.Adapters.GlobalConcurrency != nil {
 		cfg.Adapters.GlobalConcurrency = *values.Adapters.GlobalConcurrency
@@ -497,10 +518,13 @@ func (cfg Config) SafeSummary() map[string]any {
 		"database_connect_timeout":                 cfg.Database.ConnectTimeout,
 		"database_migration_timeout":               cfg.Database.MigrationTimeout,
 		"sample_adapter_configured":                cfg.Adapters.SampleExecutable != "",
+		"proxmox_adapter_configured":               cfg.Adapters.ProxmoxExecutable != "",
+		"proxmox_approved_host_count":              len(cfg.Adapters.ProxmoxApprovedHosts),
 		"sse_heartbeat":                            cfg.Server.SSEHeartbeat,
 		"sse_max_clients":                          cfg.Server.SSEMaxClients,
 		"adapter_global_concurrency":               cfg.Adapters.GlobalConcurrency,
 		"adapter_reconcile_interval":               cfg.Adapters.ReconcileInterval,
+		"adapter_secret_directory_configured":      cfg.Adapters.SecretDirectory != "",
 		"freshness_interval":                       cfg.Adapters.FreshnessInterval,
 		"freshness_batch_size":                     cfg.Adapters.FreshnessBatchSize,
 		"event_replay_size":                        cfg.Adapters.EventReplaySize,
@@ -599,6 +623,25 @@ func applyEnvironment(cfg *Config, getenv func(string) string) error {
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_SAMPLE_ADAPTER_EXECUTABLE")); value != "" {
 		cfg.Adapters.SampleExecutable = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_PROXMOX_ADAPTER_EXECUTABLE")); value != "" {
+		cfg.Adapters.ProxmoxExecutable = value
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_PROXMOX_APPROVED_HOSTS")); value != "" {
+		cfg.Adapters.ProxmoxApprovedHosts = splitCommaValues(value)
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_PROXMOX_ALLOWED_PORTS")); value != "" {
+		cfg.Adapters.ProxmoxAllowedPorts = nil
+		for _, item := range splitCommaValues(value) {
+			parsed, err := strconv.Atoi(item)
+			if err != nil {
+				return fmt.Errorf("parse ESPIAL_PROXMOX_ALLOWED_PORTS: %w", err)
+			}
+			cfg.Adapters.ProxmoxAllowedPorts = append(cfg.Adapters.ProxmoxAllowedPorts, parsed)
+		}
+	}
+	if value := strings.TrimSpace(getenv("ESPIAL_ADAPTER_SECRET_DIRECTORY")); value != "" {
+		cfg.Adapters.SecretDirectory = value
 	}
 	if value := strings.TrimSpace(getenv("ESPIAL_WEBCHECK_EXECUTABLE")); value != "" {
 		cfg.Webcheck.Executable = value
@@ -809,6 +852,20 @@ func (cfg Config) Validate() error {
 	}
 	if cfg.Adapters.SampleExecutable != "" && !filepath.IsAbs(cfg.Adapters.SampleExecutable) {
 		return errors.New("sample adapter executable must be an absolute path")
+	}
+	if cfg.Adapters.ProxmoxExecutable != "" && !filepath.IsAbs(cfg.Adapters.ProxmoxExecutable) {
+		return errors.New("proxmox adapter executable must be an absolute path")
+	}
+	if len(cfg.Adapters.ProxmoxApprovedHosts) > 256 || len(cfg.Adapters.ProxmoxAllowedPorts) < 1 || len(cfg.Adapters.ProxmoxAllowedPorts) > 32 {
+		return errors.New("proxmox network policy is outside safe bounds")
+	}
+	if !filepath.IsAbs(cfg.Adapters.SecretDirectory) {
+		return errors.New("adapter secret directory must be an absolute path")
+	}
+	for _, port := range cfg.Adapters.ProxmoxAllowedPorts {
+		if port < 1 || port > 65535 {
+			return errors.New("proxmox network policy contains an invalid port")
+		}
 	}
 	if cfg.Webcheck.Executable != "" && !filepath.IsAbs(cfg.Webcheck.Executable) {
 		return errors.New("webcheck executable must be an absolute path")
