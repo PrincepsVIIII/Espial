@@ -282,13 +282,19 @@ describe('primary route skeletons', () => {
     expect(hypervisorPage).toContain('SemicircleGauge');
     expect(hypervisorPage).toContain('HostLoadGraphic');
     expect(resourceBar).toContain(
-      'grid-template-columns: minmax(0, 1fr) 0.8rem',
+      'grid-template-columns: minmax(0, 1fr) 0.7rem',
     );
     expect(resourceBar).toContain('text-align: right');
+    expect(resourceBar).toContain('markerDetail');
+    expect(resourceBar).not.toContain('stateText');
     expect(semicircleGauge).toContain('A 88 88 0 0 1');
     expect(semicircleGauge).toContain('role="progressbar"');
     expect(hostLoadGraphic).toContain('role="tooltip"');
-    expect(hostLoadGraphic).toContain('VMs online');
+    expect(hostLoadGraphic).toContain("count === 1 ? 'VM' : 'VMs'");
+    expect(hostLoadGraphic).toContain('Load distribution');
+    expect(hostLoadGraphic).toContain('node-name');
+    expect(hostLoadGraphic).not.toContain('Host metrics table');
+    expect(hostLoadGraphic).not.toContain('Fresh observation');
     expect(
       `${hypervisorPage}${resourceBar}${semicircleGauge}${hostLoadGraphic}`,
     ).not.toMatch(/linear-gradient|radial-gradient|@keyframes/);

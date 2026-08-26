@@ -114,18 +114,31 @@ The Hypervisor pilot asks: “Which Proxmox host currently carries the most acti
 VMs, and what is that host's current compute health?” It uses the existing cluster
 read model: host metrics, cluster freshness, and active-VM counts by host.
 
-The summary surface is flat and divided horizontally. Host and storage resource
-rows use matched-width, zero-based tracks; the semantic state marker follows the
-track on the same horizontal axis, and the exact capacity reading aligns to the
-track's far edge. CPU, RAM, and storage totals use large native-SVG semicircles
-with explicit values and no gradient, glow, or ornamental animation.
+The summary surface is flat and divided horizontally. On wide screens the compact
+host/storage tracks, vertically stacked utilization gauges, and Load distribution
+view share one row, with the Load distribution column receiving the most space;
+narrower screens reflow them without changing source order. Cluster health and
+observation time appear once in the cluster heading and are not repeated beside the
+Load distribution title.
+Resource rows use matched-width, zero-based tracks; the state marker follows the
+track on the same horizontal axis, exposes swap or IO wait on hover, focus, and
+tap, and the exact capacity reading aligns to the track's far edge. Repeated inline
+health sentences are omitted because Dashboard and Alerts own that triage. CPU,
+RAM, and storage totals use large native-SVG semicircles with explicit values and
+no gradient, glow, or ornamental animation.
 
-The host comparison is not topology. It renders a deterministic compute-node field
-from stable ID-sorted host/count pairs, with circle size encoding active VM count,
-the exact count printed in every node and repeated in the hover/focus tooltip, and
-visible health text plus semantic outline. Pointer/focus preview and committed
-selection reveal linked host metrics. A complete host table remains available in a
-compact disclosure. The graphic draws no edges because the source contains no
-relationship data. Individual VM placement, migration paths, traffic, pan/zoom,
-drag, and layout controls remain out of scope until Core exposes authoritative
-relationships.
+The host comparison is titled “Load distribution”; it is not topology. It renders
+a deterministic compute-node field from stable ID-sorted host/count pairs, with
+circle size encoding active VM count. Each node shows its host name by default and
+switches to the exact VM count on hover or focus; its tooltip repeats the count with
+CPU, RAM, and swap context. Non-healthy states retain visible health text alongside
+their semantic outline. The normal `Healthy` label is omitted from individual nodes;
+the cluster-level status and each node's accessible name retain that information
+without repeating it throughout the field.
+Committed selection reveals the host's complete CPU, RAM, swap, capacity, and
+observation details directly below the field. The interactive nodes and selected
+detail are the textual equivalent for this intentionally compact comparison; the
+former duplicate host-metrics table is omitted. The graphic draws no edges because
+the source contains no relationship data. Individual VM placement, migration
+paths, traffic, pan/zoom, drag, and layout controls remain out of scope until Core
+exposes authoritative relationships.

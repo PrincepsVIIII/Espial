@@ -3,6 +3,15 @@
 This log records material visual-direction reviews so UI quality remains a delivery
 constraint instead of end-of-phase polish.
 
+## 2026-08-26 — Healthy-label density refinement
+
+Removed the repeated visible `Healthy` label beneath normal nodes in Hypervisor's
+Load distribution field. Cluster status remains the summary health signal and each
+node retains its complete accessible label. Non-healthy nodes continue to show an
+explicit visible state label with their semantic outline, so exceptions remain
+scannable without relying on color alone. Browser coverage now verifies that normal
+nodes do not render `Healthy` while warnings remain visibly labeled.
+
 ## 2026-07-30 — Pre-Slice 1.3 foundation review
 
 ### Scope
@@ -641,35 +650,50 @@ health?”
 - Rebuilt host and storage rows on one shared component so their tracks have equal
   geometry. Status dots sit after the track on the same horizontal axis, while
   capacity copy such as `7.6 TB used / 11 TB max` aligns to the track's far edge.
+- Removed the repeated `Host Healthy · Swap` and `Storage Healthy · IO` sentences
+  from resource rows. The slimmer tracks retain focusable/tappable state dots whose
+  compact disclosures expose authoritative swap usage or IO wait; Dashboard and
+  Alerts remain the primary health-triage surfaces.
 - Replaced the interim linear total meters with large, true SVG semicircle gauges.
   The arcs are flat, sharply drawn, explicitly labeled, and contain no gradients,
   glows, or continuous animation. Unknown/non-finite values have explicit text and
   do not render as zero.
 - Replaced the radial spokes and interim row plot with a deterministic compute-node
-  field. Node size encodes active VM count, every node prints the exact count, and
-  hover/focus exposes the count with CPU/RAM context. The read model contains
+  field titled “Load distribution.” Node size encodes active VM count, each circle
+  shows its host name by default, and hover/focus switches that name to the exact
+  VM count while exposing CPU, RAM, and swap context. The read model contains
   aggregate host/count pairs, so the graphic draws no invented relationship edges.
-- Linked pointer/focus preview and click/tap/Enter/Space selection to a visible host
-  detail region and complete host table. `Escape` clears selection; live refetches
-  preserve it by stable host ID while present. Cyan is selection/focus only, while
-  marker shape/outline and visible labels retain operational status.
+- At wide and laptop widths the compact resource columns, vertically stacked
+  semicircle gauges, and load distribution share one row. Constrained panels use a
+  balanced two-column node layout, while narrower screens return all sections to
+  source-order stacking rather than compressing labels or controls.
+- Linked click/tap/Enter/Space selection to a visible host detail region containing
+  CPU, RAM, swap, capacity, and observation time. The duplicate host-metrics table
+  was removed so the load field receives more space; the node controls and selected
+  detail remain the direct textual inspection path. `Escape` clears selection and
+  live refetches preserve it by stable host ID while present. Cyan is
+  selection/focus only, while marker shape/outline and visible labels retain
+  operational status.
+- Kept cluster health and observation time once in the cluster heading. Removed the
+  repeated `Healthy · Fresh observation` treatment from the Load distribution
+  heading and the redundant visible `<host> selected` confirmation from its detail.
 - Core now initializes every discovered node to zero before counting running QEMU
   and LXC guests. The read service also completes old observations from the host
   list without changing the `load_nodes` JSON shape.
 - More than 12 compute nodes use a bounded scrolling field with focus scrolling.
-  The complete equivalent table remains available behind a compact disclosure.
-  Initial rendering is static, continuous animation is absent, and reduced-motion
-  mode makes updates immediate.
+  Each node exposes its name, VM count, and health to assistive technology, with
+  full host metrics available through committed selection. Initial rendering is
+  static, continuous animation is absent, and reduced-motion mode makes updates
+  immediate.
 
 ### Viewport, accessibility, and verification evidence
 
 Visual inspection of captured 1440×900, 1280×800, 500×900, and 640×800
 zoom-equivalent views confirmed the transparent cluster surface, equal resource
 tracks, horizontally aligned end dots and capacity readings, large semicircles,
-compute nodes, exact counts, long names, status, detail prompt, and table remain
-legible without page-level horizontal overflow. The disclosed table intentionally
-uses bounded internal horizontal scrolling at narrow width so no metric column is
-removed.
+compute nodes, exact counts, long names, status, and selected-host detail remain
+legible without page-level horizontal overflow. The expanded load-distribution
+column remains larger than the paired host/storage column at the wide viewport.
 
 Automated contrast checks cover graphic labels, marks, tracks, focus, and selection.
 The neutral mark/track pair is 8.21:1, cyan selection on the flat surface is 10.87:1,
@@ -680,7 +704,7 @@ shapes.
 Svelte diagnostics reported zero errors and warnings; 62 frontend unit/contract
 tests and the production build passed. The 12-scenario graphics browser suite
 covers zero, one, several, and 128 hosts; long labels and outliers; keyboard and
-touch; plot/table synchronization; hover/focus VM disclosure; live selection
+touch; selected-host metric disclosure; hover/focus VM disclosure; live selection
 persistence; stale,
 disconnected, empty, and Core-error states; reduced motion; all four viewports; and
 zero serious/critical axe findings. Geometry assertions additionally reject a

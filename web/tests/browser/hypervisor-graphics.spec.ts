@@ -21,7 +21,17 @@ for (const viewport of [
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Compute nodes' }),
+      page.getByRole('heading', { name: 'Load distribution' }),
+    ).toBeVisible();
+    await expect(page.getByText(/Host Healthy · Swap/)).toHaveCount(0);
+    await expect(page.getByText(/Storage (Healthy|Warning) · IO/)).toHaveCount(
+      0,
+    );
+    await expect(
+      page.locator('.node-health', { hasText: 'Healthy' }),
+    ).toHaveCount(0);
+    await expect(
+      page.locator('.node-health', { hasText: 'Warning' }),
     ).toBeVisible();
     await expect(
       page.getByRole('progressbar', { name: 'CPU total' }),
@@ -31,16 +41,8 @@ for (const viewport of [
         name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
       }),
     ).toBeVisible();
-    await page.getByText('Host metrics table').click();
-    const table = page.getByRole('table', {
-      name: 'Host metrics equivalent to the compute-node graphic',
-    });
-    await expect(table).toBeVisible();
-    await expect(
-      table.getByRole('row', {
-        name: /pve-compute-host-with-a-long-operator-facing-name 40 44% 46% 28% Critical/,
-      }),
-    ).toBeVisible();
+    await expect(page.getByText('Host metrics table')).toHaveCount(0);
+    await expect(page.getByText('Fresh observation')).toHaveCount(0);
 
     if (viewport.name === 'large') {
       const clusterPanel = page.locator('.cluster-panel').first();
@@ -56,6 +58,7 @@ for (const viewport of [
       expect(hostTrack).not.toBeNull();
       expect(storageTrack).not.toBeNull();
       expect(Math.abs(hostTrack!.width - storageTrack!.width)).toBeLessThan(1);
+      expect(hostTrack!.height).toBeLessThan(16);
       const marker = await page.locator('.bar-marker').first().boundingBox();
       expect(marker).not.toBeNull();
       expect(marker!.x).toBeGreaterThanOrEqual(hostTrack!.x + hostTrack!.width);
@@ -74,13 +77,53 @@ for (const viewport of [
       const gauge = page.locator('.semicircle-gauge svg').first();
       expect((await gauge.boundingBox())!.width).toBeGreaterThan(150);
       await expect(page.locator('.gauge-value')).toHaveCount(3);
+      const gaugeBoxes = await page
+        .locator('.semicircle-gauge')
+        .evaluateAll((gauges) =>
+          gauges.map((element) => element.getBoundingClientRect().toJSON()),
+        );
+      expect(Math.abs(gaugeBoxes[0].x - gaugeBoxes[1].x)).toBeLessThan(1);
+      expect(gaugeBoxes[1].y).toBeGreaterThan(gaugeBoxes[0].y);
+      expect(gaugeBoxes[2].y).toBeGreaterThan(gaugeBoxes[1].y);
+
+      const overviewTop = (await page
+        .locator('.resource-columns')
+        .boundingBox())!.y;
+      const loadBox = (await page.locator('.compute-map').boundingBox())!;
+      const resourceBox = (await page
+        .locator('.resource-columns')
+        .boundingBox())!;
+      const loadTop = loadBox.y;
+      expect(Math.abs(overviewTop - loadTop)).toBeLessThan(2);
+      expect(loadBox.width).toBeGreaterThan(resourceBox.width);
+
+      const hostMarker = page.getByRole('button', {
+        name: 'pve-001: Swap usage 2%',
+      });
+      await hostMarker.hover();
+      await expect(hostMarker.locator('[role="tooltip"]')).toHaveCSS(
+        'opacity',
+        '1',
+      );
+      const storageMarker = page.getByRole('button', {
+        name: 'shared-vmstore: IO wait 7%',
+      });
+      await storageMarker.focus();
+      await expect(storageMarker.locator('[role="tooltip"]')).toContainText(
+        'IO wait 7%',
+      );
 
       const longHost = page.getByRole('button', {
         name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
       });
+      await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '1');
+      await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '0');
       await longHost.hover();
+      await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '0');
+      await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '1');
       const tooltip = longHost.locator('xpath=..').locator('[role="tooltip"]');
       await expect(tooltip).toContainText('40 VMs online');
+      await expect(tooltip).toContainText('Swap 28%');
       await expect(tooltip).toHaveCSS('opacity', '1');
     }
 
@@ -98,15 +141,6 @@ for (const viewport of [
       ),
     ).toEqual([]);
 
-    await page.mouse.move(0, 0);
-    if (
-      await page
-        .locator('.host-data')
-        .evaluate((element) => element.hasAttribute('open'))
-    ) {
-      await page.getByText('Host metrics table').click();
-    }
-
     await page.screenshot({
       path: testInfo.outputPath(`hypervisor-graphics-${viewport.name}.png`),
       fullPage: true,
@@ -115,7 +149,7 @@ for (const viewport of [
   });
 }
 
-test('plot and table provide linked keyboard selection', async ({ page }) => {
+test('plot provides keyboard selection and host detail', async ({ page }) => {
   await page.goto('/hypervisor');
   await waitForHydration(page);
 
@@ -123,27 +157,28 @@ test('plot and table provide linked keyboard selection', async ({ page }) => {
     name: /pve-002, 4 VMs online, health Warning/,
   });
   await plotHost.focus();
-  await expect(page.getByRole('heading', { name: 'pve-002' })).toBeVisible();
+  await expect(plotHost.locator('.node-load')).toHaveCSS('opacity', '1');
   await page.keyboard.press('Enter');
+  await expect(page.getByRole('heading', { name: 'pve-002' })).toBeVisible();
   await expect(plotHost).toHaveAttribute('aria-pressed', 'true');
-  await page.getByText('Host metrics table').click();
-  await expect(
-    page.locator('tbody tr.selected').filter({ hasText: 'pve-002' }),
-  ).toBeVisible();
+  await expect(page.locator('.node-detail')).toContainText(/CPU\s+31%/);
+  await expect(page.locator('.node-detail')).toContainText(/RAM\s+35%/);
+  await expect(page.locator('.node-detail')).toContainText(/Swap\s+14%/);
+  await expect(page.getByText('pve-002 selected.')).toHaveCount(0);
+  await expect(page.getByText(/Selected ·/)).toHaveCount(0);
 
   await page.keyboard.press('Escape');
   await expect(plotHost).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('Compute-node selection cleared.')).toBeVisible();
 
-  const tableHost = page.getByRole('button', { name: 'pve-001', exact: true });
-  await tableHost.focus();
+  const firstHost = page.getByRole('button', {
+    name: /pve-001, 1 VM online, health Healthy/,
+  });
+  await expect(firstHost.locator('.node-health')).toHaveCount(0);
+  await firstHost.focus();
   await page.keyboard.press('Space');
-  await expect(tableHost).toHaveAttribute('aria-pressed', 'true');
-  await expect(
-    page.getByRole('button', {
-      name: /pve-001, 1 VM online, health Healthy/,
-    }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(firstHost).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('heading', { name: 'pve-001' })).toBeVisible();
 });
 
 test('touch selects a host without topology controls', async ({ browser }) => {
@@ -154,6 +189,12 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   const page = await context.newPage();
   await page.goto('/hypervisor');
   await waitForHydration(page);
+  const marker = page.getByRole('button', {
+    name: 'pve-001: Swap usage 2%',
+  });
+  await marker.tap();
+  await expect(marker).toHaveAttribute('aria-expanded', 'true');
+  await expect(marker.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
   const host = page.getByRole('button', {
     name: /pve-002, 4 VMs online, health Warning/,
   });
@@ -189,7 +230,7 @@ test('selection survives live authoritative data replacement', async ({
     name: /pve-002, 5 VMs online, health Warning/,
   });
   await expect(updated).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('Selected · 5 VMs online')).toBeVisible();
+  await expect(page.locator('.node-detail p')).toHaveText('5 VMs online');
 });
 
 for (const scenario of [
@@ -205,9 +246,9 @@ for (const scenario of [
     await page.goto('/hypervisor');
     await waitForHydration(page);
     await expect(page.locator('.node-button')).toHaveCount(scenario.rows);
-    await expect(page.locator('tbody tr')).toHaveCount(scenario.rows);
+    await expect(page.locator('table')).toHaveCount(0);
     if (scenario.mode === 'zero') {
-      await expect(page.locator('.node-disc strong')).toHaveText([
+      await expect(page.locator('.node-load strong')).toHaveText([
         '0',
         '0',
         '0',
@@ -231,7 +272,10 @@ test('stale, disconnected, empty, and Core-error states stay explicit', async ({
   await request.get(`${mockCore}/__test/control?hypervisor=stale`);
   await page.goto('/hypervisor');
   await waitForHydration(page);
-  await expect(page.getByText('Stale observation')).toBeVisible();
+  await expect(page.getByText('Stale observation')).toHaveCount(0);
+  await expect(
+    page.locator('.cluster-title').getByText('Stale', { exact: true }),
+  ).toBeVisible();
 
   await request.get(`${mockCore}/__test/control?reset=true`);
   await request.get(`${mockCore}/__test/control?events=disconnect-once`);

@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { tick } from 'svelte';
-  import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import {
     displayState,
@@ -16,34 +14,27 @@
   let {
     id,
     clusterName,
-    clusterState,
-    freshness,
     lastObservedAt,
     hosts,
     loadNodes,
   }: {
     id: string;
     clusterName: string;
-    clusterState: string;
-    freshness: string;
     lastObservedAt?: string | null;
     hosts: HypervisorHostMetric[];
     loadNodes: HypervisorLoadNode[];
   } = $props();
 
   let selectedID = $state<string | null>(null);
-  let previewID = $state<string | null>(null);
   let selectionNotice = $state('');
   let rows = $derived(hostGraphicRows(hosts, loadNodes));
   let highestLoad = $derived(Math.max(1, ...rows.map((row) => row.active_vms)));
-  let activeID = $derived(previewID ?? selectedID);
-  let activeRow = $derived(rows.find((row) => row.id === activeID) ?? null);
+  let activeRow = $derived(rows.find((row) => row.id === selectedID) ?? null);
 
   $effect(() => {
     const next = selectionAfterUpdate(selectedID, rows);
     if (next.removedID) {
       selectedID = null;
-      if (previewID === next.removedID) previewID = null;
       selectionNotice = `${next.removedID} is no longer present in the latest cluster observation. Selection was cleared.`;
     }
   });
@@ -57,26 +48,12 @@
   }
 
   function nodeSize(activeVMs: number): string {
-    return `${5.2 + (Math.max(0, activeVMs) / highestLoad) * 2.6}rem`;
+    return `${5 + (Math.max(0, activeVMs) / highestLoad) * 2.2}rem`;
   }
 
-  function preview(hostID: string) {
-    previewID = hostID;
-  }
-
-  function stopPreview(hostID: string) {
-    if (previewID === hostID) previewID = null;
-  }
-
-  async function commit(hostID: string, revealNode = false) {
+  function commit(hostID: string) {
     selectedID = hostID;
-    selectionNotice = `${hostID} selected.`;
-    if (revealNode) {
-      await tick();
-      document
-        .getElementById(nodeID(hostID))
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-    }
+    selectionNotice = '';
   }
 
   function clearSelection(event: KeyboardEvent) {
@@ -84,13 +61,7 @@
     event.preventDefault();
     event.stopPropagation();
     selectedID = null;
-    previewID = null;
     selectionNotice = 'Compute-node selection cleared.';
-  }
-
-  function freshnessLabel(value: string): string {
-    if (value === 'fresh') return 'Fresh observation';
-    return `${statusLabel(value)} observation`;
   }
 
   function vmLabel(count: number): string {
@@ -101,12 +72,8 @@
 <section class="compute-map" aria-labelledby={`${id}-title`}>
   <header class="compute-heading">
     <div>
-      <h3 id={`${id}-title`}>Compute nodes</h3>
-      <p>Active VM distribution and current host health for {clusterName}.</p>
-    </div>
-    <div class="compute-state">
-      <StatusIndicator state={displayState(clusterState)} compact />
-      <span>{freshnessLabel(freshness)}</span>
+      <h3 id={`${id}-title`}>Load distribution</h3>
+      <p>Active VMs by host in {clusterName}.</p>
     </div>
   </header>
 
@@ -132,29 +99,29 @@
           aria-label={`${row.id}, ${vmLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
           onclick={() => commit(row.id)}
           onkeydown={clearSelection}
-          onpointerenter={() => preview(row.id)}
-          onpointerleave={() => stopPreview(row.id)}
-          onfocus={() => preview(row.id)}
-          onblur={() => stopPreview(row.id)}
         >
           <span
             class={`node-disc disc-${displayState(row.health_state)}`}
             aria-hidden="true"
           >
-            <strong>{row.active_vms}</strong>
-            <small>VMs</small>
+            <code class="node-name" title={row.id}>{row.id}</code>
+            <span class="node-load">
+              <strong>{row.active_vms}</strong>
+              <small>VMs</small>
+            </span>
           </span>
-          <code title={row.id}>{row.id}</code>
-          <span class={`node-health health-${displayState(row.health_state)}`}
-            >{statusLabel(row.health_state)}</span
-          >
+          {#if displayState(row.health_state) !== 'healthy'}
+            <span class={`node-health health-${displayState(row.health_state)}`}
+              >{statusLabel(row.health_state)}</span
+            >
+          {/if}
         </button>
         <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
           <strong>{vmLabel(row.active_vms)}</strong>
           <span>
             CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
               row.ram_percent,
-            )}
+            )} · Swap {formatPercentage(row.swap_percent)}
           </span>
         </span>
       </div>
@@ -165,10 +132,7 @@
     <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
       <div>
         <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
-        <p>
-          {previewID && previewID !== selectedID ? 'Preview' : 'Selected'} ·
-          {vmLabel(activeRow.active_vms)}
-        </p>
+        <p>{vmLabel(activeRow.active_vms)}</p>
       </div>
       <dl>
         <div>
@@ -206,71 +170,16 @@
     </section>
   {/if}
 
-  <p class="selection-notice" aria-live="polite">{selectionNotice}</p>
-
-  <details class="host-data">
-    <summary onkeydown={clearSelection}>Host metrics table</summary>
-    <div
-      class="table-scroll"
-      role="region"
-      aria-label={`${clusterName} host metrics table`}
-    >
-      <table>
-        <caption>Host metrics equivalent to the compute-node graphic</caption>
-        <thead>
-          <tr>
-            <th scope="col">Host</th>
-            <th scope="col">VMs online</th>
-            <th scope="col">CPU</th>
-            <th scope="col">RAM</th>
-            <th scope="col">Swap</th>
-            <th scope="col">Health</th>
-          </tr>
-        </thead>
-        <tbody>
-          {#each rows as row (row.id)}
-            <tr class:selected={selectedID === row.id}>
-              <th scope="row">
-                <button
-                  type="button"
-                  class="table-host"
-                  aria-pressed={selectedID === row.id}
-                  onclick={() => commit(row.id, true)}
-                  onkeydown={clearSelection}
-                  onfocus={() => preview(row.id)}
-                  onblur={() => stopPreview(row.id)}>{row.id}</button
-                >
-              </th>
-              <td>{row.active_vms}</td>
-              <td>{formatPercentage(row.cpu_percent)}</td>
-              <td>{formatPercentage(row.ram_percent)}</td>
-              <td>{formatPercentage(row.swap_percent)}</td>
-              <td>
-                <StatusIndicator
-                  state={displayState(row.health_state)}
-                  compact
-                />
-              </td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
-  </details>
+  {#if selectionNotice}
+    <p class="selection-notice" aria-live="polite">{selectionNotice}</p>
+  {/if}
 </section>
 
 <style>
   .compute-map {
+    container-name: load-distribution;
+    container-type: inline-size;
     min-width: 0;
-    padding-block: 1.2rem 0;
-    border-top: 1px solid var(--border);
-  }
-
-  .compute-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: flex-start;
   }
 
   h3,
@@ -286,22 +195,13 @@
     line-height: 1.4;
   }
 
-  .compute-state {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: 0.5rem 0.8rem;
-    color: var(--graphic-label-muted);
-    font-size: 0.82rem;
-  }
-
   .node-field {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+    gap: 1rem 0.7rem;
     align-items: end;
-    margin-top: 1.35rem;
-    padding: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.35rem;
   }
 
   .node-field.many {
@@ -320,8 +220,8 @@
   .node-button {
     display: grid;
     justify-items: center;
-    gap: 0.35rem;
-    min-width: min(100%, 10rem);
+    gap: 0.3rem;
+    width: 100%;
     min-height: 0;
     padding: 0;
     border: 0;
@@ -380,12 +280,51 @@
     border-color: var(--disabled);
   }
 
-  .node-disc strong {
+  .node-name,
+  .node-load {
+    grid-area: 1 / 1;
+    align-self: center;
+    justify-self: center;
+    transition: opacity var(--graphic-transition-duration) ease-out;
+  }
+
+  .node-name {
+    display: -webkit-box;
+    width: calc(var(--node-size) - 1rem);
+    overflow: hidden;
+    color: var(--text);
+    font-size: 0.72rem;
+    font-weight: 720;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    text-align: center;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+
+  .node-load {
+    display: grid;
+    place-items: center;
+    opacity: 0;
+  }
+
+  .node-button:hover .node-name,
+  .node-button:focus-visible .node-name {
+    opacity: 0;
+  }
+
+  .node-button:hover .node-load,
+  .node-button:focus-visible .node-load {
+    opacity: 1;
+  }
+
+  .node-load strong {
     font-family: var(--font-mono);
     font-size: 1.35rem;
   }
 
-  .node-disc small {
+  .node-load small {
     margin-top: 0.1rem;
     color: var(--text);
     font-size: 0.68rem;
@@ -394,22 +333,9 @@
     text-transform: uppercase;
   }
 
-  .node-button code {
-    width: 100%;
-    overflow: hidden;
-    color: var(--text);
-    font-weight: 700;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
   .node-health {
     font-size: 0.75rem;
     font-weight: 700;
-  }
-
-  .health-healthy {
-    color: var(--healthy);
   }
 
   .health-warning {
@@ -437,10 +363,11 @@
     position: absolute;
     z-index: 4;
     top: 1.2rem;
-    left: 50%;
+    right: 0;
     display: grid;
     gap: 0.2rem;
-    width: max-content;
+    box-sizing: border-box;
+    width: 100%;
     max-width: 14rem;
     padding: 0.55rem 0.65rem;
     border: 1px solid var(--border-strong);
@@ -450,7 +377,7 @@
     line-height: 1.35;
     opacity: 0;
     pointer-events: none;
-    transform: translate(-50%, -0.25rem);
+    transform: translateY(-0.25rem);
     transition:
       opacity var(--graphic-transition-duration) ease-out,
       transform var(--graphic-transition-duration) ease-out;
@@ -463,7 +390,7 @@
   .node-item:hover .node-tooltip,
   .node-item:focus-within .node-tooltip {
     opacity: 1;
-    transform: translate(-50%, 0);
+    transform: translateY(0);
   }
 
   .node-detail {
@@ -498,93 +425,23 @@
   }
 
   .selection-notice {
-    min-height: 1.4em;
+    min-height: 0;
     margin-top: 0.65rem;
     color: var(--graphic-label-muted);
     font-size: 0.8rem;
   }
 
-  .host-data {
-    margin-top: 0.2rem;
-    border-top: 1px solid var(--border);
-  }
+  @container load-distribution (max-width: 34rem) {
+    .node-field {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 
-  summary {
-    width: max-content;
-    padding: 0.8rem 0;
-    color: var(--netdef-cyan);
-    font-weight: 700;
-    cursor: pointer;
-  }
+    .node-item:last-child:nth-child(odd) {
+      grid-column: 1 / -1;
+    }
 
-  summary:focus-visible {
-    outline: 3px solid var(--graphic-focus);
-    outline-offset: 2px;
-  }
-
-  .table-scroll {
-    overflow-x: auto;
-    padding-bottom: 0.5rem;
-  }
-
-  table {
-    width: 100%;
-    min-width: 42rem;
-    border-collapse: collapse;
-  }
-
-  caption {
-    padding: 0 0 0.65rem;
-    color: var(--graphic-label-muted);
-    text-align: left;
-  }
-
-  th,
-  td {
-    padding: 0.6rem;
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-  }
-
-  thead th {
-    color: var(--graphic-label-muted);
-    font-size: 0.74rem;
-    text-transform: uppercase;
-  }
-
-  tbody tr.selected {
-    outline: 2px solid var(--graphic-selection);
-    outline-offset: -2px;
-  }
-
-  .table-host {
-    min-height: 2rem;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--text);
-    font-family: var(--font-mono);
-    text-align: left;
-  }
-
-  .table-host:hover,
-  .table-host:active {
-    background: transparent;
-    color: var(--netdef-cyan);
-  }
-
-  @media (max-width: 800px) {
-    .compute-heading,
     .node-detail {
       grid-template-columns: 1fr;
-    }
-
-    .compute-heading {
-      display: grid;
-    }
-
-    .compute-state {
-      justify-content: flex-start;
     }
 
     dl {

@@ -247,7 +247,7 @@
                     secondaryValue={host.ram_percent}
                     description={`${host.id}: CPU ${formatPercentage(host.cpu_percent)}, RAM ${formatPercentage(host.ram_percent)}, health ${statusLabel(host.health_state)}`}
                     state={host.health_state}
-                    stateText={`Host ${statusLabel(host.health_state)} · Swap ${formatPercentage(host.swap_percent)}`}
+                    markerDetail={`Swap usage ${formatPercentage(host.swap_percent)}`}
                     reading={`${host.cpu_cores.toFixed(0)} cores / ${formatBytes(host.ram_bytes)}`}
                   />
                 {/each}
@@ -266,7 +266,7 @@
                     value={item.used_percent}
                     description={`${item.id}: ${formatPercentage(item.used_percent)} used, IO wait ${formatPercentage(item.io_wait_percent)}, health ${statusLabel(item.health_state)}`}
                     state={item.health_state}
-                    stateText={`Storage ${statusLabel(item.health_state)} · IO ${formatPercentage(item.io_wait_percent)}`}
+                    markerDetail={`IO wait ${formatPercentage(item.io_wait_percent)}`}
                     reading={`${formatBytes(item.used_bytes)} used / ${formatBytes(item.total_bytes)} max`}
                   />
                 {/each}
@@ -296,17 +296,15 @@
               />
             </div>
           </section>
-        </div>
 
-        <HostLoadGraphic
-          id={`cluster-${cluster.id}-load`}
-          clusterName={cluster.name}
-          clusterState={cluster.state}
-          freshness={cluster.freshness}
-          lastObservedAt={cluster.last_observed_at}
-          hosts={cluster.hosts}
-          loadNodes={cluster.load_nodes}
-        />
+          <HostLoadGraphic
+            id={`cluster-${cluster.id}-load`}
+            clusterName={cluster.name}
+            lastObservedAt={cluster.last_observed_at}
+            hosts={cluster.hosts}
+            loadNodes={cluster.load_nodes}
+          />
+        </div>
       </article>
     {/each}
   </div>
@@ -644,15 +642,17 @@
 
   .cluster-overview {
     display: grid;
-    grid-template-columns: minmax(34rem, 1fr) minmax(32rem, 1fr);
-    gap: clamp(1.5rem, 3vw, 3.5rem);
+    grid-template-columns:
+      minmax(28rem, 1fr) minmax(10.5rem, 0.38fr)
+      minmax(30rem, 1.3fr);
+    gap: clamp(1.25rem, 2.25vw, 2.5rem);
     align-items: start;
   }
 
   .resource-columns {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: clamp(1.5rem, 3vw, 3rem);
+    gap: clamp(1rem, 2vw, 1.75rem);
     min-width: 0;
   }
 
@@ -664,7 +664,7 @@
 
   .resource-list {
     display: grid;
-    gap: 1rem;
+    gap: 0.72rem;
   }
 
   .cluster-meters {
@@ -673,9 +673,12 @@
 
   .gauge-set {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: clamp(0.75rem, 2vw, 1.5rem);
-    align-items: end;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.35rem;
+  }
+
+  .gauge-set :global(.semicircle-gauge) {
+    max-width: 11.5rem;
   }
 
   .modal-backdrop {
@@ -939,21 +942,29 @@
 
   @media (max-width: 1180px) {
     .cluster-overview {
-      grid-template-columns: 1fr;
+      grid-template-columns: minmax(11rem, 0.38fr) minmax(28rem, 1fr);
+    }
+
+    .resource-columns {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 800px) {
+    .cluster-overview {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .resource-columns {
+      grid-column: auto;
     }
   }
 
   @media (max-width: 680px) {
     .resource-columns,
-    .gauge-set,
     .form-grid,
     .form-grid-three {
       grid-template-columns: 1fr;
-    }
-
-    .cluster-overview {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr);
     }
 
     .modal-backdrop {
