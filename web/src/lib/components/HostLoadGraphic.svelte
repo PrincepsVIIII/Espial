@@ -1,7 +1,5 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import GraphicFrame from '$lib/components/GraphicFrame.svelte';
-  import MetricMeter from '$lib/components/MetricMeter.svelte';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import {
@@ -9,8 +7,6 @@
     formatBytes,
     formatPercentage,
     hostGraphicRows,
-    integerDomain,
-    positionInDomain,
     selectionAfterUpdate,
     statusLabel,
     type HypervisorHostMetric,
@@ -39,7 +35,7 @@
   let previewID = $state<string | null>(null);
   let selectionNotice = $state('');
   let rows = $derived(hostGraphicRows(hosts, loadNodes));
-  let domain = $derived(integerDomain(rows.map((row) => row.active_vms)));
+  let highestLoad = $derived(Math.max(1, ...rows.map((row) => row.active_vms)));
   let activeID = $derived(previewID ?? selectedID);
   let activeRow = $derived(rows.find((row) => row.id === activeID) ?? null);
 
@@ -52,8 +48,16 @@
     }
   });
 
-  function plotRowID(hostID: string): string {
-    return `${id}-plot-${encodeURIComponent(hostID).replaceAll('%', '-')}`;
+  function nodeID(hostID: string): string {
+    return `${id}-node-${encodeURIComponent(hostID).replaceAll('%', '-')}`;
+  }
+
+  function tooltipID(hostID: string): string {
+    return `${nodeID(hostID)}-tooltip`;
+  }
+
+  function nodeSize(activeVMs: number): string {
+    return `${5.2 + (Math.max(0, activeVMs) / highestLoad) * 2.6}rem`;
   }
 
   function preview(hostID: string) {
@@ -64,13 +68,13 @@
     if (previewID === hostID) previewID = null;
   }
 
-  async function commit(hostID: string, revealPlot = false) {
+  async function commit(hostID: string, revealNode = false) {
     selectedID = hostID;
     selectionNotice = `${hostID} selected.`;
-    if (revealPlot) {
+    if (revealNode) {
       await tick();
       document
-        .getElementById(plotRowID(hostID))
+        .getElementById(nodeID(hostID))
         ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }
@@ -81,7 +85,7 @@
     event.stopPropagation();
     selectedID = null;
     previewID = null;
-    selectionNotice = 'Host selection cleared.';
+    selectionNotice = 'Compute-node selection cleared.';
   }
 
   function freshnessLabel(value: string): string {
@@ -90,155 +94,133 @@
   }
 
   function vmLabel(count: number): string {
-    return `${count} active ${count === 1 ? 'VM' : 'VMs'}`;
+    return `${count} ${count === 1 ? 'VM' : 'VMs'} online`;
   }
 </script>
 
-<GraphicFrame
-  {id}
-  title="Active VMs by host"
-  description={`Which ${clusterName} host carries the most active VMs, and what is its current compute health? Select a host to inspect the authoritative host metrics.`}
-  freshness={freshnessLabel(freshness)}
-  status={displayState(clusterState)}
->
-  {#snippet plot()}
-    <div class="load-plot">
-      <div class="plot-axis" aria-hidden="true">
-        <span></span>
-        <div class="tick-track">
-          {#each domain.ticks as tick}
-            <span
-              class="tick"
-              style={`left: ${positionInDomain(tick, domain)}%`}
-            >
-              <span>{tick}</span>
-            </span>
-          {/each}
-        </div>
-        <span>VMs</span>
-        <span>Health</span>
-      </div>
-      <div class:many={rows.length > 12} class="plot-rows">
-        {#each rows as row (row.id)}
-          <button
-            id={plotRowID(row.id)}
-            type="button"
-            class="plot-row"
-            class:selected={selectedID === row.id}
-            aria-pressed={selectedID === row.id}
-            aria-label={`${row.id}, ${vmLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
-            onclick={() => commit(row.id)}
-            onkeydown={clearSelection}
-            onpointerenter={() => preview(row.id)}
-            onpointerleave={() => stopPreview(row.id)}
-            onfocus={() => preview(row.id)}
-            onblur={() => stopPreview(row.id)}
-          >
-            <code title={row.id}>{row.id}</code>
-            <span class="load-track" aria-hidden="true">
-              {#each domain.ticks as tick}
-                <span
-                  class="grid-line"
-                  style={`left: ${positionInDomain(tick, domain)}%`}
-                ></span>
-              {/each}
-              <span
-                class="marker"
-                style={`left: ${positionInDomain(row.active_vms, domain)}%`}
-              >
-                <span
-                  class={`marker-shape shape-${displayState(row.health_state)}`}
-                ></span>
-              </span>
-            </span>
-            <span class="vm-count">{row.active_vms}</span>
-            <span
-              class={`health-label health-${displayState(row.health_state)}`}
-              >{statusLabel(row.health_state)}</span
-            >
-          </button>
-        {/each}
-      </div>
+<section class="compute-map" aria-labelledby={`${id}-title`}>
+  <header class="compute-heading">
+    <div>
+      <h3 id={`${id}-title`}>Compute nodes</h3>
+      <p>Active VM distribution and current host health for {clusterName}.</p>
     </div>
-  {/snippet}
+    <div class="compute-state">
+      <StatusIndicator state={displayState(clusterState)} compact />
+      <span>{freshnessLabel(freshness)}</span>
+    </div>
+  </header>
 
-  {#snippet legend()}
-    <p class="legend-copy">
-      Marker position encodes active VM count from zero. Marker outline and
-      shape reinforce the visible health label. Cyan outlines indicate the
-      committed selection, not operational health.
-    </p>
-  {/snippet}
+  <div
+    class="node-field"
+    class:many={rows.length > 12}
+    role="list"
+    aria-label={`${clusterName} compute nodes`}
+  >
+    {#each rows as row (row.id)}
+      <div
+        class="node-item"
+        role="listitem"
+        style={`--node-size: ${nodeSize(row.active_vms)}`}
+      >
+        <button
+          id={nodeID(row.id)}
+          type="button"
+          class="node-button"
+          class:selected={selectedID === row.id}
+          aria-pressed={selectedID === row.id}
+          aria-describedby={tooltipID(row.id)}
+          aria-label={`${row.id}, ${vmLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
+          onclick={() => commit(row.id)}
+          onkeydown={clearSelection}
+          onpointerenter={() => preview(row.id)}
+          onpointerleave={() => stopPreview(row.id)}
+          onfocus={() => preview(row.id)}
+          onblur={() => stopPreview(row.id)}
+        >
+          <span
+            class={`node-disc disc-${displayState(row.health_state)}`}
+            aria-hidden="true"
+          >
+            <strong>{row.active_vms}</strong>
+            <small>VMs</small>
+          </span>
+          <code title={row.id}>{row.id}</code>
+          <span class={`node-health health-${displayState(row.health_state)}`}
+            >{statusLabel(row.health_state)}</span
+          >
+        </button>
+        <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
+          <strong>{vmLabel(row.active_vms)}</strong>
+          <span>
+            CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
+              row.ram_percent,
+            )}
+          </span>
+        </span>
+      </div>
+    {/each}
+  </div>
 
-  {#snippet details()}
-    {#if activeRow}
-      <section class="host-detail" aria-labelledby={`${id}-detail-title`}>
-        <div class="detail-heading">
-          <div>
-            <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
-            <p>
-              {previewID && previewID !== selectedID
-                ? 'Previewed host'
-                : 'Selected host'}
-              · {vmLabel(activeRow.active_vms)}
-            </p>
-          </div>
-          <StatusIndicator
-            state={displayState(activeRow.health_state)}
-            compact
-          />
+  {#if activeRow}
+    <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
+      <div>
+        <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
+        <p>
+          {previewID && previewID !== selectedID ? 'Preview' : 'Selected'} ·
+          {vmLabel(activeRow.active_vms)}
+        </p>
+      </div>
+      <dl>
+        <div>
+          <dt>CPU</dt>
+          <dd>{formatPercentage(activeRow.cpu_percent)}</dd>
         </div>
-        <div class="detail-meters">
-          <MetricMeter label="CPU" value={activeRow.cpu_percent} />
-          <MetricMeter label="RAM" value={activeRow.ram_percent} />
-          <MetricMeter label="Swap" value={activeRow.swap_percent} />
+        <div>
+          <dt>RAM</dt>
+          <dd>{formatPercentage(activeRow.ram_percent)}</dd>
         </div>
-        <dl>
-          <div>
-            <dt>CPU capacity</dt>
-            <dd>
-              {activeRow.cpu_cores === null
-                ? 'Unknown'
-                : `${activeRow.cpu_cores.toFixed(0)} cores`}
-            </dd>
-          </div>
-          <div>
-            <dt>RAM capacity</dt>
-            <dd>{formatBytes(activeRow.ram_bytes)}</dd>
-          </div>
-          <div>
-            <dt>Observation</dt>
-            <dd>
-              {#if lastObservedAt}
-                <Timestamp value={lastObservedAt} />
-              {:else}
-                Unknown
-              {/if}
-            </dd>
-          </div>
-        </dl>
-      </section>
-    {:else}
-      <p class="detail-prompt">
-        Select a host in the plot or table to compare active VM load with CPU,
-        RAM, swap, health, and observation freshness.
-      </p>
-    {/if}
-    <p class="selection-notice" aria-live="polite">{selectionNotice}</p>
-  {/snippet}
+        <div>
+          <dt>Swap</dt>
+          <dd>{formatPercentage(activeRow.swap_percent)}</dd>
+        </div>
+        <div>
+          <dt>Capacity</dt>
+          <dd>
+            {activeRow.cpu_cores === null
+              ? 'Unknown'
+              : `${activeRow.cpu_cores.toFixed(0)} cores`}
+            / {formatBytes(activeRow.ram_bytes)}
+          </dd>
+        </div>
+        <div>
+          <dt>Observed</dt>
+          <dd>
+            {#if lastObservedAt}
+              <Timestamp value={lastObservedAt} />
+            {:else}
+              Unknown
+            {/if}
+          </dd>
+        </div>
+      </dl>
+    </section>
+  {/if}
 
-  {#snippet table()}
+  <p class="selection-notice" aria-live="polite">{selectionNotice}</p>
+
+  <details class="host-data">
+    <summary onkeydown={clearSelection}>Host metrics table</summary>
     <div
       class="table-scroll"
       role="region"
       aria-label={`${clusterName} host metrics table`}
     >
       <table>
-        <caption> Host metrics equivalent to the active VM plot </caption>
+        <caption>Host metrics equivalent to the compute-node graphic</caption>
         <thead>
           <tr>
             <th scope="col">Host</th>
-            <th scope="col">Active VMs</th>
+            <th scope="col">VMs online</th>
             <th scope="col">CPU</th>
             <th scope="col">RAM</th>
             <th scope="col">Swap</th>
@@ -255,8 +237,6 @@
                   aria-pressed={selectedID === row.id}
                   onclick={() => commit(row.id, true)}
                   onkeydown={clearSelection}
-                  onpointerenter={() => preview(row.id)}
-                  onpointerleave={() => stopPreview(row.id)}
                   onfocus={() => preview(row.id)}
                   onblur={() => stopPreview(row.id)}>{row.id}</button
                 >
@@ -276,168 +256,155 @@
         </tbody>
       </table>
     </div>
-  {/snippet}
-</GraphicFrame>
+  </details>
+</section>
 
 <style>
-  .load-plot {
+  .compute-map {
     min-width: 0;
+    padding-block: 1.2rem 0;
+    border-top: 1px solid var(--border);
   }
 
-  .plot-axis,
-  .plot-row {
-    display: grid;
-    grid-template-columns:
-      minmax(7rem, 12rem) minmax(9rem, 1fr) minmax(2.7rem, 3.5rem)
-      minmax(5.7rem, 7rem);
-    gap: 0.7rem;
-    align-items: center;
+  .compute-heading {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: flex-start;
   }
 
-  .plot-axis {
-    min-height: 2.2rem;
+  h3,
+  h4,
+  p {
+    margin: 0;
+  }
+
+  .compute-heading p,
+  .node-detail p {
+    margin-top: 0.3rem;
     color: var(--graphic-label-muted);
-    font-size: 0.75rem;
-    font-weight: 650;
+    line-height: 1.4;
   }
 
-  .tick-track,
-  .load-track {
-    position: relative;
+  .compute-state {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.5rem 0.8rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.82rem;
   }
 
-  .tick-track {
-    height: 1.8rem;
+  .node-field {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 1.5rem;
+    align-items: end;
+    margin-top: 1.35rem;
+    padding: 0.5rem;
   }
 
-  .tick {
-    position: absolute;
-    inset-block: 0;
-    width: 1px;
-    background: var(--graphic-grid);
-  }
-
-  .tick span {
-    position: absolute;
-    top: 0;
-    transform: translateX(-50%);
-    font-family: var(--font-mono);
-  }
-
-  .plot-rows {
-    min-width: 0;
-  }
-
-  .plot-rows.many {
+  .node-field.many {
     max-height: min(34rem, 70vh);
     overflow-y: auto;
     scrollbar-gutter: stable;
   }
 
-  .plot-row {
-    width: 100%;
-    min-height: 3.1rem;
-    padding: 0.45rem 0.35rem;
-    border: 1px solid transparent;
-    border-top-color: var(--graphic-grid);
-    border-radius: 0;
+  .node-item {
+    position: relative;
+    display: grid;
+    justify-items: center;
+    min-width: 0;
+  }
+
+  .node-button {
+    display: grid;
+    justify-items: center;
+    gap: 0.35rem;
+    min-width: min(100%, 10rem);
+    min-height: 0;
+    padding: 0;
+    border: 0;
     background: transparent;
     color: var(--text);
-    text-align: left;
   }
 
-  .plot-row:hover,
-  .plot-row:active {
-    border-color: var(--border-strong);
+  .node-button:hover,
+  .node-button:active {
     background: transparent;
   }
 
-  .plot-row.selected {
-    border-color: var(--graphic-selection);
+  .node-disc {
+    display: grid;
+    place-content: center;
+    width: min(var(--node-size), 100%);
+    aspect-ratio: 1;
+    border: 3px solid var(--unknown);
+    border-radius: 50%;
+    background: #0a1820;
+    transition: transform var(--graphic-transition-duration) ease-out;
   }
 
-  .plot-row code {
+  .node-button:hover .node-disc,
+  .node-button:focus-visible .node-disc {
+    transform: scale(1.035);
+  }
+
+  .node-button.selected .node-disc {
+    outline: 3px solid var(--graphic-selection);
+    outline-offset: 4px;
+  }
+
+  .disc-healthy {
+    border-color: var(--healthy);
+  }
+
+  .disc-warning {
+    border-color: var(--warning);
+  }
+
+  .disc-critical {
+    border-color: var(--critical);
+  }
+
+  .disc-stale {
+    border-color: var(--stale);
+    border-style: dashed;
+  }
+
+  .disc-maintenance {
+    border-color: var(--maintenance);
+  }
+
+  .disc-disabled {
+    border-color: var(--disabled);
+  }
+
+  .node-disc strong {
+    font-family: var(--font-mono);
+    font-size: 1.35rem;
+  }
+
+  .node-disc small {
+    margin-top: 0.1rem;
+    color: var(--text);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .node-button code {
+    width: 100%;
     overflow: hidden;
-    color: inherit;
+    color: var(--text);
+    font-weight: 700;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .load-track {
-    height: 0.65rem;
-    border: 1px solid var(--graphic-grid);
-    background: var(--graphic-track);
-  }
-
-  .grid-line {
-    position: absolute;
-    top: -0.32rem;
-    width: 1px;
-    height: 1.28rem;
-    background: var(--graphic-grid);
-  }
-
-  .marker {
-    position: absolute;
-    top: 50%;
-    width: 1rem;
-    height: 1rem;
-    transform: translate(-50%, -50%);
-    transition: left var(--graphic-transition-duration) ease-out;
-  }
-
-  .marker-shape {
-    display: block;
-    width: 100%;
-    height: 100%;
-    border: 2px solid var(--unknown);
-    background: var(--surface-1);
-    border-radius: 50%;
-  }
-
-  .shape-healthy {
-    border-color: var(--healthy);
-  }
-
-  .shape-warning {
-    border-color: var(--warning);
-    border-radius: 0;
-    transform: rotate(45deg) scale(0.78);
-  }
-
-  .shape-critical {
-    border-color: var(--critical);
-    border-radius: 0;
-    clip-path: polygon(
-      30% 0,
-      70% 0,
-      100% 30%,
-      100% 70%,
-      70% 100%,
-      30% 100%,
-      0 70%,
-      0 30%
-    );
-  }
-
-  .shape-stale,
-  .shape-unknown {
-    border-style: dashed;
-  }
-
-  .shape-maintenance,
-  .shape-disabled {
-    border-color: var(--maintenance);
-    border-radius: 0;
-  }
-
-  .vm-count {
-    font-family: var(--font-mono);
-    text-align: right;
-  }
-
-  .health-label {
-    font-size: 0.82rem;
+  .node-health {
+    font-size: 0.75rem;
     font-weight: 700;
   }
 
@@ -466,70 +433,98 @@
     color: var(--unknown);
   }
 
-  .legend-copy,
-  .detail-prompt,
-  .selection-notice {
-    margin: 0;
-    color: var(--graphic-label-muted);
-    line-height: 1.45;
-  }
-
-  .host-detail {
+  .node-tooltip {
+    position: absolute;
+    z-index: 4;
+    top: 1.2rem;
+    left: 50%;
     display: grid;
-    gap: 1rem;
+    gap: 0.2rem;
+    width: max-content;
+    max-width: 14rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid var(--border-strong);
+    background: var(--nav-blue);
+    color: var(--text);
+    font-size: 0.76rem;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -0.25rem);
+    transition:
+      opacity var(--graphic-transition-duration) ease-out,
+      transform var(--graphic-transition-duration) ease-out;
   }
 
-  .detail-heading {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: flex-start;
-  }
-
-  .detail-heading h4 {
-    margin: 0;
-  }
-
-  .detail-heading p {
-    margin: 0.25rem 0 0;
+  .node-tooltip span {
     color: var(--graphic-label-muted);
   }
 
-  .detail-meters {
+  .node-item:hover .node-tooltip,
+  .node-item:focus-within .node-tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  .node-detail {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    grid-template-columns: minmax(11rem, 0.8fr) minmax(0, 2fr);
+    gap: 1.5rem;
+    align-items: start;
+    margin-top: 1.4rem;
+    padding-block: 1rem;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
   }
 
   dl {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 1rem;
     margin: 0;
   }
 
-  dl > div {
-    border-left: 2px solid var(--border-strong);
-    padding-left: 0.65rem;
-  }
-
   dt {
     color: var(--graphic-label-muted);
-    font-size: 0.82rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
   }
 
   dd {
-    margin: 0.2rem 0 0;
+    margin: 0.25rem 0 0;
     font-family: var(--font-mono);
+    font-size: 0.84rem;
   }
 
   .selection-notice {
     min-height: 1.4em;
-    margin-top: 0.75rem;
+    margin-top: 0.65rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.8rem;
+  }
+
+  .host-data {
+    margin-top: 0.2rem;
+    border-top: 1px solid var(--border);
+  }
+
+  summary {
+    width: max-content;
+    padding: 0.8rem 0;
+    color: var(--netdef-cyan);
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  summary:focus-visible {
+    outline: 3px solid var(--graphic-focus);
+    outline-offset: 2px;
   }
 
   .table-scroll {
     overflow-x: auto;
+    padding-bottom: 0.5rem;
   }
 
   table {
@@ -539,9 +534,8 @@
   }
 
   caption {
-    padding: 0 0 0.75rem;
+    padding: 0 0 0.65rem;
     color: var(--graphic-label-muted);
-    font-weight: 650;
     text-align: left;
   }
 
@@ -554,7 +548,7 @@
 
   thead th {
     color: var(--graphic-label-muted);
-    font-size: 0.78rem;
+    font-size: 0.74rem;
     text-transform: uppercase;
   }
 
@@ -571,30 +565,30 @@
     color: var(--text);
     font-family: var(--font-mono);
     text-align: left;
-    text-decoration: underline;
-    text-decoration-color: transparent;
-    text-underline-offset: 0.2rem;
   }
 
   .table-host:hover,
   .table-host:active {
     background: transparent;
     color: var(--netdef-cyan);
-    text-decoration-color: currentColor;
   }
 
-  @media (max-width: 700px) {
-    .plot-axis,
-    .plot-row {
-      grid-template-columns:
-        minmax(6.5rem, 1fr) minmax(7rem, 1.5fr) 2.4rem
-        minmax(4.8rem, 0.8fr);
-      gap: 0.4rem;
+  @media (max-width: 800px) {
+    .compute-heading,
+    .node-detail {
+      grid-template-columns: 1fr;
     }
 
-    .detail-meters,
+    .compute-heading {
+      display: grid;
+    }
+
+    .compute-state {
+      justify-content: flex-start;
+    }
+
     dl {
-      grid-template-columns: 1fr;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
     }
   }
 </style>

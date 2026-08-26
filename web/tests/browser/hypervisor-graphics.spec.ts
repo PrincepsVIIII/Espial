@@ -21,21 +21,68 @@ for (const viewport of [
     await waitForHydration(page);
 
     await expect(
-      page.getByRole('heading', { name: 'Active VMs by host' }),
+      page.getByRole('heading', { name: 'Compute nodes' }),
     ).toBeVisible();
     await expect(
       page.getByRole('progressbar', { name: 'CPU total' }),
     ).toHaveAttribute('aria-valuenow', '57.6');
     await expect(
       page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 active VMs, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
       }),
     ).toBeVisible();
+    await page.getByText('Host metrics table').click();
+    const table = page.getByRole('table', {
+      name: 'Host metrics equivalent to the compute-node graphic',
+    });
+    await expect(table).toBeVisible();
     await expect(
-      page.getByRole('table', {
-        name: 'Host metrics equivalent to the active VM plot',
+      table.getByRole('row', {
+        name: /pve-compute-host-with-a-long-operator-facing-name 40 44% 46% 28% Critical/,
       }),
     ).toBeVisible();
+
+    if (viewport.name === 'large') {
+      const clusterPanel = page.locator('.cluster-panel').first();
+      await expect(clusterPanel).toHaveCSS(
+        'background-color',
+        'rgba(0, 0, 0, 0)',
+      );
+      await expect(clusterPanel).toHaveCSS('border-left-width', '0px');
+
+      const resourceTracks = page.locator('.bar-track');
+      const hostTrack = await resourceTracks.nth(0).boundingBox();
+      const storageTrack = await resourceTracks.nth(3).boundingBox();
+      expect(hostTrack).not.toBeNull();
+      expect(storageTrack).not.toBeNull();
+      expect(Math.abs(hostTrack!.width - storageTrack!.width)).toBeLessThan(1);
+      const marker = await page.locator('.bar-marker').first().boundingBox();
+      expect(marker).not.toBeNull();
+      expect(marker!.x).toBeGreaterThanOrEqual(hostTrack!.x + hostTrack!.width);
+      expect(
+        Math.abs(
+          marker!.y +
+            marker!.height / 2 -
+            (hostTrack!.y + hostTrack!.height / 2),
+        ),
+      ).toBeLessThan(1);
+      await expect(page.locator('.reading').last()).toHaveCSS(
+        'text-align',
+        'right',
+      );
+
+      const gauge = page.locator('.semicircle-gauge svg').first();
+      expect((await gauge.boundingBox())!.width).toBeGreaterThan(150);
+      await expect(page.locator('.gauge-value')).toHaveCount(3);
+
+      const longHost = page.getByRole('button', {
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
+      });
+      await longHost.hover();
+      const tooltip = longHost.locator('xpath=..').locator('[role="tooltip"]');
+      await expect(tooltip).toContainText('40 VMs online');
+      await expect(tooltip).toHaveCSS('opacity', '1');
+    }
 
     const overflow = await page.evaluate(
       () =>
@@ -51,6 +98,15 @@ for (const viewport of [
       ),
     ).toEqual([]);
 
+    await page.mouse.move(0, 0);
+    if (
+      await page
+        .locator('.host-data')
+        .evaluate((element) => element.hasAttribute('open'))
+    ) {
+      await page.getByText('Host metrics table').click();
+    }
+
     await page.screenshot({
       path: testInfo.outputPath(`hypervisor-graphics-${viewport.name}.png`),
       fullPage: true,
@@ -64,19 +120,20 @@ test('plot and table provide linked keyboard selection', async ({ page }) => {
   await waitForHydration(page);
 
   const plotHost = page.getByRole('button', {
-    name: /pve-002, 4 active VMs, health Warning/,
+    name: /pve-002, 4 VMs online, health Warning/,
   });
   await plotHost.focus();
   await expect(page.getByRole('heading', { name: 'pve-002' })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(plotHost).toHaveAttribute('aria-pressed', 'true');
+  await page.getByText('Host metrics table').click();
   await expect(
     page.locator('tbody tr.selected').filter({ hasText: 'pve-002' }),
   ).toBeVisible();
 
   await page.keyboard.press('Escape');
   await expect(plotHost).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByText('Host selection cleared.')).toBeVisible();
+  await expect(page.getByText('Compute-node selection cleared.')).toBeVisible();
 
   const tableHost = page.getByRole('button', { name: 'pve-001', exact: true });
   await tableHost.focus();
@@ -84,7 +141,7 @@ test('plot and table provide linked keyboard selection', async ({ page }) => {
   await expect(tableHost).toHaveAttribute('aria-pressed', 'true');
   await expect(
     page.getByRole('button', {
-      name: /pve-001, 1 active VM, health Healthy/,
+      name: /pve-001, 1 VM online, health Healthy/,
     }),
   ).toHaveAttribute('aria-pressed', 'true');
 });
@@ -98,7 +155,7 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const host = page.getByRole('button', {
-    name: /pve-002, 4 active VMs, health Warning/,
+    name: /pve-002, 4 VMs online, health Warning/,
   });
   await host.tap();
   await expect(host).toHaveAttribute('aria-pressed', 'true');
@@ -117,7 +174,7 @@ test('selection survives live authoritative data replacement', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const initial = page.getByRole('button', {
-    name: /pve-002, 4 active VMs, health Warning/,
+    name: /pve-002, 4 VMs online, health Warning/,
   });
   await initial.click();
   await expect(initial).toHaveAttribute('aria-pressed', 'true');
@@ -129,10 +186,10 @@ test('selection survives live authoritative data replacement', async ({
     })
     .toBe(1);
   const updated = page.getByRole('button', {
-    name: /pve-002, 5 active VMs, health Warning/,
+    name: /pve-002, 5 VMs online, health Warning/,
   });
   await expect(updated).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText('5 active VMs')).toBeVisible();
+  await expect(page.getByText('Selected · 5 VMs online')).toBeVisible();
 });
 
 for (const scenario of [
@@ -147,13 +204,22 @@ for (const scenario of [
     await request.get(`${mockCore}/__test/control?hypervisor=${scenario.mode}`);
     await page.goto('/hypervisor');
     await waitForHydration(page);
-    await expect(page.locator('.plot-row')).toHaveCount(scenario.rows);
+    await expect(page.locator('.node-button')).toHaveCount(scenario.rows);
     await expect(page.locator('tbody tr')).toHaveCount(scenario.rows);
     if (scenario.mode === 'zero') {
-      await expect(page.locator('.vm-count')).toHaveText(['0', '0', '0']);
+      await expect(page.locator('.node-disc strong')).toHaveText([
+        '0',
+        '0',
+        '0',
+      ]);
     }
     if (scenario.mode === 'large') {
-      await expect(page.locator('.plot-rows')).toHaveCSS('overflow-y', 'auto');
+      const plot = page.locator('.node-field');
+      await expect(plot).toHaveCSS('overflow-y', 'auto');
+      await page.locator('.node-button').last().focus();
+      expect(
+        await plot.evaluate((element) => element.scrollTop),
+      ).toBeGreaterThan(0);
     }
   });
 }
@@ -200,7 +266,7 @@ test('reduced motion removes graphic transitions and continuous animation', asyn
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const transition = await page
-    .locator('.marker')
+    .locator('.node-disc')
     .first()
     .evaluate((element) => getComputedStyle(element).transitionDuration);
   expect(Number.parseFloat(transition)).toBeLessThanOrEqual(0.001);

@@ -31,11 +31,13 @@ Operational graphics use the shared `GraphicFrame` structure:
 - linked selected-detail region for exploratory graphics; and
 - a table or list equivalent that remains available without hover or animation.
 
-Meters use `MetricMeter`: a zero-based flat track, flat neutral fill, printed value
-and unit, and accessible progress semantics. Unknown, missing, or non-finite values
-render as `Unknown`; they never silently become zero. Values outside a percentage
-domain are clamped for rendering while the authoritative formatted value policy is
-tested.
+Linear meters use `MetricMeter`: a zero-based flat track, flat neutral fill,
+printed value and unit, and accessible progress semantics. Compact aggregate
+utilization may use `SemicircleGauge` when the larger arc improves at-a-glance
+scanning and an explicit value remains centered in the gauge. Both forms expose
+accessible progress semantics. Unknown, missing, or non-finite values render as
+`Unknown`; they never silently become zero. Values outside a percentage domain are
+clamped for rendering while the authoritative formatted value policy is tested.
 
 The shared graphic tokens are `--graphic-grid`, `--graphic-track`,
 `--graphic-mark`, `--graphic-selection`, `--graphic-focus`,
@@ -112,9 +114,18 @@ The Hypervisor pilot asks: “Which Proxmox host currently carries the most acti
 VMs, and what is that host's current compute health?” It uses the existing cluster
 read model: host metrics, cluster freshness, and active-VM counts by host.
 
-The comparison is not topology. It renders stable ID-sorted host rows on a zero
-domain, exact active-VM counts, visible health labels with marker shape/outline,
-linked host metrics, and a complete host table. It draws no edges because the
-source contains no relationship data. Individual VM placement, migration paths,
-traffic, pan/zoom, drag, and layout controls remain out of scope until Core exposes
-authoritative relationships.
+The summary surface is flat and divided horizontally. Host and storage resource
+rows use matched-width, zero-based tracks; the semantic state marker follows the
+track on the same horizontal axis, and the exact capacity reading aligns to the
+track's far edge. CPU, RAM, and storage totals use large native-SVG semicircles
+with explicit values and no gradient, glow, or ornamental animation.
+
+The host comparison is not topology. It renders a deterministic compute-node field
+from stable ID-sorted host/count pairs, with circle size encoding active VM count,
+the exact count printed in every node and repeated in the hover/focus tooltip, and
+visible health text plus semantic outline. Pointer/focus preview and committed
+selection reveal linked host metrics. A complete host table remains available in a
+compact disclosure. The graphic draws no edges because the source contains no
+relationship data. Individual VM placement, migration paths, traffic, pan/zoom,
+drag, and layout controls remain out of scope until Core exposes authoritative
+relationships.

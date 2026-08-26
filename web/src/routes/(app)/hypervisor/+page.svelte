@@ -3,7 +3,8 @@
   import { tick } from 'svelte';
   import { readCookie } from '$lib/auth';
   import HostLoadGraphic from '$lib/components/HostLoadGraphic.svelte';
-  import MetricMeter from '$lib/components/MetricMeter.svelte';
+  import ResourceBar from '$lib/components/ResourceBar.svelte';
+  import SemicircleGauge from '$lib/components/SemicircleGauge.svelte';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import { ApiFailure, problemFrom, requestJSON } from '$lib/api/client';
@@ -11,7 +12,6 @@
     displayState,
     formatBytes,
     formatPercentage,
-    normalizePercentage,
     statusLabel,
   } from '$lib/graphics';
   import {
@@ -115,14 +115,6 @@
   function numberValue(form: FormData, key: string, fallback: number): number {
     const value = Number.parseFloat(text(form, key));
     return Number.isFinite(value) ? value : fallback;
-  }
-
-  function indicatorLabel(value: string): string {
-    return statusLabel(value);
-  }
-
-  function meterWidth(value: number): number {
-    return normalizePercentage(value) ?? 0;
   }
 
   function closeBackdrop(event: MouseEvent) {
@@ -241,93 +233,66 @@
         </header>
 
         <div class="cluster-overview">
-          <section
-            class="cluster-list-column"
-            aria-label={`${cluster.name} hosts`}
-          >
-            <h3>Hosts</h3>
-            {#each cluster.hosts as host}
-              <div class="host-row">
-                <div class="row-label">
-                  <code>{host.id}</code>
-                  <span
-                    class={`indicator indicator-${host.swap_indicator}`}
-                    title={`Swap ${indicatorLabel(host.swap_indicator)} ${formatPercentage(host.swap_percent)}`}
-                    >Swap {indicatorLabel(host.swap_indicator)}</span
-                  >
-                </div>
-                <div
-                  class="dual-bar"
-                  role="img"
-                  aria-label={`${host.id} CPU ${formatPercentage(host.cpu_percent)}, RAM ${formatPercentage(host.ram_percent)}`}
-                >
-                  <span
-                    class="cpu-fill"
-                    style={`width:${meterWidth(host.cpu_percent)}%`}
-                  ></span>
-                  <span
-                    class="ram-fill"
-                    style={`width:${meterWidth(host.ram_percent)}%`}
-                  ></span>
-                </div>
-                <small
-                  >{host.cpu_cores.toFixed(0)} cores / {formatBytes(
-                    host.ram_bytes,
-                  )}</small
-                >
+          <div class="resource-columns">
+            <section
+              class="cluster-list-column"
+              aria-label={`${cluster.name} hosts`}
+            >
+              <h3>Hosts</h3>
+              <div class="resource-list">
+                {#each cluster.hosts as host}
+                  <ResourceBar
+                    label={host.id}
+                    value={host.cpu_percent}
+                    secondaryValue={host.ram_percent}
+                    description={`${host.id}: CPU ${formatPercentage(host.cpu_percent)}, RAM ${formatPercentage(host.ram_percent)}, health ${statusLabel(host.health_state)}`}
+                    state={host.health_state}
+                    stateText={`Host ${statusLabel(host.health_state)} · Swap ${formatPercentage(host.swap_percent)}`}
+                    reading={`${host.cpu_cores.toFixed(0)} cores / ${formatBytes(host.ram_bytes)}`}
+                  />
+                {/each}
               </div>
-            {/each}
-          </section>
+            </section>
 
-          <section
-            class="cluster-list-column storage-column"
-            aria-label={`${cluster.name} storage`}
-          >
-            <h3>Storage</h3>
-            {#each cluster.storage as item}
-              <div class="storage-row">
-                <div class="row-label">
-                  <code>{item.id}</code>
-                  <span
-                    class={`indicator indicator-${item.io_wait_indicator}`}
-                    title={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${formatPercentage(item.io_wait_percent)}`}
-                    >IO {indicatorLabel(item.io_wait_indicator)}</span
-                  >
-                </div>
-                <div
-                  class="storage-bar"
-                  role="img"
-                  aria-label={`${item.id} storage ${formatPercentage(item.used_percent)} used`}
-                >
-                  <span style={`width:${meterWidth(item.used_percent)}%`}
-                  ></span>
-                </div>
-                <small
-                  >{formatBytes(item.used_bytes)} used / {formatBytes(
-                    item.total_bytes,
-                  )} max</small
-                >
+            <section
+              class="cluster-list-column storage-column"
+              aria-label={`${cluster.name} storage`}
+            >
+              <h3>Storage</h3>
+              <div class="resource-list">
+                {#each cluster.storage as item}
+                  <ResourceBar
+                    label={item.id}
+                    value={item.used_percent}
+                    description={`${item.id}: ${formatPercentage(item.used_percent)} used, IO wait ${formatPercentage(item.io_wait_percent)}, health ${statusLabel(item.health_state)}`}
+                    state={item.health_state}
+                    stateText={`Storage ${statusLabel(item.health_state)} · IO ${formatPercentage(item.io_wait_percent)}`}
+                    reading={`${formatBytes(item.used_bytes)} used / ${formatBytes(item.total_bytes)} max`}
+                  />
+                {/each}
               </div>
-            {/each}
-          </section>
+            </section>
+          </div>
 
           <section
             class="cluster-meters"
             aria-label={`${cluster.name} total utilization`}
           >
             <h3>Cluster utilization</h3>
-            <div class="meter-set">
-              <MetricMeter
+            <div class="gauge-set">
+              <SemicircleGauge
                 label="CPU total"
                 value={cluster.totals.cpu_percent}
               />
-              <MetricMeter
+              <SemicircleGauge
                 label="RAM total"
                 value={cluster.totals.ram_percent}
+                tone="amber"
               />
-              <MetricMeter
+              <SemicircleGauge
                 label="Storage total"
                 value={cluster.totals.storage_percent}
+                tone="neutral"
               />
             </div>
           </section>
@@ -644,15 +609,13 @@
 
   .cluster-stack {
     display: grid;
-    gap: 1rem;
+    gap: 2.25rem;
   }
 
   .cluster-panel {
-    border: 1px solid rgba(151, 176, 190, 0.28);
-    background: #101b24;
-    padding: 1rem;
     display: grid;
-    gap: 1rem;
+    gap: 1.25rem;
+    min-width: 0;
   }
 
   .cluster-panel:focus {
@@ -665,7 +628,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 1rem;
-    padding-bottom: 0.9rem;
+    padding: 0.2rem 0 1rem;
     border-bottom: 1px solid var(--border);
   }
 
@@ -681,115 +644,38 @@
 
   .cluster-overview {
     display: grid;
-    grid-template-columns: minmax(190px, 1fr) minmax(230px, 1.2fr) minmax(
-        250px,
-        1fr
-      );
-    gap: 1rem;
-    align-items: stretch;
+    grid-template-columns: minmax(34rem, 1fr) minmax(32rem, 1fr);
+    gap: clamp(1.5rem, 3vw, 3.5rem);
+    align-items: start;
   }
 
-  .cluster-list-column,
-  .cluster-meters {
-    border-left: 1px solid rgba(151, 176, 190, 0.22);
-    padding-left: 0.9rem;
+  .resource-columns {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(1.5rem, 3vw, 3rem);
+    min-width: 0;
   }
 
   .cluster-list-column h3,
   .cluster-meters h3 {
-    margin: 0 0 0.7rem;
+    margin: 0 0 1rem;
     font-size: 1rem;
   }
 
-  .host-row,
-  .storage-row {
+  .resource-list {
     display: grid;
-    gap: 0.25rem;
-    margin-bottom: 0.7rem;
+    gap: 1rem;
   }
 
-  .row-label {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 0.75rem;
+  .cluster-meters {
+    min-width: 0;
   }
 
-  .indicator {
-    display: inline-flex;
-    gap: 0.35rem;
-    align-items: center;
-    color: var(--unknown);
-    font-size: 0.72rem;
-    font-weight: 700;
-  }
-
-  .indicator::before {
-    width: 0.58rem;
-    height: 0.58rem;
-    border: 2px solid currentColor;
-    border-radius: 50%;
-    content: '';
-    flex: 0 0 auto;
-  }
-
-  .indicator-healthy {
-    color: var(--healthy);
-  }
-
-  .indicator-warning {
-    color: var(--warning);
-  }
-
-  .indicator-warning::before {
-    border-radius: 0;
-    transform: rotate(45deg) scale(0.8);
-  }
-
-  .indicator-critical {
-    color: var(--critical);
-  }
-
-  .indicator-critical::before {
-    border-radius: 0;
-  }
-
-  .dual-bar,
-  .storage-bar {
-    position: relative;
-    height: 1.1rem;
-    background: #071016;
-    border: 1px solid rgba(151, 176, 190, 0.28);
-    overflow: hidden;
-  }
-
-  .dual-bar span,
-  .storage-bar span {
-    position: absolute;
-    inset-block: 0;
-    left: 0;
-  }
-
-  .cpu-fill {
-    background: rgba(0, 169, 201, 0.55);
-  }
-
-  .ram-fill {
-    background: rgba(225, 173, 51, 0.55);
-    top: 50%;
-  }
-
-  .storage-bar {
-    height: 1.55rem;
-  }
-
-  .storage-bar span {
-    background: rgba(0, 169, 201, 0.62);
-  }
-
-  .meter-set {
+  .gauge-set {
     display: grid;
-    gap: 0.9rem;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    align-items: end;
   }
 
   .modal-backdrop {
@@ -1051,33 +937,23 @@
     opacity: 0.65;
   }
 
-  @media (max-width: 1100px) {
+  @media (max-width: 1180px) {
     .cluster-overview {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .cluster-meters {
-      grid-column: 1 / -1;
-    }
-
-    .meter-set {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: 1fr;
     }
   }
 
   @media (max-width: 680px) {
-    .cluster-overview,
+    .resource-columns,
+    .gauge-set,
     .form-grid,
     .form-grid-three {
       grid-template-columns: 1fr;
     }
 
-    .cluster-meters {
-      grid-column: auto;
-    }
-
-    .meter-set {
-      grid-template-columns: 1fr;
+    .cluster-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .modal-backdrop {
@@ -1123,10 +999,8 @@
       margin-inline: 1rem;
     }
 
-    .cluster-list-column,
+    .storage-column,
     .cluster-meters {
-      border-left: 0;
-      padding-left: 0;
       border-top: 1px solid rgba(151, 176, 190, 0.22);
       padding-top: 0.9rem;
     }

@@ -23,6 +23,9 @@ const alertNavigation = source('../lib/components/AlertNavigation.svelte');
 const navigation = source('../lib/navigation.ts');
 const datacenterPage = source('../routes/(app)/datacenter/+page.svelte');
 const hypervisorPage = source('../routes/(app)/hypervisor/+page.svelte');
+const resourceBar = source('../lib/components/ResourceBar.svelte');
+const semicircleGauge = source('../lib/components/SemicircleGauge.svelte');
+const hostLoadGraphic = source('../lib/components/HostLoadGraphic.svelte');
 const webpagesPage = source('../routes/(app)/webpages/+page.svelte');
 const certificatesPage = source(
   '../routes/(app)/webpages/certificates/+page.svelte',
@@ -272,6 +275,23 @@ describe('primary route skeletons', () => {
     );
     expect(hypervisorPage).toContain('Espial pins the certificate');
     expect(hypervisorPage).not.toContain('UnavailableSection');
+  });
+
+  it('keeps Hypervisor graphics flat, explicit, and dependency-free', () => {
+    expect(hypervisorPage).toContain('ResourceBar');
+    expect(hypervisorPage).toContain('SemicircleGauge');
+    expect(hypervisorPage).toContain('HostLoadGraphic');
+    expect(resourceBar).toContain(
+      'grid-template-columns: minmax(0, 1fr) 0.8rem',
+    );
+    expect(resourceBar).toContain('text-align: right');
+    expect(semicircleGauge).toContain('A 88 88 0 0 1');
+    expect(semicircleGauge).toContain('role="progressbar"');
+    expect(hostLoadGraphic).toContain('role="tooltip"');
+    expect(hostLoadGraphic).toContain('VMs online');
+    expect(
+      `${hypervisorPage}${resourceBar}${semicircleGauge}${hostLoadGraphic}`,
+    ).not.toMatch(/linear-gradient|radial-gradient|@keyframes/);
   });
 
   it('exposes authoritative website availability without retaining protected content', () => {

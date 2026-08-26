@@ -635,12 +635,20 @@ health?”
 - Kept the pilot dependency-free with semantic HTML, CSS, and native Svelte. The
   contract reserves LayerCake, uPlot, and `d3-force` for data shapes that actually
   require coordinate layering, high-density time series, or authoritative edges.
-- Replaced the gradient semicircle gauges with aligned, zero-based CPU, RAM, and
-  storage meters. Unknown/non-finite values have explicit text and do not render as
-  zero.
-- Replaced the radial spokes and pulse with a stable ID-sorted “Active VMs by host”
-  comparison. The read model contains aggregate host/count pairs, so the graphic
-  draws no topology or relationship edges.
+- Removed the lighter cluster container and vertical separators. The page now uses
+  the near-black canvas, strong type, and thin horizontal rules already established
+  elsewhere in Espial.
+- Rebuilt host and storage rows on one shared component so their tracks have equal
+  geometry. Status dots sit after the track on the same horizontal axis, while
+  capacity copy such as `7.6 TB used / 11 TB max` aligns to the track's far edge.
+- Replaced the interim linear total meters with large, true SVG semicircle gauges.
+  The arcs are flat, sharply drawn, explicitly labeled, and contain no gradients,
+  glows, or continuous animation. Unknown/non-finite values have explicit text and
+  do not render as zero.
+- Replaced the radial spokes and interim row plot with a deterministic compute-node
+  field. Node size encodes active VM count, every node prints the exact count, and
+  hover/focus exposes the count with CPU/RAM context. The read model contains
+  aggregate host/count pairs, so the graphic draws no invented relationship edges.
 - Linked pointer/focus preview and click/tap/Enter/Space selection to a visible host
   detail region and complete host table. `Escape` clears selection; live refetches
   preserve it by stable host ID while present. Cyan is selection/focus only, while
@@ -648,17 +656,20 @@ health?”
 - Core now initializes every discovered node to zero before counting running QEMU
   and LXC guests. The read service also completes old observations from the host
   list without changing the `load_nodes` JSON shape.
-- Added deterministic integer domains, a 12-row bounded plot region, and the 180 ms
-  update token. Initial rendering is static, continuous animation is absent, and
-  reduced-motion mode makes updates immediate.
+- More than 12 compute nodes use a bounded scrolling field with focus scrolling.
+  The complete equivalent table remains available behind a compact disclosure.
+  Initial rendering is static, continuous animation is absent, and reduced-motion
+  mode makes updates immediate.
 
 ### Viewport, accessibility, and verification evidence
 
 Visual inspection of captured 1440×900, 1280×800, 500×900, and 640×800
-zoom-equivalent views confirmed that the plot, exact counts, long names, status,
-detail prompt, and table remain legible without page-level horizontal overflow.
-The table intentionally uses bounded internal horizontal scrolling at narrow width
-so no metric column is removed.
+zoom-equivalent views confirmed the transparent cluster surface, equal resource
+tracks, horizontally aligned end dots and capacity readings, large semicircles,
+compute nodes, exact counts, long names, status, detail prompt, and table remain
+legible without page-level horizontal overflow. The disclosed table intentionally
+uses bounded internal horizontal scrolling at narrow width so no metric column is
+removed.
 
 Automated contrast checks cover graphic labels, marks, tracks, focus, and selection.
 The neutral mark/track pair is 8.21:1, cyan selection on the flat surface is 10.87:1,
@@ -666,12 +677,15 @@ muted labels on the surface are 9.49:1, and the grid/track boundary is 3.10:1.
 Status retains the established text-first semantic component and distinct marker
 shapes.
 
-Svelte diagnostics reported zero errors and warnings; 61 frontend unit/contract
+Svelte diagnostics reported zero errors and warnings; 62 frontend unit/contract
 tests and the production build passed. The 12-scenario graphics browser suite
 covers zero, one, several, and 128 hosts; long labels and outliers; keyboard and
-touch; plot/table synchronization; live selection persistence; stale,
+touch; plot/table synchronization; hover/focus VM disclosure; live selection
+persistence; stale,
 disconnected, empty, and Core-error states; reduced motion; all four viewports; and
-zero serious/critical axe findings. The complete 55-scenario Chromium suite passes.
+zero serious/critical axe findings. Geometry assertions additionally reject a
+cluster background/border regression and verify matched tracks, horizontal dots,
+right-aligned readings, and large semicircle SVGs. The complete 55-scenario Chromium suite passes.
 The changed Proxmox and Hypervisor packages pass containerized race tests.
 Repository contracts, generated types, documentation links, formatting, and Go vet
 pass. The full Core unit gate continues to expose two unrelated pre-existing
