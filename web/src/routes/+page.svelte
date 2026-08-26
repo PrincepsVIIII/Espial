@@ -27,8 +27,7 @@
       <p>
         Espial is UBNetDef’s operations interface for monitoring infrastructure,
         understanding what needs attention, and moving from a system-level
-        signal to its physical location and contains no live status or environment
-        details.
+        signal to its physical location. It {'contains no live status or environment details'}.
       </p>
       <a class="text-link" href="/login"
         >Continue to authenticated access <span aria-hidden="true">→</span></a

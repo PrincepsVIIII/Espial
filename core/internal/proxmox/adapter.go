@@ -21,6 +21,7 @@ func Manifest() adapters.Manifest {
 			"required": []string{"base_url", "deployment_id", "token_id", "token_secret"},
 			"properties": map[string]any{
 				"base_url":                 map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
+				"allow_insecure_http":      map[string]any{"type": "boolean"},
 				"approved_host":            map[string]any{"type": "string", "minLength": 1, "maxLength": 253},
 				"approved_port":            map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},
 				"deployment_id":            map[string]any{"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},

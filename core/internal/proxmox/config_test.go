@@ -57,6 +57,37 @@ func TestValidateConfigFieldsAcceptsAddClusterDefaults(t *testing.T) {
 	}
 }
 
+func TestValidateConfigFieldsRequiresHTTPApproval(t *testing.T) {
+	config := Config{
+		BaseURL:      "http://cdr-debug.cse.buffalo.edu:8006",
+		DeploymentID: "prod-1",
+		TokenID:      "root@pam!espial",
+		TokenSecret:  "secret-value",
+	}
+
+	fields := ValidateConfigFields(config)
+	for _, field := range fields {
+		if field.Field == "base_url" && field.Code == "requires_https" {
+			return
+		}
+	}
+	t.Fatalf("expected base_url requires_https, got %#v", fields)
+}
+
+func TestValidateConfigFieldsAcceptsApprovedHTTP(t *testing.T) {
+	config := Config{
+		BaseURL:           "http://cdr-debug.cse.buffalo.edu:8006",
+		AllowInsecureHTTP: true,
+		DeploymentID:      "prod-1",
+		TokenID:           "root@pam!espial",
+		TokenSecret:       "secret-value",
+	}
+
+	if fields := ValidateConfigFields(config); len(fields) != 0 {
+		t.Fatalf("expected valid HTTP config with explicit approval, got %#v", fields)
+	}
+}
+
 func TestValidateConfigFieldsRejectsApprovedTargetMismatch(t *testing.T) {
 	config := Config{
 		BaseURL:      "https://pve.example.test:8006",

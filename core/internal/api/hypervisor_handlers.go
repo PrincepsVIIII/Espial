@@ -39,6 +39,7 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 		DisplayName            string   `json:"display_name"`
 		BaseURL                string   `json:"base_url"`
 		ApproveTarget          bool     `json:"approve_target"`
+		AllowInsecureHTTP      bool     `json:"allow_insecure_http"`
 		DeploymentID           string   `json:"deployment_id"`
 		TokenID                string   `json:"token_id"`
 		TokenSecret            string   `json:"token_secret"`
@@ -72,7 +73,7 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	receipt, err := server.dependencies.Hypervisor.CreateProxmoxCluster(r.Context(), hypervisor.ProxmoxClusterDefinition{
-		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, DeploymentID: body.DeploymentID,
+		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, AllowInsecureHTTP: body.AllowInsecureHTTP, DeploymentID: body.DeploymentID,
 		TokenID: body.TokenID, TokenSecret: body.TokenSecret,
 		IntervalSeconds: body.IntervalSeconds, ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds: body.RequestTimeoutSeconds, StorageWarningPercent: body.StorageWarningPercent,
@@ -99,6 +100,7 @@ func proxmoxConfigFields(body struct {
 	DisplayName            string   `json:"display_name"`
 	BaseURL                string   `json:"base_url"`
 	ApproveTarget          bool     `json:"approve_target"`
+	AllowInsecureHTTP      bool     `json:"allow_insecure_http"`
 	DeploymentID           string   `json:"deployment_id"`
 	TokenID                string   `json:"token_id"`
 	TokenSecret            string   `json:"token_secret"`
@@ -115,7 +117,7 @@ func proxmoxConfigFields(body struct {
 }) []APIFieldError {
 	configFields := proxmox.ValidateConfigFields(proxmox.Config{
 		BaseURL: body.BaseURL, DeploymentID: body.DeploymentID,
-		TokenID: body.TokenID, TokenSecret: body.TokenSecret,
+		TokenID: body.TokenID, TokenSecret: body.TokenSecret, AllowInsecureHTTP: body.AllowInsecureHTTP,
 		ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds:  body.RequestTimeoutSeconds,
 		StorageWarningPercent:  body.StorageWarningPercent,

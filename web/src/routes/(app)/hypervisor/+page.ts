@@ -24,7 +24,10 @@ export const load = (async ({ depends, fetch, parent, url }) => {
   }
   const items = clusters.value?.items ?? [];
   return {
-    clusters: dev && items.length === 0 ? { items: exampleClusters.items } : clusters.value,
+    clusters:
+      dev && items.length === 0
+        ? { items: exampleClusters.items }
+        : clusters.value,
     problem: clusters.problem,
     canManage:
       parentData.session?.user.permissions.includes('integrations:manage') ??

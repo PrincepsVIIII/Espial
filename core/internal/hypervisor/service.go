@@ -47,7 +47,7 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 		return adminops.Receipt{}, fmt.Errorf("hypervisor management unavailable")
 	}
 	config := proxmox.WithDefaults(proxmox.Config{
-		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID,
+		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID, AllowInsecureHTTP: definition.AllowInsecureHTTP,
 		TokenID: definition.TokenID, TokenSecret: definition.TokenSecret,
 		ExpectedRefreshSeconds: definition.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds:  definition.RequestTimeoutSeconds,
@@ -86,6 +86,7 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	}
 	nonsecret := map[string]any{
 		"base_url":                 config.BaseURL,
+		"allow_insecure_http":      config.AllowInsecureHTTP,
 		"approved_host":            config.ApprovedHost,
 		"approved_port":            config.ApprovedPort,
 		"deployment_id":            config.DeploymentID,

@@ -8,6 +8,7 @@
     "display_name",
     "base_url",
     "approve_target",
+    "allow_insecure_http",
     "deployment_id",
     "token_id",
     "token_secret",
@@ -26,6 +27,7 @@
     "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
     "base_url": { "type": "string", "format": "uri", "maxLength": 2048 },
     "approve_target": { "type": "boolean", "const": true },
+    "allow_insecure_http": { "type": "boolean" },
     "deployment_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,62}$"
@@ -48,12 +50,28 @@
       "minimum": 1,
       "maximum": 60
     },
-    "storage_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
-    "storage_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "storage_warning_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "storage_critical_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
     "swap_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
     "swap_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
-    "io_wait_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
-    "io_wait_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "io_wait_warning_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "io_wait_critical_percent": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100
+    },
     "expected_running_guests": {
       "type": "array",
       "maxItems": 10000,

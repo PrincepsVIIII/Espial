@@ -3,10 +3,22 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const windows = process.platform === "win32";
+const executableSuffix = windows ? ".cmd" : "";
+
+function commandName(command) {
+  if (command === "npm" || command === "npx")
+    return `${command}${executableSuffix}`;
+  return command;
+}
 
 function run(label, command, args) {
   process.stdout.write(`\n[Phase 2] ${label}\n`);
-  const result = spawnSync(command, args, { cwd: root, stdio: "inherit" });
+  const result = spawnSync(commandName(command), args, {
+    cwd: root,
+    shell: windows,
+    stdio: "inherit",
+  });
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(`${label} failed with ${result.status}`);

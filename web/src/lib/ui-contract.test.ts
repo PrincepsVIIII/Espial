@@ -257,8 +257,8 @@ describe('primary route skeletons', () => {
   it.each([['Datacenter', datacenterPage]])(
     '%s exposes an honest unavailable state',
     (name, page) => {
-    expect(page).toContain(`title="${name}"`);
-    expect(page).toMatch(/not implemented|not configured|no .* configured/i);
+      expect(page).toContain(`title="${name}"`);
+      expect(page).toMatch(/not implemented|not configured|no .* configured/i);
     },
   );
 

@@ -47,6 +47,7 @@ type Config struct {
 	DeploymentID           string   `json:"deployment_id"`
 	TokenID                string   `json:"token_id"`
 	TokenSecret            string   `json:"token_secret"`
+	AllowInsecureHTTP      bool     `json:"allow_insecure_http,omitempty"`
 	ApprovedHost           string   `json:"approved_host,omitempty"`
 	ApprovedPort           int      `json:"approved_port,omitempty"`
 	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
@@ -130,8 +131,12 @@ func ValidateConfigFields(config Config) []ConfigFieldError {
 	config = WithDefaults(config)
 	var fields []ConfigFieldError
 	target, err := url.Parse(config.BaseURL)
-	if err != nil || target.Scheme != "https" || target.Hostname() == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
+	if err != nil || target.Hostname() == "" || target.User != nil || strings.Trim(target.EscapedPath(), "/") != "" || target.RawQuery != "" || target.Fragment != "" {
 		fields = append(fields, ConfigFieldError{Field: "base_url", Code: "invalid"})
+	} else if target.Scheme == "http" && !config.AllowInsecureHTTP {
+		fields = append(fields, ConfigFieldError{Field: "base_url", Code: "requires_https"})
+	} else if target.Scheme != "https" && target.Scheme != "http" {
+		fields = append(fields, ConfigFieldError{Field: "base_url", Code: "invalid_scheme"})
 	}
 	if err == nil && config.ApprovedHost != "" && !strings.EqualFold(config.ApprovedHost, target.Hostname()) {
 		fields = append(fields, ConfigFieldError{Field: "approved_target", Code: "mismatch"})

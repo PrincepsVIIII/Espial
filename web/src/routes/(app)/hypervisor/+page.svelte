@@ -4,11 +4,7 @@
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import type { DisplayState } from '$lib/dashboard';
-  import {
-    ApiFailure,
-    problemFrom,
-    requestJSON,
-  } from '$lib/api/client';
+  import { ApiFailure, problemFrom, requestJSON } from '$lib/api/client';
   import type {
     AdministrativeMutationReceipt,
     ProxmoxClusterCreateRequest,
@@ -27,6 +23,7 @@
       display_name: text(form, 'display_name'),
       base_url: text(form, 'base_url'),
       approve_target: true,
+      allow_insecure_http: form.get('allow_insecure_http') === 'on',
       deployment_id: text(form, 'deployment_id'),
       token_id: text(form, 'token_id'),
       token_secret: text(form, 'token_secret'),
@@ -34,11 +31,19 @@
       expected_refresh_seconds: integer(form, 'expected_refresh_seconds', 300),
       request_timeout_seconds: integer(form, 'request_timeout_seconds', 10),
       storage_warning_percent: numberValue(form, 'storage_warning_percent', 80),
-      storage_critical_percent: numberValue(form, 'storage_critical_percent', 90),
+      storage_critical_percent: numberValue(
+        form,
+        'storage_critical_percent',
+        90,
+      ),
       swap_warning_percent: numberValue(form, 'swap_warning_percent', 10),
       swap_critical_percent: numberValue(form, 'swap_critical_percent', 25),
       io_wait_warning_percent: numberValue(form, 'io_wait_warning_percent', 5),
-      io_wait_critical_percent: numberValue(form, 'io_wait_critical_percent', 15),
+      io_wait_critical_percent: numberValue(
+        form,
+        'io_wait_critical_percent',
+        15,
+      ),
       expected_running_guests: text(form, 'expected_running_guests')
         .split(',')
         .map((value) => value.trim())
@@ -63,7 +68,8 @@
       modalOpen = false;
       await invalidate('espial:monitoring');
     } catch (error) {
-      const problem = error instanceof ApiFailure ? error.problem : problemFrom(error);
+      const problem =
+        error instanceof ApiFailure ? error.problem : problemFrom(error);
       formProblem = formatProblem(problem);
     } finally {
       saving = false;
@@ -71,7 +77,9 @@
   }
 
   function formatProblem(problem: ReturnType<typeof problemFrom>): string {
-    const fields = problem.fields?.map((field) => `${field.field}: ${field.code}`).join(', ');
+    const fields = problem.fields
+      ?.map((field) => `${field.field}: ${field.code}`)
+      .join(', ');
     return [
       problem.message,
       fields ? `Fields: ${fields}` : '',
@@ -145,7 +153,8 @@
 
   function nodePoint(index: number, total: number, count: number) {
     if (total === 1) return { x: 50, y: 50, r: 12 + Math.min(count, 12) };
-    if (total === 2) return { x: index === 0 ? 30 : 70, y: 50, r: 9 + Math.min(count, 10) };
+    if (total === 2)
+      return { x: index === 0 ? 30 : 70, y: 50, r: 9 + Math.min(count, 10) };
     const angle = (-90 + (360 / total) * index) * (Math.PI / 180);
     return {
       x: 50 + Math.cos(angle) * 32,
@@ -167,7 +176,11 @@
     <p>Proxmox cluster health, utilization, and active guest distribution.</p>
   </div>
   {#if data.canManage}
-    <button type="button" class="primary-action" onclick={() => (modalOpen = true)}>
+    <button
+      type="button"
+      class="primary-action"
+      onclick={() => (modalOpen = true)}
+    >
       + Add Cluster
     </button>
   {/if}
@@ -185,18 +198,23 @@
 
 {#if data.demo}
   <div class="demo-notice" role="status">
-    Development fixture. Production shows real Proxmox data only after a cluster is added.
+    Development fixture. Production shows real Proxmox data only after a cluster
+    is added.
   </div>
 {/if}
 
 {#if data.problem}
   <section class="problem-panel" aria-labelledby="hypervisor-problem-title">
     <h2 id="hypervisor-problem-title">
-      {data.problem.status === 403 ? 'Hypervisor access denied.' : 'Hypervisor data is unavailable.'}
+      {data.problem.status === 403
+        ? 'Hypervisor access denied.'
+        : 'Hypervisor data is unavailable.'}
     </h2>
     <p>{data.problem.message}</p>
     {#if data.problem.request_id}
-      <p class="request-reference">Request ID: <code>{data.problem.request_id}</code></p>
+      <p class="request-reference">
+        Request ID: <code>{data.problem.request_id}</code>
+      </p>
     {/if}
   </section>
 {:else if data.clusters?.items.length}
@@ -204,54 +222,100 @@
     {#each data.clusters.items as cluster (cluster.id)}
       <article class="cluster-panel" aria-labelledby={`cluster-${cluster.id}`}>
         <div class="cluster-columns">
-          <section class="cluster-list-column" aria-label={`${cluster.name} hosts`}>
+          <section
+            class="cluster-list-column"
+            aria-label={`${cluster.name} hosts`}
+          >
             <h2>Hosts</h2>
             {#each cluster.hosts as host}
               <div class="host-row">
                 <div class="row-label">
                   <code>{host.id}</code>
-                  <span class={`indicator indicator-${host.swap_indicator}`} title={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`} aria-label={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`}></span>
+                  <span
+                    class={`indicator indicator-${host.swap_indicator}`}
+                    title={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`}
+                    aria-label={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`}
+                  ></span>
                 </div>
-                <div class="dual-bar" aria-label={`${host.id} CPU ${percent(host.cpu_percent)}, RAM ${percent(host.ram_percent)}`}>
-                  <span class="cpu-fill" style={`width:${bounded(host.cpu_percent)}%`}></span>
-                  <span class="ram-fill" style={`width:${bounded(host.ram_percent)}%`}></span>
+                <div
+                  class="dual-bar"
+                  aria-label={`${host.id} CPU ${percent(host.cpu_percent)}, RAM ${percent(host.ram_percent)}`}
+                >
+                  <span
+                    class="cpu-fill"
+                    style={`width:${bounded(host.cpu_percent)}%`}
+                  ></span>
+                  <span
+                    class="ram-fill"
+                    style={`width:${bounded(host.ram_percent)}%`}
+                  ></span>
                 </div>
-                <small>{host.cpu_cores.toFixed(0)} cores / {formatBytes(host.ram_bytes)}</small>
+                <small
+                  >{host.cpu_cores.toFixed(0)} cores / {formatBytes(
+                    host.ram_bytes,
+                  )}</small
+                >
               </div>
             {/each}
           </section>
 
-          <section class="cluster-list-column storage-column" aria-label={`${cluster.name} storage`}>
+          <section
+            class="cluster-list-column storage-column"
+            aria-label={`${cluster.name} storage`}
+          >
             <h2>Storage</h2>
             {#each cluster.storage as item}
               <div class="storage-row">
                 <div class="row-label">
                   <code>{item.id}</code>
-                  <span class={`indicator indicator-${item.io_wait_indicator}`} title={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`} aria-label={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`}></span>
+                  <span
+                    class={`indicator indicator-${item.io_wait_indicator}`}
+                    title={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`}
+                    aria-label={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`}
+                  ></span>
                 </div>
-                <div class="storage-bar" aria-label={`${item.id} storage ${percent(item.used_percent)} used`}>
+                <div
+                  class="storage-bar"
+                  aria-label={`${item.id} storage ${percent(item.used_percent)} used`}
+                >
                   <span style={`width:${bounded(item.used_percent)}%`}></span>
                 </div>
-                <small>{formatBytes(item.used_bytes)} used / {formatBytes(item.total_bytes)} max</small>
+                <small
+                  >{formatBytes(item.used_bytes)} used / {formatBytes(
+                    item.total_bytes,
+                  )} max</small
+                >
               </div>
             {/each}
           </section>
 
-          <section class="cluster-gauges" aria-labelledby={`cluster-${cluster.id}`}>
+          <section
+            class="cluster-gauges"
+            aria-labelledby={`cluster-${cluster.id}`}
+          >
             <div class="cluster-title">
               <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
               <StatusIndicator state={displayState(cluster.state)} compact />
             </div>
             <div class="gauge-set">
-              <div class="gauge" style={`--value:${gaugeSweep(cluster.totals.cpu_percent)}`}>
+              <div
+                class="gauge"
+                style={`--value:${gaugeSweep(cluster.totals.cpu_percent)}`}
+              >
                 <span>{percent(cluster.totals.cpu_percent)}</span>
                 <small>CPU total</small>
               </div>
-              <div class="gauge" style={`--value:${gaugeSweep(cluster.totals.ram_percent)}`}>
+              <div
+                class="gauge"
+                style={`--value:${gaugeSweep(cluster.totals.ram_percent)}`}
+              >
                 <span>{percent(cluster.totals.ram_percent)}</span>
                 <small>RAM total</small>
               </div>
-              <div class="gauge" style={`--value:${gaugeSweep(cluster.totals.storage_percent)}`}>
+              <div
+                class="gauge"
+                style={`--value:${gaugeSweep(cluster.totals.storage_percent)}`}
+              >
                 <span>{percent(cluster.totals.storage_percent)}</span>
                 <small>Storage total</small>
               </div>
@@ -265,17 +329,33 @@
             </p>
           </section>
 
-          <section class="load-graph" aria-label={`${cluster.name} active VM distribution`}>
-            <svg viewBox="0 0 100 100" role="img" aria-label="Active VM distribution by node">
+          <section
+            class="load-graph"
+            aria-label={`${cluster.name} active VM distribution`}
+          >
+            <svg
+              viewBox="0 0 100 100"
+              role="img"
+              aria-label="Active VM distribution by node"
+            >
               {#if cluster.load_nodes.length > 2}
                 <circle cx="50" cy="50" r="4" class="load-center" />
               {/if}
               {#each cluster.load_nodes as node, index}
-                {@const point = nodePoint(index, cluster.load_nodes.length, node.active_vms)}
+                {@const point = nodePoint(
+                  index,
+                  cluster.load_nodes.length,
+                  node.active_vms,
+                )}
                 {#if cluster.load_nodes.length > 2}
                   <line x1="50" y1="50" x2={point.x} y2={point.y} />
                 {/if}
-                <circle class:single-node={cluster.load_nodes.length === 1} cx={point.x} cy={point.y} r={point.r}>
+                <circle
+                  class:single-node={cluster.load_nodes.length === 1}
+                  cx={point.x}
+                  cy={point.y}
+                  r={point.r}
+                >
                   <title>{node.id}: {node.active_vms} active VMs</title>
                 </circle>
                 <text x={point.x} y={point.y + point.r + 7}>{node.id}</text>
@@ -289,45 +369,171 @@
 {:else}
   <section class="empty-state">
     <strong>No Proxmox clusters are configured.</strong>
-    <span>Add a cluster with a read-only token before expecting Hypervisor data.</span>
+    <span
+      >Add a cluster with a read-only token before expecting Hypervisor data.</span
+    >
   </section>
 {/if}
 
 {#if modalOpen}
   <div class="modal-backdrop" role="presentation" onclick={closeBackdrop}>
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="add-cluster-title">
+    <div
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-cluster-title"
+    >
       <div class="modal-heading">
         <h2 id="add-cluster-title">Add Proxmox cluster</h2>
-        <button type="button" class="icon-button" aria-label="Close" onclick={() => (modalOpen = false)}>x</button>
+        <button
+          type="button"
+          class="icon-button"
+          aria-label="Close"
+          onclick={() => (modalOpen = false)}>x</button
+        >
       </div>
       <form class="cluster-form" onsubmit={createCluster}>
-        <label>Cluster name <input name="display_name" required maxlength="128" /></label>
-        <label>Base URL <input name="base_url" required placeholder="https://proxmox.example:8006" /></label>
+        <label
+          >Cluster name <input
+            name="display_name"
+            required
+            maxlength="128"
+          /></label
+        >
+        <label
+          >Base URL <input
+            name="base_url"
+            required
+            placeholder="https://proxmox.example:8006"
+          /></label
+        >
         <label class="check-row">
           <input name="approve_target" type="checkbox" required />
           <span>Approve this Proxmox target for read-only collection</span>
         </label>
-        <label>Deployment ID <input name="deployment_id" required pattern="[a-z][a-z0-9-]+" minlength="2" maxlength="63" /></label>
+        <label class="check-row">
+          <input name="allow_insecure_http" type="checkbox" />
+          <span>Allow insecure HTTP for clusters without certificates</span>
+        </label>
+        <label
+          >Deployment ID <input
+            name="deployment_id"
+            required
+            pattern="[a-z][a-z0-9-]+"
+            minlength="2"
+            maxlength="63"
+          /></label
+        >
         <label>Token ID <input name="token_id" required /></label>
-        <label>Token secret <input name="token_secret" type="password" required autocomplete="new-password" /></label>
-        <label>Collection interval <input name="interval_seconds" type="number" min="1" max="86400" value="300" /></label>
-        <label>Expected freshness <input name="expected_refresh_seconds" type="number" min="1" max="86400" value="300" /></label>
-        <label>Request timeout <input name="request_timeout_seconds" type="number" min="1" max="60" value="10" /></label>
+        <label
+          >Token secret <input
+            name="token_secret"
+            type="password"
+            required
+            autocomplete="new-password"
+          /></label
+        >
+        <label
+          >Collection interval <input
+            name="interval_seconds"
+            type="number"
+            min="1"
+            max="86400"
+            value="300"
+          /></label
+        >
+        <label
+          >Expected freshness <input
+            name="expected_refresh_seconds"
+            type="number"
+            min="1"
+            max="86400"
+            value="300"
+          /></label
+        >
+        <label
+          >Request timeout <input
+            name="request_timeout_seconds"
+            type="number"
+            min="1"
+            max="60"
+            value="10"
+          /></label
+        >
         <div class="threshold-grid">
-          <label>Storage warning <input name="storage_warning_percent" type="number" min="0" max="100" value="80" /></label>
-          <label>Storage critical <input name="storage_critical_percent" type="number" min="0" max="100" value="90" /></label>
-          <label>Swap warning <input name="swap_warning_percent" type="number" min="0" max="100" value="10" /></label>
-          <label>Swap critical <input name="swap_critical_percent" type="number" min="0" max="100" value="25" /></label>
-          <label>IO wait warning <input name="io_wait_warning_percent" type="number" min="0" max="100" value="5" /></label>
-          <label>IO wait critical <input name="io_wait_critical_percent" type="number" min="0" max="100" value="15" /></label>
+          <label
+            >Storage warning <input
+              name="storage_warning_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="80"
+            /></label
+          >
+          <label
+            >Storage critical <input
+              name="storage_critical_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="90"
+            /></label
+          >
+          <label
+            >Swap warning <input
+              name="swap_warning_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="10"
+            /></label
+          >
+          <label
+            >Swap critical <input
+              name="swap_critical_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="25"
+            /></label
+          >
+          <label
+            >IO wait warning <input
+              name="io_wait_warning_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="5"
+            /></label
+          >
+          <label
+            >IO wait critical <input
+              name="io_wait_critical_percent"
+              type="number"
+              min="0"
+              max="100"
+              value="15"
+            /></label
+          >
         </div>
-        <label>Expected-running guests <input name="expected_running_guests" placeholder="qemu:100,lxc:200" /></label>
+        <label
+          >Expected-running guests <input
+            name="expected_running_guests"
+            placeholder="qemu:100,lxc:200"
+          /></label
+        >
         {#if formProblem}
           <p class="form-problem" role="alert">{formProblem}</p>
         {/if}
         <div class="modal-actions">
-          <button type="button" class="secondary-action" onclick={() => (modalOpen = false)}>Cancel</button>
-          <button type="submit" disabled={saving}>{saving ? 'Validating...' : 'Validate and add'}</button>
+          <button
+            type="button"
+            class="secondary-action"
+            onclick={() => (modalOpen = false)}>Cancel</button
+          >
+          <button type="submit" disabled={saving}
+            >{saving ? 'Validating...' : 'Validate and add'}</button
+          >
         </div>
       </form>
     </div>
@@ -376,7 +582,9 @@
 
   .cluster-columns {
     display: grid;
-    grid-template-columns: minmax(190px, 1fr) minmax(230px, 1.25fr) minmax(260px, 1.2fr) minmax(220px, 1fr);
+    grid-template-columns:
+      minmax(190px, 1fr) minmax(230px, 1.25fr) minmax(260px, 1.2fr)
+      minmax(220px, 1fr);
     gap: 1rem;
     align-items: stretch;
   }
@@ -475,7 +683,12 @@
     min-height: 7rem;
     background:
       radial-gradient(circle at 50% 80%, #101b24 0 46%, transparent 47%),
-      conic-gradient(from 270deg, var(--color-accent, #00a9c9) var(--value), #243442 0 50%, transparent 0);
+      conic-gradient(
+        from 270deg,
+        var(--color-accent, #00a9c9) var(--value),
+        #243442 0 50%,
+        transparent 0
+      );
     clip-path: inset(0 0 45% 0);
   }
 
@@ -593,7 +806,8 @@
   }
 
   @keyframes pulse-node {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0.72;
     }
     50% {

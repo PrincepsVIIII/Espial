@@ -7,6 +7,7 @@ type ProxmoxClusterDefinition struct {
 	DisplayName            string
 	BaseURL                string
 	ApproveTarget          bool
+	AllowInsecureHTTP      bool
 	DeploymentID           string
 	TokenID                string
 	TokenSecret            string

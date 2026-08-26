@@ -122,7 +122,10 @@ secret store and persists only a generated Core-resolved secret reference. The
 same typed Add Cluster flow also requires the administrator to explicitly approve
 the Proxmox target URL; Core records the resulting host and port as non-secret
 integration policy and includes only those approved values in later adapter
-validation and collection requests. A deployment-level
+validation and collection requests. HTTPS remains the default. HTTP targets are
+accepted only when the administrator explicitly marks the cluster as allowing
+insecure HTTP, and that setting means the Proxmox API token is sent without TLS
+protection until the cluster has a certificate. A deployment-level
 `ESPIAL_PROXMOX_APPROVED_HOSTS` list may further restrict targets, but normal
 cluster onboarding does not require manually editing that environment variable.
 The adapter must never persist or log the combined authorization header, token
@@ -225,6 +228,7 @@ A bounded first configuration can include:
 
 ```text
 base_url
+allow_insecure_http          # explicit operator approval for temporary HTTP-only clusters
 approved_host                 # derived from the explicitly approved Add Cluster URL
 approved_port                 # derived from the explicitly approved Add Cluster URL
 deployment_id
