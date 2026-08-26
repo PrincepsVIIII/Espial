@@ -43,22 +43,24 @@ var (
 )
 
 type Config struct {
-	BaseURL                string   `json:"base_url"`
-	DeploymentID           string   `json:"deployment_id"`
-	TokenID                string   `json:"token_id"`
-	TokenSecret            string   `json:"token_secret"`
-	AllowInsecureHTTP      bool     `json:"allow_insecure_http,omitempty"`
-	ApprovedHost           string   `json:"approved_host,omitempty"`
-	ApprovedPort           int      `json:"approved_port,omitempty"`
-	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
-	RequestTimeoutSeconds  int      `json:"request_timeout_seconds"`
-	ExpectedRunningGuests  []string `json:"expected_running_guests"`
-	StorageWarningPercent  float64  `json:"storage_warning_percent"`
-	StorageCriticalPercent float64  `json:"storage_critical_percent"`
-	SwapWarningPercent     float64  `json:"swap_warning_percent"`
-	SwapCriticalPercent    float64  `json:"swap_critical_percent"`
-	IOWaitWarningPercent   float64  `json:"io_wait_warning_percent"`
-	IOWaitCriticalPercent  float64  `json:"io_wait_critical_percent"`
+	BaseURL                    string   `json:"base_url"`
+	DeploymentID               string   `json:"deployment_id"`
+	TokenID                    string   `json:"token_id"`
+	TokenSecret                string   `json:"token_secret"`
+	AllowInsecureHTTP          bool     `json:"allow_insecure_http,omitempty"`
+	TrustSelfSignedCertificate bool     `json:"trust_self_signed_certificate,omitempty"`
+	TrustedCertificateSHA256   string   `json:"trusted_certificate_sha256,omitempty"`
+	ApprovedHost               string   `json:"approved_host,omitempty"`
+	ApprovedPort               int      `json:"approved_port,omitempty"`
+	ExpectedRefreshSeconds     int      `json:"expected_refresh_seconds"`
+	RequestTimeoutSeconds      int      `json:"request_timeout_seconds"`
+	ExpectedRunningGuests      []string `json:"expected_running_guests"`
+	StorageWarningPercent      float64  `json:"storage_warning_percent"`
+	StorageCriticalPercent     float64  `json:"storage_critical_percent"`
+	SwapWarningPercent         float64  `json:"swap_warning_percent"`
+	SwapCriticalPercent        float64  `json:"swap_critical_percent"`
+	IOWaitWarningPercent       float64  `json:"io_wait_warning_percent"`
+	IOWaitCriticalPercent      float64  `json:"io_wait_critical_percent"`
 }
 
 type ConfigFieldError struct {
@@ -90,6 +92,7 @@ func WithDefaults(config Config) Config {
 	config.DeploymentID = strings.TrimSpace(config.DeploymentID)
 	config.TokenID = strings.TrimSpace(config.TokenID)
 	config.ApprovedHost = strings.ToLower(strings.TrimSpace(config.ApprovedHost))
+	config.TrustedCertificateSHA256 = strings.ToLower(strings.TrimSpace(config.TrustedCertificateSHA256))
 	for index, guest := range config.ExpectedRunningGuests {
 		config.ExpectedRunningGuests[index] = strings.TrimSpace(guest)
 	}
@@ -138,6 +141,14 @@ func ValidateConfigFields(config Config) []ConfigFieldError {
 	} else if target.Scheme != "https" && target.Scheme != "http" {
 		fields = append(fields, ConfigFieldError{Field: "base_url", Code: "invalid_scheme"})
 	}
+	if config.TrustSelfSignedCertificate && (err != nil || target.Scheme != "https") {
+		fields = append(fields, ConfigFieldError{Field: "trust_self_signed_certificate", Code: "requires_https"})
+	}
+	if config.TrustedCertificateSHA256 != "" {
+		if !config.TrustSelfSignedCertificate || !validSHA256Fingerprint(config.TrustedCertificateSHA256) {
+			fields = append(fields, ConfigFieldError{Field: "trusted_certificate_sha256", Code: "invalid"})
+		}
+	}
 	if err == nil && config.ApprovedHost != "" && !strings.EqualFold(config.ApprovedHost, target.Hostname()) {
 		fields = append(fields, ConfigFieldError{Field: "approved_target", Code: "mismatch"})
 	}
@@ -184,6 +195,18 @@ func RequestTimeout(config Config) time.Duration {
 
 func validThresholds(warning, critical float64) bool {
 	return warning >= 0 && warning <= 100 && critical >= 0 && critical <= 100 && warning < critical
+}
+
+func validSHA256Fingerprint(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 func targetPort(target *url.URL) int {

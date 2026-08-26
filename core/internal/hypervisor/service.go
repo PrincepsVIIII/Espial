@@ -48,7 +48,8 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	}
 	config := proxmox.WithDefaults(proxmox.Config{
 		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID, AllowInsecureHTTP: definition.AllowInsecureHTTP,
-		TokenID: definition.TokenID, TokenSecret: definition.TokenSecret,
+		TrustSelfSignedCertificate: definition.TrustSelfSignedCertificate,
+		TokenID:                    definition.TokenID, TokenSecret: definition.TokenSecret,
 		ExpectedRefreshSeconds: definition.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds:  definition.RequestTimeoutSeconds,
 		StorageWarningPercent:  definition.StorageWarningPercent,
@@ -80,26 +81,35 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	if _, err := proxmox.Collect(validationContext, config, client, service.now()); err != nil {
 		return adminops.Receipt{}, &monitoring.Error{Code: proxmoxCreateErrorCode(err)}
 	}
+	if config.TrustSelfSignedCertificate {
+		fingerprinter, ok := client.(interface{ CertificateFingerprint() string })
+		if !ok || fingerprinter.CertificateFingerprint() == "" {
+			return adminops.Receipt{}, &monitoring.Error{Code: "tls_certificate_missing"}
+		}
+		config.TrustedCertificateSHA256 = fingerprinter.CertificateFingerprint()
+	}
 	tokenSecretReference := tokenReference(config.DeploymentID, definition.CorrelationID)
 	if err := service.secrets.Write(ctx, tokenSecretReference, config.TokenSecret); err != nil {
 		return adminops.Receipt{}, &monitoring.Error{Code: "secret_store_unavailable"}
 	}
 	nonsecret := map[string]any{
-		"base_url":                 config.BaseURL,
-		"allow_insecure_http":      config.AllowInsecureHTTP,
-		"approved_host":            config.ApprovedHost,
-		"approved_port":            config.ApprovedPort,
-		"deployment_id":            config.DeploymentID,
-		"token_id":                 config.TokenID,
-		"expected_refresh_seconds": config.ExpectedRefreshSeconds,
-		"request_timeout_seconds":  config.RequestTimeoutSeconds,
-		"storage_warning_percent":  config.StorageWarningPercent,
-		"storage_critical_percent": config.StorageCriticalPercent,
-		"swap_warning_percent":     config.SwapWarningPercent,
-		"swap_critical_percent":    config.SwapCriticalPercent,
-		"io_wait_warning_percent":  config.IOWaitWarningPercent,
-		"io_wait_critical_percent": config.IOWaitCriticalPercent,
-		"expected_running_guests":  config.ExpectedRunningGuests,
+		"base_url":                      config.BaseURL,
+		"allow_insecure_http":           config.AllowInsecureHTTP,
+		"trust_self_signed_certificate": config.TrustSelfSignedCertificate,
+		"trusted_certificate_sha256":    config.TrustedCertificateSHA256,
+		"approved_host":                 config.ApprovedHost,
+		"approved_port":                 config.ApprovedPort,
+		"deployment_id":                 config.DeploymentID,
+		"token_id":                      config.TokenID,
+		"expected_refresh_seconds":      config.ExpectedRefreshSeconds,
+		"request_timeout_seconds":       config.RequestTimeoutSeconds,
+		"storage_warning_percent":       config.StorageWarningPercent,
+		"storage_critical_percent":      config.StorageCriticalPercent,
+		"swap_warning_percent":          config.SwapWarningPercent,
+		"swap_critical_percent":         config.SwapCriticalPercent,
+		"io_wait_warning_percent":       config.IOWaitWarningPercent,
+		"io_wait_critical_percent":      config.IOWaitCriticalPercent,
+		"expected_running_guests":       config.ExpectedRunningGuests,
 	}
 	id, updatedAt, err := service.creator.Create(ctx, monitoring.CreateIntegration{
 		AdapterID: proxmox.AdapterID, DisplayName: strings.TrimSpace(definition.DisplayName), Enabled: true, Typed: true,
@@ -252,7 +262,9 @@ func proxmoxCreateErrorCode(err error) string {
 		return ""
 	}
 	switch err.Error() {
-	case "target_not_approved", "unauthorized", "forbidden", "throttled", "timeout", "temporary_upstream_failure", "malformed_data", "oversized_response":
+	case "target_not_approved", "unauthorized", "forbidden", "throttled", "timeout", "temporary_upstream_failure", "malformed_data", "oversized_response",
+		"tls_certificate_untrusted", "tls_hostname_mismatch", "tls_certificate_invalid", "tls_certificate_changed", "tls_certificate_missing", "tls_handshake_failed", "dns_failed", "connection_failed",
+		"proxmox_api_not_found", "upstream_request_rejected":
 		return err.Error()
 	default:
 		return "proxmox_validation_failed"

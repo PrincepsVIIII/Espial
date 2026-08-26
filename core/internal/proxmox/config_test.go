@@ -1,6 +1,9 @@
 package proxmox
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestValidateConfigFieldsReportsSpecificInvalidInputs(t *testing.T) {
 	config := Config{
@@ -85,6 +88,40 @@ func TestValidateConfigFieldsAcceptsApprovedHTTP(t *testing.T) {
 
 	if fields := ValidateConfigFields(config); len(fields) != 0 {
 		t.Fatalf("expected valid HTTP config with explicit approval, got %#v", fields)
+	}
+}
+
+func TestValidateConfigFieldsRequiresHTTPSForSelfSignedTrust(t *testing.T) {
+	config := Config{
+		BaseURL:                    "http://cdr-debug.cse.buffalo.edu:8006",
+		AllowInsecureHTTP:          true,
+		TrustSelfSignedCertificate: true,
+		DeploymentID:               "prod-1",
+		TokenID:                    "root@pam!espial",
+		TokenSecret:                "secret-value",
+	}
+
+	fields := ValidateConfigFields(config)
+	for _, field := range fields {
+		if field.Field == "trust_self_signed_certificate" && field.Code == "requires_https" {
+			return
+		}
+	}
+	t.Fatalf("expected trust_self_signed_certificate requires_https, got %#v", fields)
+}
+
+func TestValidateConfigFieldsAcceptsPinnedSelfSignedCertificate(t *testing.T) {
+	config := Config{
+		BaseURL:                    "https://cdr-debug.cse.buffalo.edu:8006",
+		TrustSelfSignedCertificate: true,
+		TrustedCertificateSHA256:   strings.Repeat("a", 64),
+		DeploymentID:               "prod-1",
+		TokenID:                    "root@pam!espial",
+		TokenSecret:                "secret-value",
+	}
+
+	if fields := ValidateConfigFields(config); len(fields) != 0 {
+		t.Fatalf("expected valid pinned certificate config, got %#v", fields)
 	}
 }
 

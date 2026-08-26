@@ -600,3 +600,24 @@ rules, suppressions, and notification-administration captures at 1440×900,
 reported zero errors and warnings; all 50 unit tests, all 39 Chromium scenarios,
 and the production SvelteKit build passed. A source-wide contract test scans every
 Svelte view and rejects any future eyebrow class or copy pattern.
+
+## 2026-08-26 — Proxmox Add Cluster form refinement
+
+Reworked the Add Proxmox cluster dialog into compact, divided Connection, API
+token, Collection, Threshold, and Guest expectation sections. The form uses the
+existing flat dark surfaces, thin borders, restrained cyan primary action, explicit
+units, and text-first controls. It adds an explicit self-signed-certificate trust
+checkbox whose copy accurately describes Core's certificate-pinning behavior and
+keeps the separate insecure-HTTP option visibly cautionary.
+
+Validation failures now retain the safe Core request ID while translating field,
+TLS, DNS, connection, timeout, authentication, authorization, throttling, API, and
+response failures into specific operator actions. The dialog closes with its
+visible Close/Cancel controls, backdrop activation, or `Escape`; saving prevents an
+accidental close. Automated review covers the dialog at 1440×900, 1280×800, and
+500×900, checks narrow reflow and serious/critical axe findings, and captures each
+viewport for visual inspection.
+
+Final verification reported zero Svelte diagnostics, 52 frontend unit tests, all
+43 Chromium scenarios, zero serious/critical axe findings for the dialog, and a
+successful production SvelteKit build.

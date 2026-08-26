@@ -97,6 +97,7 @@ const server = http.createServer((request, response) => {
             ? []
             : [
                 'incidents:operate',
+                'integrations:manage',
                 'audit:read',
                 'users:manage',
                 'incident_rules:manage',
@@ -120,6 +121,7 @@ const server = http.createServer((request, response) => {
     url.pathname.startsWith('/api/v1/resources') ||
     url.pathname.startsWith('/api/v1/integrations') ||
     url.pathname.startsWith('/api/v1/incidents') ||
+    url.pathname.startsWith('/api/v1/hypervisor/proxmox/clusters') ||
     url.pathname.startsWith('/api/v1/webpages') ||
     url.pathname.startsWith('/api/v1/website-monitors')
   ) {
@@ -138,6 +140,19 @@ const server = http.createServer((request, response) => {
         'unavailable',
         'Espial Core is temporarily unavailable.',
       );
+  }
+  if (url.pathname === '/api/v1/hypervisor/proxmox/clusters') {
+    if (request.method === 'POST') {
+      return json(response, 400, {
+        error: {
+          code: 'validation_failed',
+          message: 'Request validation failed.',
+          request_id: 'proxmox-request-1',
+          fields: [{ field: 'proxmox', code: 'tls_certificate_untrusted' }],
+        },
+      });
+    }
+    return json(response, 200, { items: [] });
   }
   if (url.pathname === '/api/v1/overview') {
     return json(response, 200, {

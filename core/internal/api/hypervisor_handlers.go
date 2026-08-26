@@ -36,23 +36,24 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	var body struct {
-		DisplayName            string   `json:"display_name"`
-		BaseURL                string   `json:"base_url"`
-		ApproveTarget          bool     `json:"approve_target"`
-		AllowInsecureHTTP      bool     `json:"allow_insecure_http"`
-		DeploymentID           string   `json:"deployment_id"`
-		TokenID                string   `json:"token_id"`
-		TokenSecret            string   `json:"token_secret"`
-		IntervalSeconds        int      `json:"interval_seconds"`
-		ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
-		RequestTimeoutSeconds  int      `json:"request_timeout_seconds"`
-		StorageWarningPercent  float64  `json:"storage_warning_percent"`
-		StorageCriticalPercent float64  `json:"storage_critical_percent"`
-		SwapWarningPercent     float64  `json:"swap_warning_percent"`
-		SwapCriticalPercent    float64  `json:"swap_critical_percent"`
-		IOWaitWarningPercent   float64  `json:"io_wait_warning_percent"`
-		IOWaitCriticalPercent  float64  `json:"io_wait_critical_percent"`
-		ExpectedRunningGuests  []string `json:"expected_running_guests"`
+		DisplayName                string   `json:"display_name"`
+		BaseURL                    string   `json:"base_url"`
+		ApproveTarget              bool     `json:"approve_target"`
+		AllowInsecureHTTP          bool     `json:"allow_insecure_http"`
+		TrustSelfSignedCertificate bool     `json:"trust_self_signed_certificate"`
+		DeploymentID               string   `json:"deployment_id"`
+		TokenID                    string   `json:"token_id"`
+		TokenSecret                string   `json:"token_secret"`
+		IntervalSeconds            int      `json:"interval_seconds"`
+		ExpectedRefreshSeconds     int      `json:"expected_refresh_seconds"`
+		RequestTimeoutSeconds      int      `json:"request_timeout_seconds"`
+		StorageWarningPercent      float64  `json:"storage_warning_percent"`
+		StorageCriticalPercent     float64  `json:"storage_critical_percent"`
+		SwapWarningPercent         float64  `json:"swap_warning_percent"`
+		SwapCriticalPercent        float64  `json:"swap_critical_percent"`
+		IOWaitWarningPercent       float64  `json:"io_wait_warning_percent"`
+		IOWaitCriticalPercent      float64  `json:"io_wait_critical_percent"`
+		ExpectedRunningGuests      []string `json:"expected_running_guests"`
 	}
 	if err := decodeJSONLimit(w, r, &body, 64*1024); err != nil {
 		server.decodeError(w, r, err)
@@ -73,7 +74,8 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	receipt, err := server.dependencies.Hypervisor.CreateProxmoxCluster(r.Context(), hypervisor.ProxmoxClusterDefinition{
-		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, AllowInsecureHTTP: body.AllowInsecureHTTP, DeploymentID: body.DeploymentID,
+		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, AllowInsecureHTTP: body.AllowInsecureHTTP,
+		TrustSelfSignedCertificate: body.TrustSelfSignedCertificate, DeploymentID: body.DeploymentID,
 		TokenID: body.TokenID, TokenSecret: body.TokenSecret,
 		IntervalSeconds: body.IntervalSeconds, ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds: body.RequestTimeoutSeconds, StorageWarningPercent: body.StorageWarningPercent,
@@ -97,36 +99,38 @@ func (server *server) createProxmoxCluster(w http.ResponseWriter, r *http.Reques
 }
 
 func proxmoxConfigFields(body struct {
-	DisplayName            string   `json:"display_name"`
-	BaseURL                string   `json:"base_url"`
-	ApproveTarget          bool     `json:"approve_target"`
-	AllowInsecureHTTP      bool     `json:"allow_insecure_http"`
-	DeploymentID           string   `json:"deployment_id"`
-	TokenID                string   `json:"token_id"`
-	TokenSecret            string   `json:"token_secret"`
-	IntervalSeconds        int      `json:"interval_seconds"`
-	ExpectedRefreshSeconds int      `json:"expected_refresh_seconds"`
-	RequestTimeoutSeconds  int      `json:"request_timeout_seconds"`
-	StorageWarningPercent  float64  `json:"storage_warning_percent"`
-	StorageCriticalPercent float64  `json:"storage_critical_percent"`
-	SwapWarningPercent     float64  `json:"swap_warning_percent"`
-	SwapCriticalPercent    float64  `json:"swap_critical_percent"`
-	IOWaitWarningPercent   float64  `json:"io_wait_warning_percent"`
-	IOWaitCriticalPercent  float64  `json:"io_wait_critical_percent"`
-	ExpectedRunningGuests  []string `json:"expected_running_guests"`
+	DisplayName                string   `json:"display_name"`
+	BaseURL                    string   `json:"base_url"`
+	ApproveTarget              bool     `json:"approve_target"`
+	AllowInsecureHTTP          bool     `json:"allow_insecure_http"`
+	TrustSelfSignedCertificate bool     `json:"trust_self_signed_certificate"`
+	DeploymentID               string   `json:"deployment_id"`
+	TokenID                    string   `json:"token_id"`
+	TokenSecret                string   `json:"token_secret"`
+	IntervalSeconds            int      `json:"interval_seconds"`
+	ExpectedRefreshSeconds     int      `json:"expected_refresh_seconds"`
+	RequestTimeoutSeconds      int      `json:"request_timeout_seconds"`
+	StorageWarningPercent      float64  `json:"storage_warning_percent"`
+	StorageCriticalPercent     float64  `json:"storage_critical_percent"`
+	SwapWarningPercent         float64  `json:"swap_warning_percent"`
+	SwapCriticalPercent        float64  `json:"swap_critical_percent"`
+	IOWaitWarningPercent       float64  `json:"io_wait_warning_percent"`
+	IOWaitCriticalPercent      float64  `json:"io_wait_critical_percent"`
+	ExpectedRunningGuests      []string `json:"expected_running_guests"`
 }) []APIFieldError {
 	configFields := proxmox.ValidateConfigFields(proxmox.Config{
 		BaseURL: body.BaseURL, DeploymentID: body.DeploymentID,
 		TokenID: body.TokenID, TokenSecret: body.TokenSecret, AllowInsecureHTTP: body.AllowInsecureHTTP,
-		ExpectedRefreshSeconds: body.ExpectedRefreshSeconds,
-		RequestTimeoutSeconds:  body.RequestTimeoutSeconds,
-		StorageWarningPercent:  body.StorageWarningPercent,
-		StorageCriticalPercent: body.StorageCriticalPercent,
-		SwapWarningPercent:     body.SwapWarningPercent,
-		SwapCriticalPercent:    body.SwapCriticalPercent,
-		IOWaitWarningPercent:   body.IOWaitWarningPercent,
-		IOWaitCriticalPercent:  body.IOWaitCriticalPercent,
-		ExpectedRunningGuests:  body.ExpectedRunningGuests,
+		TrustSelfSignedCertificate: body.TrustSelfSignedCertificate,
+		ExpectedRefreshSeconds:     body.ExpectedRefreshSeconds,
+		RequestTimeoutSeconds:      body.RequestTimeoutSeconds,
+		StorageWarningPercent:      body.StorageWarningPercent,
+		StorageCriticalPercent:     body.StorageCriticalPercent,
+		SwapWarningPercent:         body.SwapWarningPercent,
+		SwapCriticalPercent:        body.SwapCriticalPercent,
+		IOWaitWarningPercent:       body.IOWaitWarningPercent,
+		IOWaitCriticalPercent:      body.IOWaitCriticalPercent,
+		ExpectedRunningGuests:      body.ExpectedRunningGuests,
 	})
 	fields := make([]APIFieldError, 0, len(configFields))
 	for _, field := range configFields {

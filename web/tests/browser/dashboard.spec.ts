@@ -90,6 +90,30 @@ for (const viewport of [
   });
 }
 
+test('Add Proxmox cluster explains a failed certificate validation', async ({
+  page,
+}) => {
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+  await page.getByRole('button', { name: 'Add cluster' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Proxmox cluster' });
+  await dialog.getByLabel('Cluster name').fill('Production Proxmox');
+  await dialog.getByLabel('Deployment ID').fill('production-pve');
+  await dialog.getByLabel('Base URL').fill('https://proxmox.example:8006');
+  await dialog.getByLabel(/Approve this exact target/).check();
+  await dialog.getByLabel('Token ID').fill('espial@pve!monitoring');
+  await dialog.getByLabel('Token secret').fill('write-only-secret');
+  await dialog.getByRole('button', { name: 'Validate and add' }).click();
+
+  const alert = dialog.getByRole('alert');
+  await expect(alert).toContainText('Cluster validation failed.');
+  await expect(alert).toContainText('certificate is not trusted');
+  await expect(alert).toContainText(
+    'Trust this cluster’s self-signed certificate',
+  );
+  await expect(alert).toContainText('proxmox-request-1');
+});
+
 for (const viewport of [
   { name: 'large', width: 1440, height: 900 },
   { name: 'laptop', width: 1280, height: 800 },
@@ -279,6 +303,59 @@ test('all page families use structural cyan without eyebrow copy', async ({
     .evaluate((header) => getComputedStyle(header, '::after').backgroundColor);
   expect(dividerAccent).toBe('rgb(85, 214, 226)');
 });
+
+for (const viewport of [
+  { name: 'large', width: 1440, height: 900 },
+  { name: 'laptop', width: 1280, height: 800 },
+  { name: 'narrow', width: 500, height: 900 },
+]) {
+  test(`Add Proxmox cluster form remains usable at ${viewport.name} viewport`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/hypervisor');
+    await waitForHydration(page);
+    await page.getByRole('button', { name: 'Add cluster' }).click();
+
+    const dialog = page.getByRole('dialog', { name: 'Add Proxmox cluster' });
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole('checkbox', {
+        name: /Trust this cluster’s self-signed certificate/,
+      }),
+    ).toBeVisible();
+    await expect(dialog.getByText('Read-only API token')).toBeVisible();
+    await expect(
+      dialog.getByText('Warning and critical thresholds'),
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Validate and add' }),
+    ).toBeVisible();
+    expect(
+      await dialog.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth + 1,
+      ),
+    ).toBe(true);
+
+    const results = await new AxeBuilder({ page }).include('.modal').analyze();
+    expect(
+      results.violations.filter((violation) =>
+        ['serious', 'critical'].includes(violation.impact ?? ''),
+      ),
+    ).toEqual([]);
+    await page.screenshot({
+      path: testInfo.outputPath(`proxmox-form-${viewport.name}.png`),
+      fullPage: true,
+      animations: 'disabled',
+    });
+
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await expect(
+      page.getByRole('button', { name: 'Add cluster' }),
+    ).toBeFocused();
+  });
+}
 
 test('operator action returns a visible receipt and exactly one audit record', async ({
   page,

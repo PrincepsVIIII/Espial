@@ -2,6 +2,10 @@ package proxmox
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -9,17 +13,21 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 )
 
 const defaultBodyLimit = 2 * 1024 * 1024
 
 type Client struct {
-	baseURL     *url.URL
-	tokenID     string
-	tokenSecret string
-	httpClient  *http.Client
-	bodyLimit   int64
+	baseURL                   *url.URL
+	tokenID                   string
+	tokenSecret               string
+	httpClient                *http.Client
+	bodyLimit                 int64
+	expectedCertificateSHA256 string
+	certificateMu             sync.Mutex
+	observedCertificateSHA256 string
 }
 
 type ClientOptions struct {
@@ -41,6 +49,10 @@ func NewClient(config Config, options ClientOptions) (*Client, error) {
 	if !allowsTarget(baseURL, options.ApprovedHosts, options.AllowedPorts) {
 		return nil, errors.New("target_not_approved")
 	}
+	client := &Client{
+		baseURL: baseURL, tokenID: config.TokenID, tokenSecret: config.TokenSecret,
+		expectedCertificateSHA256: config.TrustedCertificateSHA256,
+	}
 	transport := &http.Transport{
 		Proxy: nil,
 		DialContext: (&net.Dialer{
@@ -50,6 +62,14 @@ func NewClient(config Config, options ClientOptions) (*Client, error) {
 		TLSHandshakeTimeout:   RequestTimeout(config),
 		ResponseHeaderTimeout: RequestTimeout(config),
 		ExpectContinueTimeout: time.Second,
+		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
+	}
+	if config.TrustSelfSignedCertificate {
+		transport.TLSClientConfig = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, // Verification is replaced by the exact certificate pin below.
+			VerifyConnection:   client.verifyPinnedCertificate,
+		}
 	}
 	httpClient := options.HTTPClient
 	if httpClient == nil {
@@ -65,10 +85,36 @@ func NewClient(config Config, options ClientOptions) (*Client, error) {
 	if bodyLimit <= 0 || bodyLimit > defaultBodyLimit {
 		bodyLimit = defaultBodyLimit
 	}
-	return &Client{
-		baseURL: baseURL, tokenID: config.TokenID, tokenSecret: config.TokenSecret,
-		httpClient: httpClient, bodyLimit: bodyLimit,
-	}, nil
+	client.httpClient = httpClient
+	client.bodyLimit = bodyLimit
+	return client, nil
+}
+
+func (client *Client) verifyPinnedCertificate(state tls.ConnectionState) error {
+	if len(state.PeerCertificates) == 0 {
+		return errors.New("tls_certificate_missing")
+	}
+	digest := sha256.Sum256(state.PeerCertificates[0].Raw)
+	fingerprint := hex.EncodeToString(digest[:])
+	client.certificateMu.Lock()
+	defer client.certificateMu.Unlock()
+	expected := client.expectedCertificateSHA256
+	if expected == "" {
+		expected = client.observedCertificateSHA256
+	}
+	if expected != "" && fingerprint != expected {
+		return errors.New("tls_certificate_changed")
+	}
+	client.observedCertificateSHA256 = fingerprint
+	return nil
+}
+
+// CertificateFingerprint returns the SHA-256 pin observed while validating an
+// explicitly trusted self-signed target. It never returns certificate contents.
+func (client *Client) CertificateFingerprint() string {
+	client.certificateMu.Lock()
+	defer client.certificateMu.Unlock()
+	return client.observedCertificateSHA256
 }
 
 func allowsTarget(target *url.URL, hosts []string, ports []int) bool {
@@ -137,10 +183,7 @@ func getJSON[T any](ctx context.Context, client *Client, path string) (T, error)
 	request.Header.Set("Authorization", "PVEAPIToken="+client.tokenID+"="+client.tokenSecret)
 	response, err := client.httpClient.Do(request)
 	if err != nil {
-		if ctx.Err() != nil {
-			return zero, errors.New("timeout")
-		}
-		return zero, errors.New("temporary_upstream_failure")
+		return zero, classifyTransportError(ctx, err)
 	}
 	defer response.Body.Close()
 	if response.StatusCode == http.StatusUnauthorized {
@@ -152,8 +195,14 @@ func getJSON[T any](ctx context.Context, client *Client, path string) (T, error)
 	if response.StatusCode == http.StatusTooManyRequests {
 		return zero, errors.New("throttled")
 	}
+	if response.StatusCode == http.StatusNotFound {
+		return zero, errors.New("proxmox_api_not_found")
+	}
+	if response.StatusCode >= 500 {
+		return zero, errors.New("temporary_upstream_failure")
+	}
 	if response.StatusCode < 200 || response.StatusCode > 299 {
-		return zero, fmt.Errorf("upstream_status_%d", response.StatusCode)
+		return zero, errors.New("upstream_request_rejected")
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, client.bodyLimit+1))
 	if err != nil {
@@ -163,4 +212,54 @@ func getJSON[T any](ctx context.Context, client *Client, path string) (T, error)
 		return zero, errors.New("oversized_response")
 	}
 	return decodeData[T](body)
+}
+
+func classifyTransportError(ctx context.Context, err error) error {
+	if ctx.Err() != nil || errors.Is(err, context.DeadlineExceeded) {
+		return errors.New("timeout")
+	}
+	if hasErrorCode(err, "tls_certificate_changed") || hasErrorCode(err, "tls_certificate_missing") {
+		if hasErrorCode(err, "tls_certificate_changed") {
+			return errors.New("tls_certificate_changed")
+		}
+		return errors.New("tls_certificate_missing")
+	}
+	var unknownAuthority x509.UnknownAuthorityError
+	if errors.As(err, &unknownAuthority) {
+		return errors.New("tls_certificate_untrusted")
+	}
+	var hostnameError x509.HostnameError
+	if errors.As(err, &hostnameError) {
+		return errors.New("tls_hostname_mismatch")
+	}
+	var certificateError x509.CertificateInvalidError
+	if errors.As(err, &certificateError) {
+		return errors.New("tls_certificate_invalid")
+	}
+	var recordError tls.RecordHeaderError
+	if errors.As(err, &recordError) {
+		return errors.New("tls_handshake_failed")
+	}
+	var dnsError *net.DNSError
+	if errors.As(err, &dnsError) {
+		return errors.New("dns_failed")
+	}
+	var networkError net.Error
+	if errors.As(err, &networkError) && networkError.Timeout() {
+		return errors.New("timeout")
+	}
+	var operationError *net.OpError
+	if errors.As(err, &operationError) {
+		return errors.New("connection_failed")
+	}
+	return errors.New("temporary_upstream_failure")
+}
+
+func hasErrorCode(err error, code string) bool {
+	for current := err; current != nil; current = errors.Unwrap(current) {
+		if current.Error() == code {
+			return true
+		}
+	}
+	return false
 }

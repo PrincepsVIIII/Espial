@@ -28,6 +28,7 @@ const requiredOperations = new Map([
   ["/integrations", ["get", "post"]],
   ["/integrations/{id}", ["get"]],
   ["/integrations/{id}/configuration", ["put"]],
+  ["/hypervisor/proxmox/clusters", ["get", "post"]],
   ["/audit", ["get"]],
   ["/incidents", ["get"]],
   ["/incidents/{id}", ["get"]],

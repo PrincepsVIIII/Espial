@@ -1,10 +1,15 @@
 <script lang="ts">
   import { invalidate } from '$app/navigation';
+  import { tick } from 'svelte';
   import { readCookie } from '$lib/auth';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
   import type { DisplayState } from '$lib/dashboard';
   import { ApiFailure, problemFrom, requestJSON } from '$lib/api/client';
+  import {
+    clusterFormFeedback,
+    type ClusterFormFeedback,
+  } from '$lib/proxmox-form';
   import type {
     AdministrativeMutationReceipt,
     ProxmoxClusterCreateRequest,
@@ -13,17 +18,31 @@
   let { data } = $props();
   let modalOpen = $state(false);
   let saving = $state(false);
-  let formProblem = $state('');
+  let formProblem = $state<ClusterFormFeedback | null>(null);
   let receipt = $state<AdministrativeMutationReceipt | null>(null);
+  let addClusterButton = $state<HTMLButtonElement>();
+  let firstClusterInput = $state<HTMLInputElement>();
+  let clusterDialog = $state<HTMLDivElement>();
 
   async function createCluster(event: SubmitEvent) {
     event.preventDefault();
     const form = new FormData(event.currentTarget as HTMLFormElement);
+    if (form.get('approve_target') !== 'on') {
+      formProblem = {
+        title: 'Target approval is required.',
+        details: [
+          'Approve this exact host and port before Espial attempts a connection.',
+        ],
+      };
+      return;
+    }
     const body: ProxmoxClusterCreateRequest = {
       display_name: text(form, 'display_name'),
       base_url: text(form, 'base_url'),
       approve_target: true,
       allow_insecure_http: form.get('allow_insecure_http') === 'on',
+      trust_self_signed_certificate:
+        form.get('trust_self_signed_certificate') === 'on',
       deployment_id: text(form, 'deployment_id'),
       token_id: text(form, 'token_id'),
       token_secret: text(form, 'token_secret'),
@@ -50,7 +69,7 @@
         .filter(Boolean),
     };
     saving = true;
-    formProblem = '';
+    formProblem = null;
     receipt = null;
     try {
       receipt = await requestJSON<AdministrativeMutationReceipt>(
@@ -70,23 +89,10 @@
     } catch (error) {
       const problem =
         error instanceof ApiFailure ? error.problem : problemFrom(error);
-      formProblem = formatProblem(problem);
+      formProblem = clusterFormFeedback(problem);
     } finally {
       saving = false;
     }
-  }
-
-  function formatProblem(problem: ReturnType<typeof problemFrom>): string {
-    const fields = problem.fields
-      ?.map((field) => `${field.field}: ${field.code}`)
-      .join(', ');
-    return [
-      problem.message,
-      fields ? `Fields: ${fields}` : '',
-      problem.request_id ? `Request ID: ${problem.request_id}` : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
   }
 
   function text(form: FormData, key: string): string {
@@ -164,9 +170,51 @@
   }
 
   function closeBackdrop(event: MouseEvent) {
-    if (event.target === event.currentTarget) modalOpen = false;
+    if (event.target === event.currentTarget) closeModal();
+  }
+
+  async function openModal() {
+    formProblem = null;
+    modalOpen = true;
+    await tick();
+    firstClusterInput?.focus();
+  }
+
+  async function closeModal() {
+    if (saving) return;
+    modalOpen = false;
+    await tick();
+    addClusterButton?.focus();
+  }
+
+  function handleWindowKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && modalOpen) {
+      event.preventDefault();
+      closeModal();
+    }
+  }
+
+  function trapDialogFocus(event: KeyboardEvent) {
+    if (event.key !== 'Tab') return;
+    const controls = Array.from(
+      clusterDialog?.querySelectorAll<HTMLElement>(
+        'button:not(:disabled), input:not(:disabled)',
+      ) ?? [],
+    );
+    if (controls.length === 0) return;
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
   }
 </script>
+
+<svelte:window onkeydown={handleWindowKeydown} />
 
 <svelte:head><title>Hypervisor - Espial</title></svelte:head>
 
@@ -177,11 +225,12 @@
   </div>
   {#if data.canManage}
     <button
+      bind:this={addClusterButton}
       type="button"
       class="primary-action"
-      onclick={() => (modalOpen = true)}
+      onclick={openModal}
     >
-      + Add Cluster
+      Add cluster
     </button>
   {/if}
 </header>
@@ -378,158 +427,256 @@
 {#if modalOpen}
   <div class="modal-backdrop" role="presentation" onclick={closeBackdrop}>
     <div
+      bind:this={clusterDialog}
       class="modal"
       role="dialog"
+      tabindex="-1"
       aria-modal="true"
       aria-labelledby="add-cluster-title"
+      onkeydown={trapDialogFocus}
     >
       <div class="modal-heading">
-        <h2 id="add-cluster-title">Add Proxmox cluster</h2>
+        <div>
+          <h2 id="add-cluster-title">Add Proxmox cluster</h2>
+          <p id="add-cluster-description">
+            Espial validates the read-only connection before saving it. The
+            token secret is written to the configured secret store and is not
+            returned.
+          </p>
+        </div>
         <button
           type="button"
           class="icon-button"
           aria-label="Close"
-          onclick={() => (modalOpen = false)}>x</button
+          onclick={closeModal}>Close</button
         >
       </div>
-      <form class="cluster-form" onsubmit={createCluster}>
-        <label
-          >Cluster name <input
-            name="display_name"
-            required
-            maxlength="128"
-          /></label
-        >
-        <label
-          >Base URL <input
-            name="base_url"
-            required
-            placeholder="https://proxmox.example:8006"
-          /></label
-        >
-        <label class="check-row">
-          <input name="approve_target" type="checkbox" required />
-          <span>Approve this Proxmox target for read-only collection</span>
-        </label>
-        <label class="check-row">
-          <input name="allow_insecure_http" type="checkbox" />
-          <span>Allow insecure HTTP for clusters without certificates</span>
-        </label>
-        <label
-          >Deployment ID <input
-            name="deployment_id"
-            required
-            pattern="[a-z][a-z0-9-]+"
-            minlength="2"
-            maxlength="63"
-          /></label
-        >
-        <label>Token ID <input name="token_id" required /></label>
-        <label
-          >Token secret <input
-            name="token_secret"
-            type="password"
-            required
-            autocomplete="new-password"
-          /></label
-        >
-        <label
-          >Collection interval <input
-            name="interval_seconds"
-            type="number"
-            min="1"
-            max="86400"
-            value="300"
-          /></label
-        >
-        <label
-          >Expected freshness <input
-            name="expected_refresh_seconds"
-            type="number"
-            min="1"
-            max="86400"
-            value="300"
-          /></label
-        >
-        <label
-          >Request timeout <input
-            name="request_timeout_seconds"
-            type="number"
-            min="1"
-            max="60"
-            value="10"
-          /></label
-        >
-        <div class="threshold-grid">
-          <label
-            >Storage warning <input
-              name="storage_warning_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="80"
-            /></label
-          >
-          <label
-            >Storage critical <input
-              name="storage_critical_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="90"
-            /></label
-          >
-          <label
-            >Swap warning <input
-              name="swap_warning_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="10"
-            /></label
-          >
-          <label
-            >Swap critical <input
-              name="swap_critical_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="25"
-            /></label
-          >
-          <label
-            >IO wait warning <input
-              name="io_wait_warning_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="5"
-            /></label
-          >
-          <label
-            >IO wait critical <input
-              name="io_wait_critical_percent"
-              type="number"
-              min="0"
-              max="100"
-              value="15"
-            /></label
-          >
-        </div>
-        <label
-          >Expected-running guests <input
-            name="expected_running_guests"
-            placeholder="qemu:100,lxc:200"
-          /></label
-        >
+      <form
+        class="cluster-form"
+        aria-describedby="add-cluster-description"
+        aria-busy={saving}
+        onsubmit={createCluster}
+      >
+        <fieldset>
+          <legend>Connection</legend>
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Cluster name</span>
+              <input
+                bind:this={firstClusterInput}
+                name="display_name"
+                required
+                maxlength="128"
+              />
+              <small>The operator-facing name shown in Hypervisor.</small>
+            </label>
+            <label class="form-field">
+              <span>Deployment ID</span>
+              <input
+                name="deployment_id"
+                required
+                pattern="[a-z][a-z0-9-]+"
+                minlength="2"
+                maxlength="63"
+                placeholder="production-pve"
+              />
+              <small
+                >Stable lowercase identity; this cannot be a display name.</small
+              >
+            </label>
+            <label class="form-field form-field-wide">
+              <span>Base URL</span>
+              <input
+                name="base_url"
+                type="url"
+                required
+                placeholder="https://proxmox.example:8006"
+              />
+              <small
+                >Origin only. Do not include an API path, query, or credentials.</small
+              >
+            </label>
+          </div>
+          <div class="security-options">
+            <label class="check-row">
+              <input name="approve_target" type="checkbox" required />
+              <span>
+                <strong>Approve this exact target</strong>
+                <small
+                  >Allow read-only collection from the host and port above.</small
+                >
+              </span>
+            </label>
+            <label class="check-row">
+              <input name="trust_self_signed_certificate" type="checkbox" />
+              <span>
+                <strong>Trust this cluster’s self-signed certificate</strong>
+                <small
+                  >Espial pins the certificate presented during setup and
+                  rejects a later certificate change.</small
+                >
+              </span>
+            </label>
+            <label class="check-row check-row-warning">
+              <input name="allow_insecure_http" type="checkbox" />
+              <span>
+                <strong>Allow insecure HTTP</strong>
+                <small
+                  >The API token will travel without TLS. Use only for a
+                  temporary, isolated cluster.</small
+                >
+              </span>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Read-only API token</legend>
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Token ID</span>
+              <input
+                name="token_id"
+                required
+                placeholder="espial@pve!monitoring"
+                autocomplete="username"
+              />
+              <small>Include the user, realm, and token name.</small>
+            </label>
+            <label class="form-field">
+              <span>Token secret</span>
+              <input
+                name="token_secret"
+                type="password"
+                required
+                autocomplete="new-password"
+              />
+              <small>Accepted once and stored by secret reference.</small>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Collection</legend>
+          <div class="form-grid form-grid-three">
+            <label class="form-field">
+              <span>Collection interval</span>
+              <div class="input-unit">
+                <input
+                  name="interval_seconds"
+                  type="number"
+                  min="1"
+                  max="86400"
+                  value="300"
+                />
+                <span>seconds</span>
+              </div>
+            </label>
+            <label class="form-field">
+              <span>Expected freshness</span>
+              <div class="input-unit">
+                <input
+                  name="expected_refresh_seconds"
+                  type="number"
+                  min="1"
+                  max="86400"
+                  value="300"
+                />
+                <span>seconds</span>
+              </div>
+            </label>
+            <label class="form-field">
+              <span>Request timeout</span>
+              <div class="input-unit">
+                <input
+                  name="request_timeout_seconds"
+                  type="number"
+                  min="1"
+                  max="60"
+                  value="10"
+                />
+                <span>seconds</span>
+              </div>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Warning and critical thresholds</legend>
+          <p class="fieldset-description">
+            Warning must be lower than critical for each percentage.
+          </p>
+          <div class="threshold-table">
+            <span class="threshold-heading">Signal</span>
+            <span class="threshold-heading">Warning</span>
+            <span class="threshold-heading">Critical</span>
+            {#each [['Storage used', 'storage', 80, 90], ['Swap used', 'swap', 10, 25], ['IO wait', 'io_wait', 5, 15]] as threshold}
+              <span class="threshold-label">{threshold[0]}</span>
+              <label>
+                <span class="visually-hidden"
+                  >{threshold[0]} warning percent</span
+                >
+                <div class="input-unit compact">
+                  <input
+                    name={`${threshold[1]}_warning_percent`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={threshold[2]}
+                  />
+                  <span>%</span>
+                </div>
+              </label>
+              <label>
+                <span class="visually-hidden"
+                  >{threshold[0]} critical percent</span
+                >
+                <div class="input-unit compact">
+                  <input
+                    name={`${threshold[1]}_critical_percent`}
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={threshold[3]}
+                  />
+                  <span>%</span>
+                </div>
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Guest expectations</legend>
+          <label class="form-field">
+            <span>Expected-running guests <small>Optional</small></span>
+            <input
+              name="expected_running_guests"
+              placeholder="qemu:100, lxc:200"
+            />
+            <small
+              >Comma-separated qemu:&lt;id&gt; or lxc:&lt;id&gt; values. Stopped
+              guests in this list become critical.</small
+            >
+          </label>
+        </fieldset>
+
         {#if formProblem}
-          <p class="form-problem" role="alert">{formProblem}</p>
+          <section class="form-problem" role="alert" aria-live="assertive">
+            <strong>{formProblem.title}</strong>
+            <ul>
+              {#each formProblem.details as detail}
+                <li>{detail}</li>
+              {/each}
+            </ul>
+            {#if formProblem.requestID}
+              <small>Request ID: <code>{formProblem.requestID}</code></small>
+            {/if}
+          </section>
         {/if}
         <div class="modal-actions">
-          <button
-            type="button"
-            class="secondary-action"
-            onclick={() => (modalOpen = false)}>Cancel</button
+          <button type="button" class="secondary-action" onclick={closeModal}
+            >Cancel</button
           >
           <button type="submit" disabled={saving}
             >{saving ? 'Validating...' : 'Validate and add'}</button
@@ -548,9 +695,9 @@
 
   .primary-action,
   .cluster-form button[type='submit'] {
-    border: 1px solid var(--color-accent, #00a9c9);
-    background: var(--color-accent, #00a9c9);
-    color: #031317;
+    border: 1px solid var(--netdef-cyan);
+    background: var(--netdef-cyan);
+    color: var(--canvas);
     font-weight: 700;
     padding: 0.65rem 0.9rem;
   }
@@ -576,7 +723,7 @@
   }
 
   .cluster-panel:focus {
-    outline: 2px solid var(--color-accent, #00a9c9);
+    outline: 2px solid var(--netdef-cyan);
     outline-offset: 3px;
   }
 
@@ -735,74 +882,262 @@
     inset: 0;
     display: grid;
     place-items: center;
-    background: rgba(0, 0, 0, 0.62);
+    background: rgba(0, 0, 0, 0.72);
+    padding: 1rem;
     z-index: 50;
   }
 
   .modal {
-    width: min(680px, calc(100vw - 2rem));
-    max-height: calc(100vh - 2rem);
+    width: min(800px, 100%);
+    max-height: calc(100dvh - 2rem);
     overflow: auto;
-    background: #101b24;
-    border: 1px solid rgba(151, 176, 190, 0.42);
-    padding: 1rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
   }
 
-  .modal-heading,
-  .modal-actions {
+  .modal-heading {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     justify-content: space-between;
-    gap: 0.75rem;
-    align-items: center;
+    gap: 1.5rem;
+    align-items: flex-start;
+    padding: 1.25rem 1.5rem 1rem;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-heading h2 {
+    margin-bottom: 0.35rem;
+  }
+
+  .modal-heading p {
+    max-width: 62ch;
+    margin: 0;
+    color: var(--text-muted);
+    line-height: 1.5;
   }
 
   .icon-button,
   .secondary-action {
     background: transparent;
     color: inherit;
-    border: 1px solid rgba(151, 176, 190, 0.42);
-    padding: 0.45rem 0.7rem;
-  }
-
-  .cluster-form,
-  .cluster-form label {
-    display: grid;
-    gap: 0.4rem;
+    border: 1px solid var(--border-strong);
+    padding: 0.55rem 0.75rem;
   }
 
   .cluster-form {
-    gap: 0.75rem;
+    display: grid;
+    gap: 0;
+  }
+
+  .cluster-form fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 1.25rem 1.5rem;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cluster-form legend {
+    padding: 0;
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .fieldset-description {
+    margin: 0.4rem 0 0.9rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 0.85rem;
+  }
+
+  .form-grid-three {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .form-field {
+    display: grid;
+    gap: 0.4rem;
+    min-width: 0;
+    font-weight: 650;
+  }
+
+  .form-field-wide {
+    grid-column: 1 / -1;
+  }
+
+  .form-field > small,
+  .form-field > span small,
+  .check-row small {
+    color: var(--text-muted);
+    font-weight: 400;
+    line-height: 1.4;
   }
 
   .cluster-form input {
     min-width: 0;
-    background: #071016;
-    border: 1px solid rgba(151, 176, 190, 0.36);
+    min-height: 2.65rem;
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
     color: inherit;
-    padding: 0.55rem;
+    padding: 0.65rem 0.7rem;
+  }
+
+  .cluster-form input::placeholder {
+    color: #8295a5;
+  }
+
+  .security-options {
+    display: grid;
+    gap: 0.65rem;
+    margin-top: 1rem;
   }
 
   .cluster-form .check-row {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .cluster-form .check-row-warning {
+    border-left: 3px solid var(--warning);
+  }
+
+  .check-row > span {
+    display: grid;
+    gap: 0.2rem;
   }
 
   .cluster-form .check-row input {
-    min-width: 1rem;
-    width: 1rem;
-    height: 1rem;
+    min-width: 1.15rem;
+    min-height: 1.15rem;
+    width: 1.15rem;
+    height: 1.15rem;
+    margin: 0.15rem 0 0;
     padding: 0;
+    accent-color: var(--netdef-cyan);
   }
 
-  .threshold-grid {
+  .input-unit {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    background: var(--surface-1);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+  }
+
+  .input-unit:focus-within {
+    outline: 3px solid var(--netdef-cyan);
+    outline-offset: 2px;
+  }
+
+  .input-unit input {
+    width: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .input-unit input:focus-visible {
+    outline: 0;
+  }
+
+  .input-unit > span {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
+    place-items: center;
+    padding: 0 0.65rem;
+    color: var(--text-muted);
+    border-left: 1px solid var(--border);
+    font-size: 0.86rem;
+  }
+
+  .threshold-table {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) repeat(2, minmax(7rem, 0.65fr));
+    gap: 0.55rem 0.75rem;
+    align-items: center;
+  }
+
+  .threshold-heading {
+    padding-bottom: 0.3rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .threshold-label {
+    font-weight: 650;
+  }
+
+  .input-unit.compact input {
+    min-height: 2.35rem;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
   .form-problem {
-    color: #ffd3ce;
+    margin: 1rem 1.5rem 0;
+    padding: 0.9rem 1rem;
+    color: var(--critical);
+    background: var(--critical-surface);
+    border: 1px solid #6c3034;
+    border-left: 3px solid var(--critical);
+  }
+
+  .form-problem ul {
+    margin: 0.5rem 0;
+    padding-left: 1.2rem;
+    color: var(--text);
+  }
+
+  .form-problem code {
+    color: var(--text);
+  }
+
+  .modal-actions {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background: var(--surface-2);
+    border-top: 1px solid var(--border);
+  }
+
+  .cluster-form button:disabled {
+    cursor: wait;
+    opacity: 0.65;
   }
 
   @keyframes pulse-node {
@@ -829,8 +1164,52 @@
 
   @media (max-width: 680px) {
     .cluster-columns,
-    .threshold-grid {
+    .form-grid,
+    .form-grid-three {
       grid-template-columns: 1fr;
+    }
+
+    .modal-backdrop {
+      place-items: stretch;
+      padding: 0;
+    }
+
+    .modal {
+      width: 100%;
+      max-height: 100dvh;
+      border: 0;
+      border-radius: 0;
+    }
+
+    .modal-heading,
+    .cluster-form fieldset,
+    .modal-actions {
+      padding-inline: 1rem;
+    }
+
+    .modal-heading {
+      gap: 0.75rem;
+    }
+
+    .modal-heading p {
+      font-size: 0.92rem;
+    }
+
+    .form-field-wide {
+      grid-column: auto;
+    }
+
+    .threshold-table {
+      grid-template-columns: minmax(7rem, 1fr) repeat(2, minmax(5rem, 0.7fr));
+      gap: 0.5rem;
+    }
+
+    .threshold-heading {
+      font-size: 0.72rem;
+    }
+
+    .form-problem {
+      margin-inline: 1rem;
     }
 
     .cluster-list-column,

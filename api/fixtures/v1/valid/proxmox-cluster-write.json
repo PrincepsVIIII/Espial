@@ -1,0 +1,23 @@
+{
+  "schema": "proxmox-cluster-write",
+  "data": {
+    "display_name": "Lab Proxmox",
+    "base_url": "https://proxmox.example:8006",
+    "approve_target": true,
+    "allow_insecure_http": false,
+    "trust_self_signed_certificate": true,
+    "deployment_id": "lab-proxmox",
+    "token_id": "espial@pve!monitoring",
+    "token_secret": "write-only-secret",
+    "interval_seconds": 300,
+    "expected_refresh_seconds": 300,
+    "request_timeout_seconds": 10,
+    "storage_warning_percent": 80,
+    "storage_critical_percent": 90,
+    "swap_warning_percent": 10,
+    "swap_critical_percent": 25,
+    "io_wait_warning_percent": 5,
+    "io_wait_critical_percent": 15,
+    "expected_running_guests": ["qemu:100", "lxc:200"]
+  }
+}

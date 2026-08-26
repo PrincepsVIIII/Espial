@@ -20,22 +20,24 @@ func Manifest() adapters.Manifest {
 		ConfigSchema: map[string]any{"type": "object", "additionalProperties": false,
 			"required": []string{"base_url", "deployment_id", "token_id", "token_secret"},
 			"properties": map[string]any{
-				"base_url":                 map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
-				"allow_insecure_http":      map[string]any{"type": "boolean"},
-				"approved_host":            map[string]any{"type": "string", "minLength": 1, "maxLength": 253},
-				"approved_port":            map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},
-				"deployment_id":            map[string]any{"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
-				"token_id":                 map[string]any{"type": "string", "minLength": 3, "maxLength": 160},
-				"token_secret":             map[string]any{"type": "string", "maxLength": 4096},
-				"expected_refresh_seconds": map[string]any{"type": "integer", "minimum": 1, "maximum": 86400},
-				"request_timeout_seconds":  map[string]any{"type": "integer", "minimum": 1, "maximum": 60},
-				"expected_running_guests":  map[string]any{"type": "array", "maxItems": 10000, "uniqueItems": true, "items": map[string]any{"type": "string", "pattern": "^(qemu|lxc):[0-9]{1,10}$"}},
-				"storage_warning_percent":  percentSchema(),
-				"storage_critical_percent": percentSchema(),
-				"swap_warning_percent":     percentSchema(),
-				"swap_critical_percent":    percentSchema(),
-				"io_wait_warning_percent":  percentSchema(),
-				"io_wait_critical_percent": percentSchema(),
+				"base_url":                      map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
+				"allow_insecure_http":           map[string]any{"type": "boolean"},
+				"trust_self_signed_certificate": map[string]any{"type": "boolean"},
+				"trusted_certificate_sha256":    map[string]any{"type": "string", "pattern": "^[0-9a-f]{64}$"},
+				"approved_host":                 map[string]any{"type": "string", "minLength": 1, "maxLength": 253},
+				"approved_port":                 map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},
+				"deployment_id":                 map[string]any{"type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$"},
+				"token_id":                      map[string]any{"type": "string", "minLength": 3, "maxLength": 160},
+				"token_secret":                  map[string]any{"type": "string", "maxLength": 4096},
+				"expected_refresh_seconds":      map[string]any{"type": "integer", "minimum": 1, "maximum": 86400},
+				"request_timeout_seconds":       map[string]any{"type": "integer", "minimum": 1, "maximum": 60},
+				"expected_running_guests":       map[string]any{"type": "array", "maxItems": 10000, "uniqueItems": true, "items": map[string]any{"type": "string", "pattern": "^(qemu|lxc):[0-9]{1,10}$"}},
+				"storage_warning_percent":       percentSchema(),
+				"storage_critical_percent":      percentSchema(),
+				"swap_warning_percent":          percentSchema(),
+				"swap_critical_percent":         percentSchema(),
+				"io_wait_warning_percent":       percentSchema(),
+				"io_wait_critical_percent":      percentSchema(),
 			}},
 	}
 }
@@ -174,7 +176,9 @@ func safeErrorCode(err error) string {
 	switch err.Error() {
 	case "invalid proxmox config":
 		return "invalid_config"
-	case "unauthorized", "forbidden", "throttled", "timeout", "temporary_upstream_failure", "malformed_data", "oversized_response", "target_not_approved":
+	case "unauthorized", "forbidden", "throttled", "timeout", "temporary_upstream_failure", "malformed_data", "oversized_response", "target_not_approved",
+		"tls_certificate_untrusted", "tls_hostname_mismatch", "tls_certificate_invalid", "tls_certificate_changed", "tls_certificate_missing", "tls_handshake_failed", "dns_failed", "connection_failed",
+		"proxmox_api_not_found", "upstream_request_rejected":
 		return err.Error()
 	default:
 		return "proxmox_collection_failed"

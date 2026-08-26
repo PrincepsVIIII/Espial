@@ -580,6 +580,7 @@ export interface ProxmoxClusterCreateRequest {
   base_url: string;
   approve_target: true;
   allow_insecure_http: boolean;
+  trust_self_signed_certificate: boolean;
   deployment_id: string;
   token_id: string;
   token_secret: string;

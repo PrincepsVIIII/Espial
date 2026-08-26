@@ -64,7 +64,7 @@ password, token secret, private key, or unsanitized internal address:
 | Scale | QEMU VM, LXC container, and storage counts at representative and expected maximum size |
 | Optional subsystems | Whether Proxmox HA and Ceph are used and whether they are in the first adapter scope |
 | API entry point | Approved HTTPS hostname/port and whether one endpoint or bounded failover is required |
-| TLS trust | Public CA or named deployment-managed private trust bundle; verification may not be disabled |
+| TLS trust | Public CA, named deployment-managed private trust bundle, or an explicitly approved self-signed endpoint certificate pinned by SHA-256 |
 | Identity | Stable configured deployment ID plus observed node, VMID, container ID, and storage identity behavior |
 | Credentials | Dedicated user/token owner, privilege-separated token, ACL paths, expiry/rotation owner, and secret-reference mechanism |
 | Collection policy | Interval, deadlines, response limits, and representative/oversized payload sizes |
@@ -128,6 +128,13 @@ insecure HTTP, and that setting means the Proxmox API token is sent without TLS
 protection until the cluster has a certificate. A deployment-level
 `ESPIAL_PROXMOX_APPROVED_HOSTS` list may further restrict targets, but normal
 cluster onboarding does not require manually editing that environment variable.
+For HTTPS endpoints with a self-signed certificate, the administrator may
+explicitly trust the certificate presented by the approved host and port. Core
+validates the cluster before saving it, records only the certificate's SHA-256
+fingerprint, and later adapter connections reject any different certificate. This
+is certificate pinning, not an ongoing accept-any-certificate mode. A certificate
+replacement is rejected and requires operator intervention; a certificate-rotation
+workflow is not yet exposed in the current UI.
 The adapter must never persist or log the combined authorization header, token
 secret, raw credential error, or resolved secret value.
 
@@ -229,6 +236,8 @@ A bounded first configuration can include:
 ```text
 base_url
 allow_insecure_http          # explicit operator approval for temporary HTTP-only clusters
+trust_self_signed_certificate # explicitly pin the HTTPS certificate presented during setup
+trusted_certificate_sha256   # Core-derived pin; never accepted from the Add Cluster request
 approved_host                 # derived from the explicitly approved Add Cluster URL
 approved_port                 # derived from the explicitly approved Add Cluster URL
 deployment_id
@@ -270,7 +279,8 @@ disabled.
 
 The Proxmox client must enforce:
 
-- HTTPS with normal hostname and chain verification;
+- HTTPS with normal hostname and chain verification, or exact SHA-256 leaf
+  certificate verification after explicit self-signed-certificate approval;
 - exact approved host, resolved address, and port policy;
 - no redirects and no ambient proxy environment;
 - explicit connect, TLS, response-header, and whole-request deadlines bounded by
@@ -282,8 +292,11 @@ The Proxmox client must enforce:
   temporary upstream failure, malformed data, and oversized response; and
 - deterministic behavior for missing resources and partial source responses.
 
-Do not disable TLS verification for a self-signed Proxmox certificate. Mount and
-approve the Proxmox cluster CA or another deployment-managed trust bundle instead.
+Prefer mounting and approving the Proxmox cluster CA or another deployment-managed
+trust bundle. When that is not available, the typed Add Cluster flow may establish
+an exact certificate pin after explicit administrator approval. The adapter must
+never persist a generic skip-verification setting, accept a different certificate,
+or apply this exception to an unapproved target.
 
 ## 11. Fixtures and verification
 

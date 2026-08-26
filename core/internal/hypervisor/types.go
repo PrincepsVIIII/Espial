@@ -4,27 +4,28 @@ package hypervisor
 import "time"
 
 type ProxmoxClusterDefinition struct {
-	DisplayName            string
-	BaseURL                string
-	ApproveTarget          bool
-	AllowInsecureHTTP      bool
-	DeploymentID           string
-	TokenID                string
-	TokenSecret            string
-	IntervalSeconds        int
-	ExpectedRefreshSeconds int
-	RequestTimeoutSeconds  int
-	StorageWarningPercent  float64
-	StorageCriticalPercent float64
-	SwapWarningPercent     float64
-	SwapCriticalPercent    float64
-	IOWaitWarningPercent   float64
-	IOWaitCriticalPercent  float64
-	ExpectedRunningGuests  []string
-	ActorUserID            string
-	SourceAddress          string
-	CorrelationID          string
-	CanReadAudit           bool
+	DisplayName                string
+	BaseURL                    string
+	ApproveTarget              bool
+	AllowInsecureHTTP          bool
+	TrustSelfSignedCertificate bool
+	DeploymentID               string
+	TokenID                    string
+	TokenSecret                string
+	IntervalSeconds            int
+	ExpectedRefreshSeconds     int
+	RequestTimeoutSeconds      int
+	StorageWarningPercent      float64
+	StorageCriticalPercent     float64
+	SwapWarningPercent         float64
+	SwapCriticalPercent        float64
+	IOWaitWarningPercent       float64
+	IOWaitCriticalPercent      float64
+	ExpectedRunningGuests      []string
+	ActorUserID                string
+	SourceAddress              string
+	CorrelationID              string
+	CanReadAudit               bool
 }
 
 type ClusterList struct {

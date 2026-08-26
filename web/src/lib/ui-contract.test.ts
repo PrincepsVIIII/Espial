@@ -264,9 +264,13 @@ describe('primary route skeletons', () => {
 
   it('exposes Proxmox-backed Hypervisor clusters without production placeholder data', () => {
     expect(hypervisorPage).toContain('<h1>Hypervisor</h1>');
-    expect(hypervisorPage).toContain('+ Add Cluster');
+    expect(hypervisorPage).toContain('Add cluster');
     expect(hypervisorPage).toContain('No Proxmox clusters are configured.');
     expect(hypervisorPage).toContain('Development fixture.');
+    expect(hypervisorPage).toContain(
+      'Trust this cluster’s self-signed certificate',
+    );
+    expect(hypervisorPage).toContain('Espial pins the certificate');
     expect(hypervisorPage).not.toContain('UnavailableSection');
   });
 

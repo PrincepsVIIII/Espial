@@ -9,6 +9,7 @@
     "base_url",
     "approve_target",
     "allow_insecure_http",
+    "trust_self_signed_certificate",
     "deployment_id",
     "token_id",
     "token_secret",
@@ -28,6 +29,7 @@
     "base_url": { "type": "string", "format": "uri", "maxLength": 2048 },
     "approve_target": { "type": "boolean", "const": true },
     "allow_insecure_http": { "type": "boolean" },
+    "trust_self_signed_certificate": { "type": "boolean" },
     "deployment_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,62}$"
