@@ -12,6 +12,13 @@ explicit visible state label with their semantic outline, so exceptions remain
 scannable without relying on color alone. Browser coverage now verifies that normal
 nodes do not render `Healthy` while warnings remain visibly labeled.
 
+The next refinement removes the repeated `Observed` timestamp from the cluster/load
+surface. A node's semantic ring now carries its overall health; exception states
+retain visible labels. Selected nodes expand in place rather than receiving a cyan
+ring, and a click in unoccupied load-field space clears the selected detail. The
+running-guest count is labeled `idle VMs`; a user-session-active count remains
+unavailable until a source contract and fixtures establish it authoritatively.
+
 ## 2026-07-30 — Pre-Slice 1.3 foundation review
 
 ### Scope

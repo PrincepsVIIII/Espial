@@ -6,7 +6,6 @@
   import ResourceBar from '$lib/components/ResourceBar.svelte';
   import SemicircleGauge from '$lib/components/SemicircleGauge.svelte';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
-  import Timestamp from '$lib/components/Timestamp.svelte';
   import { ApiFailure, problemFrom, requestJSON } from '$lib/api/client';
   import {
     displayState,
@@ -219,17 +218,10 @@
     {#each data.clusters.items as cluster (cluster.id)}
       <article class="cluster-panel" aria-labelledby={`cluster-${cluster.id}`}>
         <header class="cluster-title">
-          <div>
-            <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
-            <p>
-              {#if cluster.last_observed_at}
-                Observed <Timestamp value={cluster.last_observed_at} />
-              {:else}
-                No observation received.
-              {/if}
-            </p>
-          </div>
-          <StatusIndicator state={displayState(cluster.state)} compact />
+          <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
+          {#if displayState(cluster.state) !== 'healthy'}
+            <StatusIndicator state={displayState(cluster.state)} compact />
+          {/if}
         </header>
 
         <div class="cluster-overview">
@@ -300,7 +292,6 @@
           <HostLoadGraphic
             id={`cluster-${cluster.id}-load`}
             clusterName={cluster.name}
-            lastObservedAt={cluster.last_observed_at}
             hosts={cluster.hosts}
             loadNodes={cluster.load_nodes}
           />
@@ -630,14 +621,8 @@
     border-bottom: 1px solid var(--border);
   }
 
-  .cluster-title h2,
-  .cluster-title p {
+  .cluster-title h2 {
     margin: 0;
-  }
-
-  .cluster-title p {
-    margin-top: 0.35rem;
-    color: var(--text-muted);
   }
 
   .cluster-overview {

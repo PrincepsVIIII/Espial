@@ -117,9 +117,9 @@ read model: host metrics, cluster freshness, and active-VM counts by host.
 The summary surface is flat and divided horizontally. On wide screens the compact
 host/storage tracks, vertically stacked utilization gauges, and Load distribution
 view share one row, with the Load distribution column receiving the most space;
-narrower screens reflow them without changing source order. Cluster health and
-observation time appear once in the cluster heading and are not repeated beside the
-Load distribution title.
+narrower screens reflow them without changing source order. Load distribution omits
+the redundant observation timestamp; the current node state is conveyed directly by
+each node's semantic ring and exception label.
 Resource rows use matched-width, zero-based tracks; the state marker follows the
 track on the same horizontal axis, exposes swap or IO wait on hover, focus, and
 tap, and the exact capacity reading aligns to the track's far edge. Repeated inline
@@ -129,16 +129,22 @@ no gradient, glow, or ornamental animation.
 
 The host comparison is titled “Load distribution”; it is not topology. It renders
 a deterministic compute-node field from stable ID-sorted host/count pairs, with
-circle size encoding active VM count. Each node shows its host name by default and
-switches to the exact VM count on hover or focus; its tooltip repeats the count with
-CPU, RAM, and swap context. Non-healthy states retain visible health text alongside
-their semantic outline. The normal `Healthy` label is omitted from individual nodes;
-the cluster-level status and each node's accessible name retain that information
-without repeating it throughout the field.
-Committed selection reveals the host's complete CPU, RAM, swap, capacity, and
-observation details directly below the field. The interactive nodes and selected
-detail are the textual equivalent for this intentionally compact comparison; the
-former duplicate host-metrics table is omitted. The graphic draws no edges because
-the source contains no relationship data. Individual VM placement, migration
-paths, traffic, pan/zoom, drag, and layout controls remain out of scope until Core
-exposes authoritative relationships.
+circle size encoding its idle-VM count (the authoritative running-guest count).
+Each node shows its host name by default and switches to the exact idle-VM count on
+hover or focus; its tooltip repeats the count with CPU, RAM, and swap context. The
+semantic ring conveys the overall node state. Non-healthy states retain visible text
+alongside that ring; normal `Healthy` is omitted from individual nodes. Selecting a
+node expands it without introducing a cyan selection ring; clicking unoccupied field
+space or pressing `Escape` clears the selection. Committed selection reveals the
+host's CPU, RAM, swap, and capacity directly below the field. The interactive nodes
+and selected detail are the textual equivalent for this intentionally compact
+comparison; the former duplicate host-metrics table is omitted.
+
+The current Proxmox read path does not report guest user sessions. It must not
+present CPU use, power state, or an unverified guest-agent response as an active-user
+session. A second, session-active VM series requires an approved source, minimum
+credential scope, supported guest coverage, normalized contract, and fixtures before
+it appears in this graphic. The graphic draws no edges because the source contains
+no relationship data. Individual VM placement, migration paths, traffic, pan/zoom,
+drag, and layout controls remain out of scope until Core exposes authoritative
+relationships.

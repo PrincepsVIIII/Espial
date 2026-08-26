@@ -1,5 +1,4 @@
 <script lang="ts">
-  import Timestamp from '$lib/components/Timestamp.svelte';
   import {
     displayState,
     formatBytes,
@@ -14,13 +13,11 @@
   let {
     id,
     clusterName,
-    lastObservedAt,
     hosts,
     loadNodes,
   }: {
     id: string;
     clusterName: string;
-    lastObservedAt?: string | null;
     hosts: HypervisorHostMetric[];
     loadNodes: HypervisorLoadNode[];
   } = $props();
@@ -56,6 +53,12 @@
     selectionNotice = '';
   }
 
+  function clearSelectionFromField() {
+    if (!selectedID) return;
+    selectedID = null;
+    selectionNotice = '';
+  }
+
   function clearSelection(event: KeyboardEvent) {
     if (event.key !== 'Escape' || !selectedID) return;
     event.preventDefault();
@@ -64,8 +67,8 @@
     selectionNotice = 'Compute-node selection cleared.';
   }
 
-  function vmLabel(count: number): string {
-    return `${count} ${count === 1 ? 'VM' : 'VMs'} online`;
+  function idleVMLabel(count: number): string {
+    return `${count} idle ${count === 1 ? 'VM' : 'VMs'}`;
   }
 </script>
 
@@ -73,20 +76,27 @@
   <header class="compute-heading">
     <div>
       <h3 id={`${id}-title`}>Load distribution</h3>
-      <p>Active VMs by host in {clusterName}.</p>
+      <p>Idle VMs by host in {clusterName}.</p>
     </div>
   </header>
 
   <div
     class="node-field"
     class:many={rows.length > 12}
-    role="list"
+    role="group"
     aria-label={`${clusterName} compute nodes`}
   >
+    <button
+      type="button"
+      class="node-field-clear"
+      aria-label="Clear selected compute node"
+      disabled={!selectedID}
+      onclick={clearSelectionFromField}
+    ></button>
     {#each rows as row (row.id)}
       <div
         class="node-item"
-        role="listitem"
+        class:selected={selectedID === row.id}
         style={`--node-size: ${nodeSize(row.active_vms)}`}
       >
         <button
@@ -96,7 +106,7 @@
           class:selected={selectedID === row.id}
           aria-pressed={selectedID === row.id}
           aria-describedby={tooltipID(row.id)}
-          aria-label={`${row.id}, ${vmLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
+          aria-label={`${row.id}, ${idleVMLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
           onclick={() => commit(row.id)}
           onkeydown={clearSelection}
         >
@@ -107,7 +117,7 @@
             <code class="node-name" title={row.id}>{row.id}</code>
             <span class="node-load">
               <strong>{row.active_vms}</strong>
-              <small>VMs</small>
+              <small>Idle VMs</small>
             </span>
           </span>
           {#if displayState(row.health_state) !== 'healthy'}
@@ -117,7 +127,7 @@
           {/if}
         </button>
         <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
-          <strong>{vmLabel(row.active_vms)}</strong>
+          <strong>{idleVMLabel(row.active_vms)}</strong>
           <span>
             CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
               row.ram_percent,
@@ -132,7 +142,7 @@
     <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
       <div>
         <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
-        <p>{vmLabel(activeRow.active_vms)}</p>
+        <p>{idleVMLabel(activeRow.active_vms)}</p>
       </div>
       <dl>
         <div>
@@ -154,16 +164,6 @@
               ? 'Unknown'
               : `${activeRow.cpu_cores.toFixed(0)} cores`}
             / {formatBytes(activeRow.ram_bytes)}
-          </dd>
-        </div>
-        <div>
-          <dt>Observed</dt>
-          <dd>
-            {#if lastObservedAt}
-              <Timestamp value={lastObservedAt} />
-            {:else}
-              Unknown
-            {/if}
           </dd>
         </div>
       </dl>
@@ -196,6 +196,7 @@
   }
 
   .node-field {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
     gap: 1rem 0.7rem;
@@ -212,9 +213,30 @@
 
   .node-item {
     position: relative;
+    z-index: 1;
     display: grid;
     justify-items: center;
     min-width: 0;
+    pointer-events: none;
+  }
+
+  .node-field-clear {
+    position: absolute;
+    inset: 0;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+  }
+
+  .node-field-clear:hover:not(:disabled),
+  .node-field-clear:active:not(:disabled) {
+    background: transparent;
+  }
+
+  .node-field-clear:focus-visible {
+    outline: 2px solid var(--graphic-focus);
+    outline-offset: 2px;
   }
 
   .node-button {
@@ -227,6 +249,7 @@
     border: 0;
     background: transparent;
     color: var(--text);
+    pointer-events: auto;
   }
 
   .node-button:hover,
@@ -242,7 +265,9 @@
     border: 3px solid var(--unknown);
     border-radius: 50%;
     background: #0a1820;
-    transition: transform var(--graphic-transition-duration) ease-out;
+    transition:
+      transform var(--graphic-transition-duration) ease-out,
+      width var(--graphic-transition-duration) ease-out;
   }
 
   .node-button:hover .node-disc,
@@ -251,8 +276,16 @@
   }
 
   .node-button.selected .node-disc {
-    outline: 3px solid var(--graphic-selection);
-    outline-offset: 4px;
+    transform: scale(1.18);
+  }
+
+  .node-button.selected:hover .node-disc,
+  .node-button.selected:focus-visible .node-disc {
+    transform: scale(1.18);
+  }
+
+  .node-item.selected {
+    z-index: 2;
   }
 
   .disc-healthy {
@@ -406,7 +439,7 @@
 
   dl {
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 1rem;
     margin: 0;
   }

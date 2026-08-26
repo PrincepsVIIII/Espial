@@ -23,6 +23,10 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Load distribution' }),
     ).toBeVisible();
+    await expect(
+      page.locator('.cluster-title .status-indicator', { hasText: 'Warning' }),
+    ).toBeVisible();
+    await expect(page.getByText(/^Observed/)).toHaveCount(0);
     await expect(page.getByText(/Host Healthy · Swap/)).toHaveCount(0);
     await expect(page.getByText(/Storage (Healthy|Warning) · IO/)).toHaveCount(
       0,
@@ -38,7 +42,7 @@ for (const viewport of [
     ).toHaveAttribute('aria-valuenow', '57.6');
     await expect(
       page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, health Critical/,
       }),
     ).toBeVisible();
     await expect(page.getByText('Host metrics table')).toHaveCount(0);
@@ -114,7 +118,7 @@ for (const viewport of [
       );
 
       const longHost = page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 VMs online, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, health Critical/,
       });
       await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '1');
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '0');
@@ -122,7 +126,7 @@ for (const viewport of [
       await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '0');
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '1');
       const tooltip = longHost.locator('xpath=..').locator('[role="tooltip"]');
-      await expect(tooltip).toContainText('40 VMs online');
+      await expect(tooltip).toContainText('40 idle VMs');
       await expect(tooltip).toContainText('Swap 28%');
       await expect(tooltip).toHaveCSS('opacity', '1');
     }
@@ -154,13 +158,27 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await waitForHydration(page);
 
   const plotHost = page.getByRole('button', {
-    name: /pve-002, 4 VMs online, health Warning/,
+    name: /pve-002, 4 idle VMs, health Warning/,
   });
   await plotHost.focus();
   await expect(plotHost.locator('.node-load')).toHaveCSS('opacity', '1');
+  const unselectedNodeWidth = await plotHost
+    .locator('.node-disc')
+    .evaluate((element) => element.getBoundingClientRect().width);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('heading', { name: 'pve-002' })).toBeVisible();
   await expect(plotHost).toHaveAttribute('aria-pressed', 'true');
+  await expect(plotHost.locator('.node-disc')).toHaveCSS(
+    'outline-style',
+    'none',
+  );
+  await expect
+    .poll(async () =>
+      plotHost
+        .locator('.node-disc')
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(unselectedNodeWidth);
   await expect(page.locator('.node-detail')).toContainText(/CPU\s+31%/);
   await expect(page.locator('.node-detail')).toContainText(/RAM\s+35%/);
   await expect(page.locator('.node-detail')).toContainText(/Swap\s+14%/);
@@ -172,13 +190,16 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await expect(page.getByText('Compute-node selection cleared.')).toBeVisible();
 
   const firstHost = page.getByRole('button', {
-    name: /pve-001, 1 VM online, health Healthy/,
+    name: /pve-001, 1 idle VM, health Healthy/,
   });
   await expect(firstHost.locator('.node-health')).toHaveCount(0);
   await firstHost.focus();
   await page.keyboard.press('Space');
   await expect(firstHost).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('heading', { name: 'pve-001' })).toBeVisible();
+  await page.locator('.node-field-clear').click({ position: { x: 1, y: 1 } });
+  await expect(firstHost).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('.node-detail')).toHaveCount(0);
 });
 
 test('touch selects a host without topology controls', async ({ browser }) => {
@@ -196,7 +217,7 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   await expect(marker).toHaveAttribute('aria-expanded', 'true');
   await expect(marker.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
   const host = page.getByRole('button', {
-    name: /pve-002, 4 VMs online, health Warning/,
+    name: /pve-002, 4 idle VMs, health Warning/,
   });
   await host.tap();
   await expect(host).toHaveAttribute('aria-pressed', 'true');
@@ -215,7 +236,7 @@ test('selection survives live authoritative data replacement', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const initial = page.getByRole('button', {
-    name: /pve-002, 4 VMs online, health Warning/,
+    name: /pve-002, 4 idle VMs, health Warning/,
   });
   await initial.click();
   await expect(initial).toHaveAttribute('aria-pressed', 'true');
@@ -227,10 +248,10 @@ test('selection survives live authoritative data replacement', async ({
     })
     .toBe(1);
   const updated = page.getByRole('button', {
-    name: /pve-002, 5 VMs online, health Warning/,
+    name: /pve-002, 5 idle VMs, health Warning/,
   });
   await expect(updated).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.node-detail p')).toHaveText('5 VMs online');
+  await expect(page.locator('.node-detail p')).toHaveText('5 idle VMs');
 });
 
 for (const scenario of [
