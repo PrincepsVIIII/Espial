@@ -2,10 +2,18 @@
   import { invalidate } from '$app/navigation';
   import { tick } from 'svelte';
   import { readCookie } from '$lib/auth';
+  import HostLoadGraphic from '$lib/components/HostLoadGraphic.svelte';
+  import MetricMeter from '$lib/components/MetricMeter.svelte';
   import StatusIndicator from '$lib/components/StatusIndicator.svelte';
   import Timestamp from '$lib/components/Timestamp.svelte';
-  import type { DisplayState } from '$lib/dashboard';
   import { ApiFailure, problemFrom, requestJSON } from '$lib/api/client';
+  import {
+    displayState,
+    formatBytes,
+    formatPercentage,
+    normalizePercentage,
+    statusLabel,
+  } from '$lib/graphics';
   import {
     clusterFormFeedback,
     type ClusterFormFeedback,
@@ -109,64 +117,12 @@
     return Number.isFinite(value) ? value : fallback;
   }
 
-  function formatBytes(value: number): string {
-    if (!value) return 'Unknown';
-    const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    let amount = value;
-    let unit = 0;
-    while (amount >= 1024 && unit < units.length - 1) {
-      amount /= 1024;
-      unit += 1;
-    }
-    return `${amount >= 10 ? amount.toFixed(0) : amount.toFixed(1)} ${units[unit]}`;
-  }
-
-  function percent(value: number): string {
-    return `${Math.round(value)}%`;
-  }
-
-  function bounded(value: number): number {
-    if (!Number.isFinite(value) || value < 0) return 0;
-    if (value > 100) return 100;
-    return value;
-  }
-
-  function gaugeSweep(value: number): string {
-    return `${bounded(value) / 2}%`;
-  }
-
   function indicatorLabel(value: string): string {
-    if (value === 'critical') return 'Critical';
-    if (value === 'warning') return 'Warning';
-    if (value === 'healthy') return 'Healthy';
-    return 'Unknown';
+    return statusLabel(value);
   }
 
-  function displayState(value: string): DisplayState {
-    if (
-      value === 'healthy' ||
-      value === 'warning' ||
-      value === 'critical' ||
-      value === 'unknown' ||
-      value === 'stale' ||
-      value === 'maintenance' ||
-      value === 'disabled'
-    ) {
-      return value;
-    }
-    return 'unknown';
-  }
-
-  function nodePoint(index: number, total: number, count: number) {
-    if (total === 1) return { x: 50, y: 50, r: 12 + Math.min(count, 12) };
-    if (total === 2)
-      return { x: index === 0 ? 30 : 70, y: 50, r: 9 + Math.min(count, 10) };
-    const angle = (-90 + (360 / total) * index) * (Math.PI / 180);
-    return {
-      x: 50 + Math.cos(angle) * 32,
-      y: 50 + Math.sin(angle) * 32,
-      r: 7 + Math.min(count, 11),
-    };
+  function meterWidth(value: number): number {
+    return normalizePercentage(value) ?? 0;
   }
 
   function closeBackdrop(event: MouseEvent) {
@@ -270,33 +226,48 @@
   <div class="cluster-stack">
     {#each data.clusters.items as cluster (cluster.id)}
       <article class="cluster-panel" aria-labelledby={`cluster-${cluster.id}`}>
-        <div class="cluster-columns">
+        <header class="cluster-title">
+          <div>
+            <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
+            <p>
+              {#if cluster.last_observed_at}
+                Observed <Timestamp value={cluster.last_observed_at} />
+              {:else}
+                No observation received.
+              {/if}
+            </p>
+          </div>
+          <StatusIndicator state={displayState(cluster.state)} compact />
+        </header>
+
+        <div class="cluster-overview">
           <section
             class="cluster-list-column"
             aria-label={`${cluster.name} hosts`}
           >
-            <h2>Hosts</h2>
+            <h3>Hosts</h3>
             {#each cluster.hosts as host}
               <div class="host-row">
                 <div class="row-label">
                   <code>{host.id}</code>
                   <span
                     class={`indicator indicator-${host.swap_indicator}`}
-                    title={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`}
-                    aria-label={`Swap ${indicatorLabel(host.swap_indicator)} ${percent(host.swap_percent)}`}
-                  ></span>
+                    title={`Swap ${indicatorLabel(host.swap_indicator)} ${formatPercentage(host.swap_percent)}`}
+                    >Swap {indicatorLabel(host.swap_indicator)}</span
+                  >
                 </div>
                 <div
                   class="dual-bar"
-                  aria-label={`${host.id} CPU ${percent(host.cpu_percent)}, RAM ${percent(host.ram_percent)}`}
+                  role="img"
+                  aria-label={`${host.id} CPU ${formatPercentage(host.cpu_percent)}, RAM ${formatPercentage(host.ram_percent)}`}
                 >
                   <span
                     class="cpu-fill"
-                    style={`width:${bounded(host.cpu_percent)}%`}
+                    style={`width:${meterWidth(host.cpu_percent)}%`}
                   ></span>
                   <span
                     class="ram-fill"
-                    style={`width:${bounded(host.ram_percent)}%`}
+                    style={`width:${meterWidth(host.ram_percent)}%`}
                   ></span>
                 </div>
                 <small
@@ -312,22 +283,24 @@
             class="cluster-list-column storage-column"
             aria-label={`${cluster.name} storage`}
           >
-            <h2>Storage</h2>
+            <h3>Storage</h3>
             {#each cluster.storage as item}
               <div class="storage-row">
                 <div class="row-label">
                   <code>{item.id}</code>
                   <span
                     class={`indicator indicator-${item.io_wait_indicator}`}
-                    title={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`}
-                    aria-label={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${percent(item.io_wait_percent)}`}
-                  ></span>
+                    title={`IO wait ${indicatorLabel(item.io_wait_indicator)} ${formatPercentage(item.io_wait_percent)}`}
+                    >IO {indicatorLabel(item.io_wait_indicator)}</span
+                  >
                 </div>
                 <div
                   class="storage-bar"
-                  aria-label={`${item.id} storage ${percent(item.used_percent)} used`}
+                  role="img"
+                  aria-label={`${item.id} storage ${formatPercentage(item.used_percent)} used`}
                 >
-                  <span style={`width:${bounded(item.used_percent)}%`}></span>
+                  <span style={`width:${meterWidth(item.used_percent)}%`}
+                  ></span>
                 </div>
                 <small
                   >{formatBytes(item.used_bytes)} used / {formatBytes(
@@ -339,79 +312,36 @@
           </section>
 
           <section
-            class="cluster-gauges"
-            aria-labelledby={`cluster-${cluster.id}`}
+            class="cluster-meters"
+            aria-label={`${cluster.name} total utilization`}
           >
-            <div class="cluster-title">
-              <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
-              <StatusIndicator state={displayState(cluster.state)} compact />
+            <h3>Cluster utilization</h3>
+            <div class="meter-set">
+              <MetricMeter
+                label="CPU total"
+                value={cluster.totals.cpu_percent}
+              />
+              <MetricMeter
+                label="RAM total"
+                value={cluster.totals.ram_percent}
+              />
+              <MetricMeter
+                label="Storage total"
+                value={cluster.totals.storage_percent}
+              />
             </div>
-            <div class="gauge-set">
-              <div
-                class="gauge"
-                style={`--value:${gaugeSweep(cluster.totals.cpu_percent)}`}
-              >
-                <span>{percent(cluster.totals.cpu_percent)}</span>
-                <small>CPU total</small>
-              </div>
-              <div
-                class="gauge"
-                style={`--value:${gaugeSweep(cluster.totals.ram_percent)}`}
-              >
-                <span>{percent(cluster.totals.ram_percent)}</span>
-                <small>RAM total</small>
-              </div>
-              <div
-                class="gauge"
-                style={`--value:${gaugeSweep(cluster.totals.storage_percent)}`}
-              >
-                <span>{percent(cluster.totals.storage_percent)}</span>
-                <small>Storage total</small>
-              </div>
-            </div>
-            <p class="cluster-time">
-              {#if cluster.last_observed_at}
-                Observed <Timestamp value={cluster.last_observed_at} />
-              {:else}
-                No observation received.
-              {/if}
-            </p>
-          </section>
-
-          <section
-            class="load-graph"
-            aria-label={`${cluster.name} active VM distribution`}
-          >
-            <svg
-              viewBox="0 0 100 100"
-              role="img"
-              aria-label="Active VM distribution by node"
-            >
-              {#if cluster.load_nodes.length > 2}
-                <circle cx="50" cy="50" r="4" class="load-center" />
-              {/if}
-              {#each cluster.load_nodes as node, index}
-                {@const point = nodePoint(
-                  index,
-                  cluster.load_nodes.length,
-                  node.active_vms,
-                )}
-                {#if cluster.load_nodes.length > 2}
-                  <line x1="50" y1="50" x2={point.x} y2={point.y} />
-                {/if}
-                <circle
-                  class:single-node={cluster.load_nodes.length === 1}
-                  cx={point.x}
-                  cy={point.y}
-                  r={point.r}
-                >
-                  <title>{node.id}: {node.active_vms} active VMs</title>
-                </circle>
-                <text x={point.x} y={point.y + point.r + 7}>{node.id}</text>
-              {/each}
-            </svg>
           </section>
         </div>
+
+        <HostLoadGraphic
+          id={`cluster-${cluster.id}-load`}
+          clusterName={cluster.name}
+          clusterState={cluster.state}
+          freshness={cluster.freshness}
+          lastObservedAt={cluster.last_observed_at}
+          hosts={cluster.hosts}
+          loadNodes={cluster.load_nodes}
+        />
       </article>
     {/each}
   </div>
@@ -501,9 +431,10 @@
             <label class="check-row">
               <input name="approve_target" type="checkbox" required />
               <span>
-                <strong>Approve this target</strong>
+                <strong>Approve this exact target</strong>
                 <small
-                  >Required. Allow read-only collection from the host and port above.</small
+                  >Required. Allow read-only collection from the host and port
+                  above.</small
                 >
               </span>
             </label>
@@ -720,6 +651,8 @@
     border: 1px solid rgba(151, 176, 190, 0.28);
     background: #101b24;
     padding: 1rem;
+    display: grid;
+    gap: 1rem;
   }
 
   .cluster-panel:focus {
@@ -727,24 +660,43 @@
     outline-offset: 3px;
   }
 
-  .cluster-columns {
+  .cluster-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+    padding-bottom: 0.9rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cluster-title h2,
+  .cluster-title p {
+    margin: 0;
+  }
+
+  .cluster-title p {
+    margin-top: 0.35rem;
+    color: var(--text-muted);
+  }
+
+  .cluster-overview {
     display: grid;
-    grid-template-columns:
-      minmax(190px, 1fr) minmax(230px, 1.25fr) minmax(260px, 1.2fr)
-      minmax(220px, 1fr);
+    grid-template-columns: minmax(190px, 1fr) minmax(230px, 1.2fr) minmax(
+        250px,
+        1fr
+      );
     gap: 1rem;
     align-items: stretch;
   }
 
   .cluster-list-column,
-  .cluster-gauges,
-  .load-graph {
+  .cluster-meters {
     border-left: 1px solid rgba(151, 176, 190, 0.22);
     padding-left: 0.9rem;
   }
 
-  .cluster-list-column h2,
-  .cluster-gauges h2 {
+  .cluster-list-column h3,
+  .cluster-meters h3 {
     margin: 0 0 0.7rem;
     font-size: 1rem;
   }
@@ -756,8 +708,7 @@
     margin-bottom: 0.7rem;
   }
 
-  .row-label,
-  .cluster-title {
+  .row-label {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -765,23 +716,42 @@
   }
 
   .indicator {
-    width: 0.72rem;
-    height: 0.72rem;
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+    color: var(--unknown);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .indicator::before {
+    width: 0.58rem;
+    height: 0.58rem;
+    border: 2px solid currentColor;
     border-radius: 50%;
-    background: #8a96a0;
+    content: '';
     flex: 0 0 auto;
   }
 
   .indicator-healthy {
-    background: #39b86f;
+    color: var(--healthy);
   }
 
   .indicator-warning {
-    background: #e1ad33;
+    color: var(--warning);
+  }
+
+  .indicator-warning::before {
+    border-radius: 0;
+    transform: rotate(45deg) scale(0.8);
   }
 
   .indicator-critical {
-    background: #e05a4f;
+    color: var(--critical);
+  }
+
+  .indicator-critical::before {
+    border-radius: 0;
   }
 
   .dual-bar,
@@ -817,64 +787,9 @@
     background: rgba(0, 169, 201, 0.62);
   }
 
-  .gauge-set {
+  .meter-set {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-  }
-
-  .gauge {
-    display: grid;
-    place-items: center;
-    align-content: end;
-    min-height: 7rem;
-    background:
-      radial-gradient(circle at 50% 80%, #101b24 0 46%, transparent 47%),
-      conic-gradient(
-        from 270deg,
-        var(--color-accent, #00a9c9) var(--value),
-        #243442 0 50%,
-        transparent 0
-      );
-    clip-path: inset(0 0 45% 0);
-  }
-
-  .gauge span {
-    font-size: 1.35rem;
-    font-weight: 700;
-  }
-
-  .cluster-time {
-    margin: 0.7rem 0 0;
-    color: #bac6cf;
-  }
-
-  .load-graph svg {
-    width: 100%;
-    min-height: 13rem;
-  }
-
-  .load-graph line {
-    stroke: rgba(151, 176, 190, 0.4);
-  }
-
-  .load-graph circle {
-    fill: rgba(0, 169, 201, 0.72);
-    stroke: #d7f8ff;
-  }
-
-  .load-graph .load-center {
-    fill: #e1ad33;
-  }
-
-  .single-node {
-    animation: pulse-node 1.6s ease-in-out infinite;
-  }
-
-  .load-graph text {
-    fill: #d8e6ee;
-    font-size: 0.42rem;
-    text-anchor: middle;
+    gap: 0.9rem;
   }
 
   .modal-backdrop {
@@ -1136,32 +1051,32 @@
     opacity: 0.65;
   }
 
-  @keyframes pulse-node {
-    0%,
-    100% {
-      opacity: 0.72;
-    }
-    50% {
-      opacity: 1;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .single-node {
-      animation: none;
-    }
-  }
-
   @media (max-width: 1100px) {
-    .cluster-columns {
+    .cluster-overview {
       grid-template-columns: 1fr 1fr;
+    }
+
+    .cluster-meters {
+      grid-column: 1 / -1;
+    }
+
+    .meter-set {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
   @media (max-width: 680px) {
-    .cluster-columns,
+    .cluster-overview,
     .form-grid,
     .form-grid-three {
+      grid-template-columns: 1fr;
+    }
+
+    .cluster-meters {
+      grid-column: auto;
+    }
+
+    .meter-set {
       grid-template-columns: 1fr;
     }
 
@@ -1209,8 +1124,7 @@
     }
 
     .cluster-list-column,
-    .cluster-gauges,
-    .load-graph {
+    .cluster-meters {
       border-left: 0;
       padding-left: 0;
       border-top: 1px solid rgba(151, 176, 190, 0.22);

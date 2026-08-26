@@ -16,13 +16,14 @@ func (fixtureAPI) GetVersion(context.Context) (VersionResponse, error) {
 
 func (fixtureAPI) GetClusterStatus(context.Context) ([]ClusterStatusItem, error) {
 	quorate := 1
-	return []ClusterStatusItem{{Type: "cluster", Name: "lab", Quorate: &quorate}, {Type: "node", Name: "pve-a"}}, nil
+	return []ClusterStatusItem{{Type: "cluster", Name: "lab", Quorate: &quorate}, {Type: "node", Name: "pve-a"}, {Type: "node", Name: "pve-b"}}, nil
 }
 
 func (fixtureAPI) GetClusterResources(context.Context) ([]ClusterResource, error) {
 	shared := 1
 	return []ClusterResource{
 		{ID: "node/pve-a", Type: "node", Node: "pve-a", Name: "pve-a", Status: "online", CPU: 0.50, MaxCPU: 16, Mem: 16, MaxMem: 32},
+		{ID: "node/pve-b", Type: "node", Node: "pve-b", Name: "pve-b", Status: "online", CPU: 0.25, MaxCPU: 8, Mem: 8, MaxMem: 32},
 		{ID: "qemu/100", Type: "qemu", Node: "pve-a", Name: "auth", Status: "running", VMID: 100},
 		{ID: "lxc/200", Type: "lxc", Node: "pve-a", Name: "dns", Status: "stopped", VMID: 200},
 		{ID: "storage/pve-a/vmstore", Type: "storage", Node: "pve-a", Storage: "vmstore", Status: "available", Disk: 85, MaxDisk: 100, Shared: &shared},
@@ -42,7 +43,7 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Collect: %v", err)
 	}
-	if len(payload.Resources) != 5 || len(payload.Observations) != 6 {
+	if len(payload.Resources) != 6 || len(payload.Observations) != 7 {
 		t.Fatalf("resources=%d observations=%d", len(payload.Resources), len(payload.Observations))
 	}
 	foundExpectedStopped := false
@@ -60,5 +61,12 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	}
 	if !foundExpectedStopped || !foundStorageWarning {
 		t.Fatalf("missing expected stopped guest or storage warning")
+	}
+	activeByNode, ok := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int)
+	if !ok {
+		t.Fatalf("active_vms_by_node = %#v", payload.Observations[0].Metadata["active_vms_by_node"])
+	}
+	if activeByNode["pve-a"] != 1 || activeByNode["pve-b"] != 0 {
+		t.Fatalf("active_vms_by_node = %#v", activeByNode)
 	}
 }

@@ -232,7 +232,7 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 		cluster := clusters[id]
 		sort.Slice(cluster.Hosts, func(i, j int) bool { return cluster.Hosts[i].ID < cluster.Hosts[j].ID })
 		sort.Slice(cluster.Storage, func(i, j int) bool { return cluster.Storage[i].ID < cluster.Storage[j].ID })
-		sort.Slice(cluster.LoadNodes, func(i, j int) bool { return cluster.LoadNodes[i].ID < cluster.LoadNodes[j].ID })
+		cluster.LoadNodes = completeLoadNodes(cluster.Hosts, cluster.LoadNodes)
 		cluster.Totals = totals(*cluster)
 		items = append(items, *cluster)
 	}
@@ -333,6 +333,25 @@ func loadNodes(value any) []LoadNodeSummary {
 	for key, count := range values {
 		result = append(result, LoadNodeSummary{ID: key, ActiveVMs: int(number(count))})
 	}
+	return result
+}
+
+func completeLoadNodes(hosts []HostSummary, loads []LoadNodeSummary) []LoadNodeSummary {
+	counts := make(map[string]int, len(hosts)+len(loads))
+	for _, host := range hosts {
+		counts[host.ID] = 0
+	}
+	for _, load := range loads {
+		if load.ActiveVMs < 0 {
+			load.ActiveVMs = 0
+		}
+		counts[load.ID] = load.ActiveVMs
+	}
+	result := make([]LoadNodeSummary, 0, len(counts))
+	for id, count := range counts {
+		result = append(result, LoadNodeSummary{ID: id, ActiveVMs: count})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result
 }
 

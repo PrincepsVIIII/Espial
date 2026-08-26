@@ -9,8 +9,11 @@ let monitoringReads = 0;
 let eventID = 0;
 let incidentStatus = 'open';
 let incidentVersion = 1;
+let hypervisorMode = 'several';
+let hypervisorRevision = 0;
 
 const now = '2026-07-31T12:00:00Z';
+const hypervisorNow = '2026-08-26T15:00:00Z';
 const integrationID = '60000000-0000-4000-8000-000000000001';
 const incidentID = '80000000-0000-4000-8000-000000000021';
 const websiteMonitorID = '70000000-0000-4000-8000-000000000025';
@@ -60,6 +63,7 @@ const server = http.createServer((request, response) => {
     eventMode = url.searchParams.get('events') ?? eventMode;
     apiMode = url.searchParams.get('api') ?? apiMode;
     sessionMode = url.searchParams.get('session') ?? sessionMode;
+    hypervisorMode = url.searchParams.get('hypervisor') ?? hypervisorMode;
     if (url.searchParams.get('reset') === 'true') {
       eventMode = 'quiet';
       apiMode = 'ok';
@@ -69,6 +73,8 @@ const server = http.createServer((request, response) => {
       eventID = 0;
       incidentStatus = 'open';
       incidentVersion = 1;
+      hypervisorMode = 'several';
+      hypervisorRevision = 0;
       incidentTimeline = initialIncidentTimeline();
       users = initialUsers();
       auditEvents = initialAuditEvents();
@@ -152,7 +158,11 @@ const server = http.createServer((request, response) => {
         },
       });
     }
-    return json(response, 200, { items: [] });
+    return json(
+      response,
+      200,
+      hypervisorClusters(hypervisorMode, hypervisorRevision),
+    );
   }
   if (url.pathname === '/api/v1/overview') {
     return json(response, 200, {
@@ -597,6 +607,7 @@ function stream(_request, response) {
       ? null
       : setTimeout(() => {
           if (response.destroyed) return;
+          if (eventMode === 'hypervisor-update') hypervisorRevision += 1;
           eventID += 1;
           response.write(
             `id: ${eventID}\nevent: integration_changed\ndata: ${JSON.stringify({ schema_version: 1, integration_id: integrationID, result: 'collected', changed_at: now })}\n\n`,
@@ -670,9 +681,78 @@ function state() {
     eventID,
     incidentStatus,
     incidentVersion,
+    hypervisorMode,
+    hypervisorRevision,
     incidentAuditCount: auditEvents.filter(
       (event) => event.target_type === 'incident',
     ).length,
+  };
+}
+
+function hypervisorClusters(mode, revision) {
+  if (mode === 'empty') return { items: [] };
+  const count = mode === 'one' ? 1 : mode === 'large' ? 128 : 3;
+  const stale = mode === 'stale';
+  const zero = mode === 'zero';
+  const hosts = Array.from({ length: count }, (_, index) => {
+    const number = index + 1;
+    const id =
+      mode === 'several' && index === 2
+        ? 'pve-compute-host-with-a-long-operator-facing-name'
+        : `pve-${String(number).padStart(3, '0')}`;
+    const healthState =
+      index % 9 === 1 ? 'warning' : index % 17 === 2 ? 'critical' : 'healthy';
+    return {
+      id,
+      cpu_percent: Math.min(98, 18 + ((index * 13 + revision * 7) % 78)),
+      ram_percent: Math.min(97, 24 + ((index * 11 + revision * 5) % 70)),
+      cpu_cores: 8 + (index % 4) * 8,
+      ram_bytes: 68_719_476_736 * (1 + (index % 3)),
+      swap_percent: index % 9 === 1 ? 14 : index % 17 === 2 ? 28 : 2,
+      swap_indicator:
+        index % 17 === 2 ? 'critical' : index % 9 === 1 ? 'warning' : 'healthy',
+      health_state: healthState,
+    };
+  });
+  const loadNodes = hosts.map((host, index) => ({
+    id: host.id,
+    active_vms: zero
+      ? 0
+      : mode === 'several' && index === 2
+        ? 40 + revision
+        : (index * 3 + 1 + revision) % 19,
+  }));
+  return {
+    items: [
+      {
+        id: 'proxmox-browser-cluster',
+        integration_id: 'proxmox-browser-integration',
+        name: 'Production Proxmox',
+        state: stale ? 'stale' : 'warning',
+        freshness: stale ? 'stale' : 'fresh',
+        last_observed_at: stale ? '2026-08-26T12:00:00Z' : hypervisorNow,
+        last_collection_at: hypervisorNow,
+        hosts,
+        storage: [
+          {
+            id: 'shared-vmstore',
+            scope: 'shared',
+            used_bytes: 8_400_000_000_000,
+            total_bytes: 12_000_000_000_000,
+            used_percent: 70,
+            io_wait_percent: 7,
+            io_wait_indicator: 'warning',
+            health_state: 'warning',
+          },
+        ],
+        totals: {
+          cpu_percent: 57.6 + revision,
+          ram_percent: 68.7,
+          storage_percent: 70,
+        },
+        load_nodes: loadNodes,
+      },
+    ],
   };
 }
 

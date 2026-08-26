@@ -621,3 +621,59 @@ viewport for visual inspection.
 Final verification reported zero Svelte diagnostics, 52 frontend unit tests, all
 43 Chromium scenarios, zero serious/critical axe findings for the dialog, and a
 successful production SvelteKit build.
+
+## 2026-08-26 — Reactive graphics foundation and Hypervisor pilot
+
+### Scope and material decisions
+
+Reviewed the shared graphics contract, tokens, `GraphicFrame`, `MetricMeter`, and
+Hypervisor host-load comparison against the general UI guidance, design system,
+authoritative Proxmox read model, and the named operator question: “Which Proxmox
+host currently carries the most active VMs, and what is that host's current compute
+health?”
+
+- Kept the pilot dependency-free with semantic HTML, CSS, and native Svelte. The
+  contract reserves LayerCake, uPlot, and `d3-force` for data shapes that actually
+  require coordinate layering, high-density time series, or authoritative edges.
+- Replaced the gradient semicircle gauges with aligned, zero-based CPU, RAM, and
+  storage meters. Unknown/non-finite values have explicit text and do not render as
+  zero.
+- Replaced the radial spokes and pulse with a stable ID-sorted “Active VMs by host”
+  comparison. The read model contains aggregate host/count pairs, so the graphic
+  draws no topology or relationship edges.
+- Linked pointer/focus preview and click/tap/Enter/Space selection to a visible host
+  detail region and complete host table. `Escape` clears selection; live refetches
+  preserve it by stable host ID while present. Cyan is selection/focus only, while
+  marker shape/outline and visible labels retain operational status.
+- Core now initializes every discovered node to zero before counting running QEMU
+  and LXC guests. The read service also completes old observations from the host
+  list without changing the `load_nodes` JSON shape.
+- Added deterministic integer domains, a 12-row bounded plot region, and the 180 ms
+  update token. Initial rendering is static, continuous animation is absent, and
+  reduced-motion mode makes updates immediate.
+
+### Viewport, accessibility, and verification evidence
+
+Visual inspection of captured 1440×900, 1280×800, 500×900, and 640×800
+zoom-equivalent views confirmed that the plot, exact counts, long names, status,
+detail prompt, and table remain legible without page-level horizontal overflow.
+The table intentionally uses bounded internal horizontal scrolling at narrow width
+so no metric column is removed.
+
+Automated contrast checks cover graphic labels, marks, tracks, focus, and selection.
+The neutral mark/track pair is 8.21:1, cyan selection on the flat surface is 10.87:1,
+muted labels on the surface are 9.49:1, and the grid/track boundary is 3.10:1.
+Status retains the established text-first semantic component and distinct marker
+shapes.
+
+Svelte diagnostics reported zero errors and warnings; 61 frontend unit/contract
+tests and the production build passed. The 12-scenario graphics browser suite
+covers zero, one, several, and 128 hosts; long labels and outliers; keyboard and
+touch; plot/table synchronization; live selection persistence; stale,
+disconnected, empty, and Core-error states; reduced motion; all four viewports; and
+zero serious/critical axe findings. The complete 55-scenario Chromium suite passes.
+The changed Proxmox and Hypervisor packages pass containerized race tests.
+Repository contracts, generated types, documentation links, formatting, and Go vet
+pass. The full Core unit gate continues to expose two unrelated pre-existing
+failures in adapter startup-timeout classification and the notification file-secret
+containment fixture; neither changed package fails.

@@ -28,3 +28,23 @@ func TestProxmoxCreateErrorCodePreservesActionableCategories(t *testing.T) {
 		t.Fatalf("unexpected safe fallback %q", got)
 	}
 }
+
+func TestCompleteLoadNodesIncludesZeroGuestHostsAndKeepsCounts(t *testing.T) {
+	hosts := []HostSummary{{ID: "pve-b"}, {ID: "pve-a"}}
+	loads := []LoadNodeSummary{{ID: "pve-a", ActiveVMs: 3}, {ID: "pve-c", ActiveVMs: -2}}
+
+	got := completeLoadNodes(hosts, loads)
+	want := []LoadNodeSummary{
+		{ID: "pve-a", ActiveVMs: 3},
+		{ID: "pve-b", ActiveVMs: 0},
+		{ID: "pve-c", ActiveVMs: 0},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("completeLoadNodes() = %#v", got)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("completeLoadNodes()[%d] = %#v, want %#v", index, got[index], want[index])
+		}
+	}
+}

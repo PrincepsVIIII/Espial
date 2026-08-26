@@ -6,6 +6,8 @@ This baseline defines semantics, not a finished component library.
 
 The [general UI guidance](UI_GUIDANCE.md) is the authoritative product and
 navigation contract. This document supplies its concrete tokens and component rules.
+Meters, plots, diagrams, and spatial views additionally follow the
+[graphics contract](GRAPHICS.md).
 
 ## Brand use
 
@@ -41,6 +43,14 @@ altered, recolored, or combined into a new logo.
   --border-strong: #3b5361;
   --text: #f4f7fb;
   --text-muted: #a9bacb;
+
+  --graphic-grid: #496574;
+  --graphic-track: #071016;
+  --graphic-mark: #9bacb8;
+  --graphic-selection: #55d6e2;
+  --graphic-focus: #55d6e2;
+  --graphic-label-muted: #a9bacb;
+  --graphic-transition-duration: 180ms;
 
   --healthy: #72d6a0;
   --warning: #f2b84b;

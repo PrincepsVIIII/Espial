@@ -70,9 +70,21 @@ describe('UBNetDef design tokens', () => {
     ['white action text on UB Blue', 'hayes-white', 'ub-blue'],
     ['critical text on critical surface', 'critical', 'critical-surface'],
     ['healthy text on healthy surface', 'healthy', 'healthy-surface'],
+    ['graphic labels on surface', 'graphic-label-muted', 'surface-1'],
+    ['graphic marks on track', 'graphic-mark', 'graphic-track'],
+    ['graphic selection on surface', 'graphic-selection', 'surface-1'],
   ])('%s meets WCAG AA for ordinary text', (_, foreground, background) => {
     expect(
       contrast(token(foreground), token(background)),
     ).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps graphic tracks and focus boundaries distinguishable', () => {
+    expect(
+      contrast(token('graphic-grid'), token('graphic-track')),
+    ).toBeGreaterThanOrEqual(3);
+    expect(
+      contrast(token('graphic-focus'), token('surface-1')),
+    ).toBeGreaterThanOrEqual(3);
   });
 });

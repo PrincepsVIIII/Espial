@@ -181,6 +181,11 @@ Every physical view has a direct URL and a non-spatial list/table equivalent.
 
 ## Required states and review
 
+Operational meters, plots, diagrams, and future spatial renderings also follow the
+[graphics contract](GRAPHICS.md). The contract defines the required operator
+question, data and freshness disclosure, interaction, motion, renderer choice, and
+textual equivalent for every graphic.
+
 Every page must deliberately handle loading, empty/not-configured, permission
 denied, stale data, disconnected live updates, Core unavailable, and unexpected
 error states where applicable. These states use the same shell and visual language

@@ -23,16 +23,17 @@ export const load = (async ({ depends, fetch, parent, url }) => {
     );
   }
   const items = clusters.value?.items ?? [];
+  const showDevelopmentFixture =
+    dev && items.length === 0 && url.searchParams.get('fixture') !== 'off';
   return {
-    clusters:
-      dev && items.length === 0
-        ? { items: exampleClusters.items }
-        : clusters.value,
+    clusters: showDevelopmentFixture
+      ? { items: exampleClusters.items }
+      : clusters.value,
     problem: clusters.problem,
     canManage:
       parentData.session?.user.permissions.includes('integrations:manage') ??
       false,
-    demo: dev && items.length === 0 && !clusters.problem,
+    demo: showDevelopmentFixture && !clusters.problem,
   };
 }) satisfies PageLoad;
 

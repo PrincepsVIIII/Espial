@@ -190,6 +190,14 @@ but that is not a Phase 4 dependency relationship. Resource `source_url` values
 must be assembled only from the approved UI base and known version-checked path
 forms. Never copy an arbitrary response URL into `source_url`.
 
+The cluster observation's `active_vms_by_node` metadata is an aggregate comparison,
+not a relationship graph. Collection initializes every discovered node to zero and
+then counts running QEMU and LXC guests, so a node with no running guests remains
+visible. The Hypervisor read model preserves the existing `load_nodes` JSON shape
+and completes older observations from the authoritative host list before returning
+stable ID-sorted host/count pairs. The UI must not infer guest placement edges,
+migration paths, or topology from these counts.
+
 ## 7. Check taxonomy and health semantics
 
 The first implementation should prefer a few explainable checks:

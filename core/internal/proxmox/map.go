@@ -74,6 +74,9 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 		switch item.Type {
 		case "node":
 			node := itemNode(item)
+			if _, exists := activeByNode[node]; !exists {
+				activeByNode[node] = 0
+			}
 			status := nodeStatus[node]
 			cpuUsed, cpuMax := item.CPU, item.MaxCPU
 			if cpuMax == 0 {
