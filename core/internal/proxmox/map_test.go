@@ -89,6 +89,45 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	}
 }
 
+type duplicatedSharedStorageAPI struct{ fixtureAPI }
+
+func (duplicatedSharedStorageAPI) GetClusterResources(context.Context) ([]ClusterResource, error) {
+	resources, err := fixtureAPI{}.GetClusterResources(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	shared := 1
+	return append(resources, ClusterResource{
+		ID: "storage/pve-b/vmstore", Type: "storage", Node: "pve-b", Storage: "vmstore",
+		Status: "available", Disk: 85, MaxDisk: 100, Shared: &shared,
+	}), nil
+}
+
+func TestCollectCollapsesDuplicateSharedStorageEntries(t *testing.T) {
+	payload, err := Collect(context.Background(), Config{
+		BaseURL: "https://proxmox.example:8006", DeploymentID: "lab",
+		TokenID: "user@pve!espial", TokenSecret: "secret",
+	}, duplicatedSharedStorageAPI{}, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	storageResources := 0
+	storageObservations := 0
+	for _, resource := range payload.Resources {
+		if resource.ExternalID == "proxmox:lab:storage:shared:vmstore" {
+			storageResources++
+		}
+	}
+	for _, observation := range payload.Observations {
+		if observation.ExternalResourceID == "proxmox:lab:storage:shared:vmstore" {
+			storageObservations++
+		}
+	}
+	if storageResources != 1 || storageObservations != 2 {
+		t.Fatalf("shared storage resources=%d observations=%d", storageResources, storageObservations)
+	}
+}
+
 type unavailableTasksAPI struct{ fixtureAPI }
 
 func (unavailableTasksAPI) GetActiveTasks(context.Context) ([]Task, error) {

@@ -744,3 +744,10 @@ field and clears a committed selection. Focus, Enter, Space, Escape, touch, and
 the visible selected detail retain their previous equivalent behavior. Focused
 Chromium coverage verifies the left-side dismissal and audited editor flow; Svelte
 diagnostics and focused Core tests pass.
+
+## 2026-08-27 — Pending route feedback
+
+The shared authenticated shell now shows a compact, polite `Loading <section>…`
+notice whenever SvelteKit has a pending route load. This keeps the prior route from
+being mistaken for the selected destination during a slower authoritative read,
+without adding permanent connection chrome or obscuring navigation.

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/health"
@@ -69,7 +70,34 @@ func DecodeCollection(payload json.RawMessage, receivedAt time.Time) (Collection
 		}
 	}
 	if err := observations.ValidateBatch(batch, receivedAt); err != nil {
-		return CollectionPayload{}, observations.Batch{}, runtimeError("invalid_collection")
+		return CollectionPayload{}, observations.Batch{}, invalidCollectionError(err)
 	}
 	return collection, batch, nil
+}
+
+// invalidCollectionError preserves a bounded structural category for collection
+// diagnostics. It never includes source values, paths, payload fragments, or
+// adapter diagnostics, all of which may contain sensitive information.
+func invalidCollectionError(err error) error {
+	var validation *observations.ValidationError
+	if !errors.As(err, &validation) || len(validation.Fields) == 0 {
+		return runtimeError("invalid_collection")
+	}
+	field := validation.Fields[0]
+	parts := []string{"invalid_collection", field.Record, field.Field, field.Code}
+	for _, part := range parts {
+		if part == "" || !safeDiagnosticPart(part) {
+			return runtimeError("invalid_collection")
+		}
+	}
+	return runtimeError(strings.Join(parts, "_"))
+}
+
+func safeDiagnosticPart(value string) bool {
+	for _, character := range value {
+		if (character < 'a' || character > 'z') && character != '_' && (character < '0' || character > '9') {
+			return false
+		}
+	}
+	return true
 }

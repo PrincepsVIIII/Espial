@@ -13,6 +13,10 @@ func TestCollectionFailuresUseStableSafeCategories(t *testing.T) {
 	if result, code := classifyCollectionError(invalid), safeCollectionCode(invalid); result != CollectionRejected || code != "invalid_collection" {
 		t.Fatalf("invalid collection = %s %s", result, code)
 	}
+	invalidDetail := &adapters.RuntimeError{Code: "invalid_collection_resource_external_id_duplicate"}
+	if result, code := classifyCollectionError(invalidDetail), safeCollectionCode(invalidDetail); result != CollectionRejected || code != "invalid_collection_resource_external_id_duplicate" {
+		t.Fatalf("detailed invalid collection = %s %s", result, code)
+	}
 	unsafe := errors.New("remote payload contained a secret")
 	if result, code := classifyCollectionError(unsafe), safeCollectionCode(unsafe); result != CollectionFailed || code != "collection_failed" {
 		t.Fatalf("unsafe failure = %s %s", result, code)

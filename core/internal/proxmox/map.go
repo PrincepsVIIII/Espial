@@ -94,6 +94,10 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 	if consoleActivityAvailable {
 		activeByNode = activeConsoleVMs(activeTasks, runningGuests)
 	}
+	// /cluster/resources can report the same shared storage once per node. The
+	// shared scope deliberately gives those rows one Espial identity, so emit it
+	// once rather than producing an invalid batch with duplicate resource IDs.
+	seenStorage := map[string]struct{}{}
 	for _, item := range source {
 		switch item.Type {
 		case "node":
@@ -167,6 +171,11 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 			})
 		case "storage":
 			scope := storageScope(item)
+			externalID := storageID(config.DeploymentID, scope, displayName(item.Storage, item.Name))
+			if _, exists := seenStorage[externalID]; exists {
+				continue
+			}
+			seenStorage[externalID] = struct{}{}
 			used, total := item.Disk, item.MaxDisk
 			usedPercent := percent(used, total)
 			state := health.Healthy
@@ -179,7 +188,6 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 				capacityState = health.Critical
 			}
 			ioWait := nodeStatus[item.Node].Wait * 100
-			externalID := storageID(config.DeploymentID, scope, displayName(item.Storage, item.Name))
 			payload.Resources = append(payload.Resources, adapters.CollectionResource{
 				ExternalID: externalID, Kind: StorageKind, DisplayName: displayName(item.Storage, item.Name),
 				ObservedAt: observedAt, SourceURL: sourceURL(config.BaseURL, "/pve2/nodes/"+url.PathEscape(item.Node)+"/storage"),

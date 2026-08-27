@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto, invalidate } from '$app/navigation';
-  import { page } from '$app/state';
+  import { navigating, page } from '$app/state';
   import { onDestroy, onMount } from 'svelte';
   import { readCookie } from '$lib/auth';
   import BrandLogo from '$lib/components/BrandLogo.svelte';
@@ -89,6 +89,12 @@
     return (
       page.url.pathname === href || page.url.pathname.startsWith(`${href}/`)
     );
+  }
+
+  function navigationLabel(pathname: string): string {
+    return navItems.find(
+      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
+    )?.label ?? 'page';
   }
 
   function closeNavigation() {
@@ -313,6 +319,11 @@
       </div>
     </header>
     <main id="main-content" class="content">
+      {#if navigating.to}
+        <div class="refresh-notice" role="status" aria-live="polite">
+          Loading {navigationLabel(navigating.to.url.pathname)}…
+        </div>
+      {/if}
       {#if interruptionLabels[$liveConnection.status]}
         <div class="connection-notice" role="status" aria-live="polite">
           <span>{interruptionLabels[$liveConnection.status]}</span>

@@ -3,6 +3,7 @@ package monitoring
 import (
 	"context"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
@@ -118,7 +119,7 @@ func (collector *Collector) nowAfter(startedAt time.Time) time.Time {
 
 func classifyCollectionError(err error) string {
 	var runtime *adapters.RuntimeError
-	if errors.As(err, &runtime) && runtime.Code == "invalid_collection" {
+	if errors.As(err, &runtime) && strings.HasPrefix(runtime.Code, "invalid_collection") {
 		return CollectionRejected
 	}
 	return CollectionFailed

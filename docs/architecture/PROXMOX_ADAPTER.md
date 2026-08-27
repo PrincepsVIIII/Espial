@@ -191,8 +191,10 @@ human-readable cluster display name as the only deployment identity.
 Proxmox VMIDs are cluster-wide identifiers and are suitable for guest identity
 when combined with the guest type and Espial deployment ID. Node and storage
 identity must be confirmed against the actual deployment. Local storage with the
-same storage ID on several nodes may require the node in `<scope>`; shared storage
-must not be duplicated or collapsed until fixtures establish its semantics.
+same storage ID on several nodes uses the node in `<scope>`. `/cluster/resources`
+may report shared storage once per node; those duplicate rows share one
+`shared:<storage-id>` identity and are collapsed before the collection batch is
+validated, preventing duplicate resource IDs.
 
 A guest's current node may be stored as a bounded attribute for source context,
 but that is not a Phase 4 dependency relationship. Resource `source_url` values
