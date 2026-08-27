@@ -1679,6 +1679,54 @@
         }
       }
     },
+    "/hypervisor/proxmox/clusters/{id}/configuration": {
+      "get": {
+        "operationId": "getProxmoxClusterConfiguration",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/ID" }],
+        "responses": {
+          "200": {
+            "description": "Administrator-safe typed Proxmox configuration; token material is never returned.",
+            "headers": { "ETag": { "schema": { "type": "string" } } },
+            "content": { "application/json": { "schema": { "$ref": "../schemas/v1/proxmox-cluster-configuration.schema.json" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      },
+      "put": {
+        "operationId": "updateProxmoxClusterConfiguration",
+        "security": [{ "cookieAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/ID" },
+          { "$ref": "#/components/parameters/Origin" },
+          { "$ref": "#/components/parameters/CSRFToken" },
+          { "$ref": "#/components/parameters/IfMatch" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "../schemas/v1/proxmox-cluster-update.schema.json" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Validated Proxmox configuration saved with an audit receipt.",
+            "headers": { "ETag": { "schema": { "type": "string" } } },
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AdministrativeMutationReceipt" } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "412": { "$ref": "#/components/responses/PreconditionFailed" },
+          "413": { "$ref": "#/components/responses/TooLarge" },
+          "500": { "$ref": "#/components/responses/InternalError" },
+          "503": { "$ref": "#/components/responses/Unavailable" }
+        }
+      }
+    },
     "/website-monitors": {
       "get": {
         "operationId": "listWebsiteMonitors",

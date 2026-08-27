@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/proxmox-cluster-update.schema.json",
+  "title": "Proxmox cluster configuration update request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "display_name", "base_url", "approve_target", "allow_insecure_http",
+    "trust_self_signed_certificate", "deployment_id", "token_id",
+    "interval_seconds", "expected_refresh_seconds", "request_timeout_seconds",
+    "storage_warning_percent", "storage_critical_percent", "swap_warning_percent",
+    "swap_critical_percent", "io_wait_warning_percent", "io_wait_critical_percent",
+    "expected_running_guests"
+  ],
+  "properties": {
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "base_url": { "type": "string", "format": "uri", "maxLength": 2048 },
+    "approve_target": { "type": "boolean", "const": true },
+    "allow_insecure_http": { "type": "boolean" },
+    "trust_self_signed_certificate": { "type": "boolean" },
+    "deployment_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,62}$" },
+    "token_id": { "type": "string", "minLength": 3, "maxLength": 160 },
+    "token_secret": { "type": "string", "writeOnly": true, "minLength": 1, "maxLength": 4096 },
+    "interval_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "expected_refresh_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+    "request_timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 60 },
+    "storage_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "storage_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "swap_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "swap_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "io_wait_warning_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "io_wait_critical_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+    "expected_running_guests": {
+      "type": "array", "maxItems": 10000, "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(qemu|lxc):[0-9]{1,10}$" }
+    }
+  }
+}

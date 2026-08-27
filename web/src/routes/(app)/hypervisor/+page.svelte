@@ -19,6 +19,7 @@
   } from '$lib/proxmox-form';
   import type {
     AdministrativeMutationReceipt,
+    ProxmoxClusterConfiguration,
     ProxmoxClusterCreateRequest,
   } from '$lib/api/generated';
 
@@ -30,8 +31,11 @@
   let addClusterButton = $state<HTMLButtonElement>();
   let firstClusterInput = $state<HTMLInputElement>();
   let clusterDialog = $state<HTMLDivElement>();
+  let editor = $state<ProxmoxClusterConfiguration | null>(null);
+  let editorLoading = $state(false);
+  let modalReturnTarget = $state<HTMLElement | null>(null);
 
-  async function createCluster(event: SubmitEvent) {
+  async function saveCluster(event: SubmitEvent) {
     event.preventDefault();
     const form = new FormData(event.currentTarget as HTMLFormElement);
     if (form.get('approve_target') !== 'on') {
@@ -79,19 +83,20 @@
     formProblem = null;
     receipt = null;
     try {
-      receipt = await requestJSON<AdministrativeMutationReceipt>(
-        fetch,
-        '/api/v1/hypervisor/proxmox/clusters',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': readCookie('espial_csrf'),
-          },
-          body: JSON.stringify(body),
+      const endpoint = editor
+        ? `/api/v1/hypervisor/proxmox/clusters/${editor.id}/configuration`
+        : '/api/v1/hypervisor/proxmox/clusters';
+      receipt = await requestJSON<AdministrativeMutationReceipt>(fetch, endpoint, {
+        method: editor ? 'PUT' : 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': readCookie('espial_csrf'),
+          ...(editor ? { 'If-Match': configurationETag(editor.version) } : {}),
         },
-      );
+        body: JSON.stringify(body),
+      });
       modalOpen = false;
+      editor = null;
       await invalidate('espial:monitoring');
     } catch (error) {
       const problem =
@@ -122,6 +127,7 @@
 
   async function openModal() {
     formProblem = null;
+    editor = null;
     modalOpen = true;
     await tick();
     firstClusterInput?.focus();
@@ -130,8 +136,36 @@
   async function closeModal() {
     if (saving) return;
     modalOpen = false;
+    editor = null;
     await tick();
-    addClusterButton?.focus();
+    (modalReturnTarget ?? addClusterButton)?.focus();
+    modalReturnTarget = null;
+  }
+
+  async function openClusterEditor(event: MouseEvent, id: string) {
+    modalReturnTarget = event.currentTarget as HTMLElement;
+    formProblem = null;
+    editor = null;
+    editorLoading = true;
+    modalOpen = true;
+    try {
+      editor = await requestJSON<ProxmoxClusterConfiguration>(
+        fetch,
+        `/api/v1/hypervisor/proxmox/clusters/${id}/configuration`,
+      );
+      await tick();
+      firstClusterInput?.focus();
+    } catch (error) {
+      const problem =
+        error instanceof ApiFailure ? error.problem : problemFrom(error);
+      formProblem = clusterFormFeedback(problem);
+    } finally {
+      editorLoading = false;
+    }
+  }
+
+  function configurationETag(version: number): string {
+    return `"${Math.trunc(version).toString(16)}"`;
   }
 
   function handleWindowKeydown(event: KeyboardEvent) {
@@ -182,9 +216,9 @@
   {/if}
 </header>
 
-{#if receipt}
+  {#if receipt}
   <div class="receipt" role="status">
-    <strong>Cluster integration created.</strong>
+    <strong>Cluster configuration saved.</strong>
     <span>Request ID: <code>{receipt.request_id}</code></span>
     {#if receipt.audit_url}
       <a class="text-link" href={receipt.audit_url}>Audit record</a>
@@ -218,7 +252,17 @@
     {#each data.clusters.items as cluster (cluster.id)}
       <article class="cluster-panel" aria-labelledby={`cluster-${cluster.id}`}>
         <header class="cluster-title">
-          <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
+          {#if data.canManage}
+            <button
+              id={`cluster-${cluster.id}`}
+              type="button"
+              class="cluster-settings-button"
+              aria-label={`Edit settings for ${cluster.name}`}
+              onclick={(event) => openClusterEditor(event, cluster.integration_id)}
+            >{cluster.name}</button>
+          {:else}
+            <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
+          {/if}
           {#if displayState(cluster.state) !== 'healthy'}
             <StatusIndicator state={displayState(cluster.state)} compact />
           {/if}
@@ -294,6 +338,7 @@
             clusterName={cluster.name}
             hosts={cluster.hosts}
             loadNodes={cluster.load_nodes}
+            consoleActivityAvailable={cluster.console_activity_available}
           />
         </div>
       </article>
@@ -316,16 +361,18 @@
       role="dialog"
       tabindex="-1"
       aria-modal="true"
-      aria-labelledby="add-cluster-title"
+      aria-labelledby="cluster-editor-title"
       onkeydown={trapDialogFocus}
     >
       <div class="modal-heading">
         <div>
-          <h2 id="add-cluster-title">Add Proxmox cluster</h2>
-          <p id="add-cluster-description">
-            Espial validates the read-only connection before saving it. The
-            token secret is written to the configured secret store and is not
-            returned.
+          <h2 id="cluster-editor-title">
+            {editor ? `Edit ${editor.display_name}` : 'Add Proxmox cluster'}
+          </h2>
+          <p id="cluster-editor-description">
+            {editor
+              ? 'Espial validates changes before saving them. Leave the token secret empty to retain the stored secret.'
+              : 'Espial validates the read-only connection before saving it. The token secret is written to the configured secret store and is not returned.'}
           </p>
         </div>
         <button
@@ -335,11 +382,23 @@
           onclick={closeModal}>Close</button
         >
       </div>
+      {#if editorLoading}
+        <div class="editor-loading" aria-live="polite">Loading cluster settings…</div>
+      {:else if !editor && formProblem}
+        <section class="form-problem editor-problem" role="alert">
+          <strong>{formProblem.title}</strong>
+          <ul>
+            {#each formProblem.details as detail}
+              <li>{detail}</li>
+            {/each}
+          </ul>
+        </section>
+      {:else}
       <form
         class="cluster-form"
-        aria-describedby="add-cluster-description"
+        aria-describedby="cluster-editor-description"
         aria-busy={saving}
-        onsubmit={createCluster}
+        onsubmit={saveCluster}
       >
         <fieldset>
           <legend>Connection</legend>
@@ -351,6 +410,7 @@
                 name="display_name"
                 required
                 maxlength="128"
+                value={editor?.display_name ?? ''}
               />
               <small>The operator-facing name shown in Hypervisor.</small>
             </label>
@@ -363,6 +423,7 @@
                 minlength="2"
                 maxlength="63"
                 placeholder="production-pve"
+                value={editor?.deployment_id ?? ''}
               />
               <small
                 >Stable lowercase identity; this cannot be a display name.</small
@@ -375,6 +436,7 @@
                 type="url"
                 required
                 placeholder="https://proxmox.example:8006"
+                value={editor?.base_url ?? ''}
               />
               <small
                 >Origin only. Do not include an API path, query, or credentials.</small
@@ -383,7 +445,7 @@
           </div>
           <div class="security-options">
             <label class="check-row">
-              <input name="approve_target" type="checkbox" required />
+              <input name="approve_target" type="checkbox" required checked={editor?.approve_target ?? false} />
               <span>
                 <strong>Approve this exact target</strong>
                 <small
@@ -393,7 +455,7 @@
               </span>
             </label>
             <label class="check-row">
-              <input name="trust_self_signed_certificate" type="checkbox" />
+              <input name="trust_self_signed_certificate" type="checkbox" checked={editor?.trust_self_signed_certificate ?? false} />
               <span>
                 <strong>Trust this cluster’s self-signed certificate</strong>
                 <small
@@ -403,7 +465,7 @@
               </span>
             </label>
             <label class="check-row">
-              <input name="allow_insecure_http" type="checkbox" />
+              <input name="allow_insecure_http" type="checkbox" checked={editor?.allow_insecure_http ?? false} />
               <span>
                 <strong>Allow insecure HTTP</strong>
                 <small
@@ -425,6 +487,7 @@
                 required
                 placeholder="espial@pve!monitoring"
                 autocomplete="username"
+                value={editor?.token_id ?? ''}
               />
               <small>Include the user, realm, and token name.</small>
             </label>
@@ -433,10 +496,10 @@
               <input
                 name="token_secret"
                 type="password"
-                required
+                required={!editor}
                 autocomplete="new-password"
               />
-              <small>Accepted once and stored by secret reference.</small>
+              <small>{editor ? 'Leave empty to retain the stored secret. Enter a value to replace it.' : 'Accepted once and stored by secret reference.'}</small>
             </label>
           </div>
         </fieldset>
@@ -452,7 +515,7 @@
                   type="number"
                   min="1"
                   max="86400"
-                  value="300"
+                  value={editor?.interval_seconds ?? 300}
                 />
                 <span>seconds</span>
               </div>
@@ -465,7 +528,7 @@
                   type="number"
                   min="1"
                   max="86400"
-                  value="300"
+                  value={editor?.expected_refresh_seconds ?? 300}
                 />
                 <span>seconds</span>
               </div>
@@ -478,7 +541,7 @@
                   type="number"
                   min="1"
                   max="60"
-                  value="10"
+                  value={editor?.request_timeout_seconds ?? 10}
                 />
                 <span>seconds</span>
               </div>
@@ -507,7 +570,13 @@
                     type="number"
                     min="0"
                     max="100"
-                    value={threshold[2]}
+                    value={editor
+                      ? threshold[1] === 'storage'
+                        ? editor.storage_warning_percent
+                        : threshold[1] === 'swap'
+                          ? editor.swap_warning_percent
+                          : editor.io_wait_warning_percent
+                      : threshold[2]}
                   />
                   <span>%</span>
                 </div>
@@ -522,7 +591,13 @@
                     type="number"
                     min="0"
                     max="100"
-                    value={threshold[3]}
+                    value={editor
+                      ? threshold[1] === 'storage'
+                        ? editor.storage_critical_percent
+                        : threshold[1] === 'swap'
+                          ? editor.swap_critical_percent
+                          : editor.io_wait_critical_percent
+                      : threshold[3]}
                   />
                   <span>%</span>
                 </div>
@@ -538,6 +613,7 @@
             <input
               name="expected_running_guests"
               placeholder="qemu:100, lxc:200"
+              value={editor?.expected_running_guests.join(', ') ?? ''}
             />
             <small
               >Comma-separated qemu:&lt;id&gt; or lxc:&lt;id&gt; values. Stopped
@@ -564,10 +640,11 @@
             >Cancel</button
           >
           <button type="submit" disabled={saving}
-            >{saving ? 'Validating...' : 'Validate and add'}</button
+            >{saving ? 'Validating...' : editor ? 'Validate and save' : 'Validate and add'}</button
           >
         </div>
       </form>
+      {/if}
     </div>
   </div>
 {/if}
@@ -623,6 +700,25 @@
 
   .cluster-title h2 {
     margin: 0;
+  }
+
+  .cluster-settings-button {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 1.5rem;
+    font-weight: 700;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .cluster-settings-button:hover,
+  .cluster-settings-button:focus-visible {
+    border-bottom-color: var(--netdef-cyan);
   }
 
   .cluster-overview {
@@ -683,6 +779,11 @@
     background: var(--surface-2);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius-sm);
+  }
+
+  .editor-loading,
+  .editor-problem {
+    margin: 1.5rem;
   }
 
   .modal-heading {

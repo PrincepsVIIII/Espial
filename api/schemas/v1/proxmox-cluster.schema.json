@@ -13,7 +13,8 @@
     "hosts",
     "storage",
     "totals",
-    "load_nodes"
+    "load_nodes",
+    "console_activity_available"
   ],
   "properties": {
     "id": { "type": "string", "minLength": 1, "maxLength": 128 },
@@ -92,12 +93,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "active_vms"],
+        "required": ["id", "idle_vms", "active_vms"],
         "properties": {
           "id": { "type": "string" },
+          "idle_vms": { "type": "integer", "minimum": 0 },
           "active_vms": { "type": "integer", "minimum": 0 }
         }
       }
-    }
+    },
+    "console_activity_available": { "type": "boolean" }
   }
 }

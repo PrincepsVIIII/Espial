@@ -103,9 +103,10 @@ const exampleClusters: ProxmoxClusterList = {
         ram_percent: 68.7,
         storage_percent: 63.6,
       },
+      console_activity_available: true,
       load_nodes: [
-        { id: 'pve-a', active_vms: 3 },
-        { id: 'pve-b', active_vms: 7 },
+        { id: 'pve-a', idle_vms: 3, active_vms: 1 },
+        { id: 'pve-b', idle_vms: 7, active_vms: 2 },
       ],
     },
   ],

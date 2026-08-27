@@ -104,7 +104,7 @@ func Serve(ctx context.Context, cfg config.Config, logger *slog.Logger) error {
 		Notifications:    notificationService,
 		Websites:         websiteService,
 		Certificates:     certificates.NewService(pool),
-		Hypervisor:       hypervisor.NewService(pool, integrationManager, adapterSecrets, proxmox.Policy{ApprovedHosts: cfg.Adapters.ProxmoxApprovedHosts, AllowedPorts: cfg.Adapters.ProxmoxAllowedPorts}, nil),
+		Hypervisor:       hypervisor.NewService(pool, integrationManager, adapterSecrets, proxmox.Policy{ApprovedHosts: cfg.Adapters.ProxmoxApprovedHosts, AllowedPorts: cfg.Adapters.ProxmoxAllowedPorts}, nil, monitoringRuntime),
 		Metrics:          operations.NewCollector(pool, notificationService, nil),
 		Integrations:     integrationManager,
 		Users:            authService,

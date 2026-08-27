@@ -3,6 +3,7 @@ package hypervisor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"sort"
@@ -12,13 +13,19 @@ import (
 
 	"github.com/PrincepsVIIII/Espial/core/internal/adapters"
 	"github.com/PrincepsVIIII/Espial/core/internal/adminops"
+	"github.com/PrincepsVIIII/Espial/core/internal/audit"
 	"github.com/PrincepsVIIII/Espial/core/internal/monitoring"
 	"github.com/PrincepsVIIII/Espial/core/internal/proxmox"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type IntegrationCreator interface {
 	Create(context.Context, monitoring.CreateIntegration) (string, time.Time, error)
+}
+
+type IntegrationRestarter interface {
+	RestartIntegration(string)
 }
 
 type Service struct {
@@ -28,18 +35,23 @@ type Service struct {
 	policy    proxmox.Policy
 	newClient func(proxmox.Config) (proxmox.API, error)
 	now       func() time.Time
+	restarter IntegrationRestarter
 }
 
-func NewService(pool *pgxpool.Pool, creator IntegrationCreator, secrets adapters.SecretStore, policy proxmox.Policy, now func() time.Time) *Service {
+func NewService(pool *pgxpool.Pool, creator IntegrationCreator, secrets adapters.SecretStore, policy proxmox.Policy, now func() time.Time, restarters ...IntegrationRestarter) *Service {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
-	return &Service{
+	service := &Service{
 		pool: pool, creator: creator, secrets: secrets, policy: policy, now: now,
 		newClient: func(config proxmox.Config) (proxmox.API, error) {
 			return proxmox.NewClient(config, proxmoxClientOptions(policy, config))
 		},
 	}
+	if len(restarters) > 0 {
+		service.restarter = restarters[0]
+	}
+	return service
 }
 
 func (service *Service) CreateProxmoxCluster(ctx context.Context, definition ProxmoxClusterDefinition) (adminops.Receipt, error) {
@@ -92,25 +104,7 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	if err := service.secrets.Write(ctx, tokenSecretReference, config.TokenSecret); err != nil {
 		return adminops.Receipt{}, &monitoring.Error{Code: "secret_store_unavailable"}
 	}
-	nonsecret := map[string]any{
-		"base_url":                      config.BaseURL,
-		"allow_insecure_http":           config.AllowInsecureHTTP,
-		"trust_self_signed_certificate": config.TrustSelfSignedCertificate,
-		"trusted_certificate_sha256":    config.TrustedCertificateSHA256,
-		"approved_host":                 config.ApprovedHost,
-		"approved_port":                 config.ApprovedPort,
-		"deployment_id":                 config.DeploymentID,
-		"token_id":                      config.TokenID,
-		"expected_refresh_seconds":      config.ExpectedRefreshSeconds,
-		"request_timeout_seconds":       config.RequestTimeoutSeconds,
-		"storage_warning_percent":       config.StorageWarningPercent,
-		"storage_critical_percent":      config.StorageCriticalPercent,
-		"swap_warning_percent":          config.SwapWarningPercent,
-		"swap_critical_percent":         config.SwapCriticalPercent,
-		"io_wait_warning_percent":       config.IOWaitWarningPercent,
-		"io_wait_critical_percent":      config.IOWaitCriticalPercent,
-		"expected_running_guests":       config.ExpectedRunningGuests,
-	}
+	nonsecret := nonsecretConfig(config)
 	id, updatedAt, err := service.creator.Create(ctx, monitoring.CreateIntegration{
 		AdapterID: proxmox.AdapterID, DisplayName: strings.TrimSpace(definition.DisplayName), Enabled: true, Typed: true,
 		Interval:        time.Duration(intervalSeconds(definition.IntervalSeconds)) * time.Second,
@@ -125,6 +119,253 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 		receipt.AuditURL = "/audit?correlation_id=" + definition.CorrelationID
 	}
 	return receipt, nil
+}
+
+type proxmoxClusterRecord struct {
+	ID               string
+	DisplayName      string
+	Enabled          bool
+	IntervalSeconds  int
+	Config           map[string]any
+	SecretReferences map[string]string
+	UpdatedAt        time.Time
+}
+
+// ProxmoxClusterConfiguration returns the dedicated, non-secret editor view.
+// It deliberately requires callers to use the typed configuration route rather
+// than the generic integration configuration API.
+func (service *Service) ProxmoxClusterConfiguration(ctx context.Context, id string) (ProxmoxClusterConfiguration, error) {
+	record, err := service.loadProxmoxCluster(ctx, service.pool, id, false)
+	if err != nil {
+		return ProxmoxClusterConfiguration{}, err
+	}
+	return configurationFromRecord(record)
+}
+
+// UpdateProxmoxCluster validates the replacement configuration against Proxmox,
+// writes an append-only redacted audit event, and restarts collection after the
+// transaction commits. An empty TokenSecret retains the stored secret.
+func (service *Service) UpdateProxmoxCluster(ctx context.Context, definition ProxmoxClusterUpdateDefinition) (adminops.Receipt, error) {
+	if service.pool == nil || service.secrets == nil || definition.ID == "" || definition.ExpectedUpdatedAt.IsZero() {
+		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_integration_config"}
+	}
+	record, err := service.loadProxmoxCluster(ctx, service.pool, definition.ID, false)
+	if err != nil {
+		return adminops.Receipt{}, err
+	}
+	if !record.UpdatedAt.Equal(definition.ExpectedUpdatedAt) {
+		return adminops.Receipt{}, &monitoring.Error{Code: "integration_config_conflict"}
+	}
+	previous, err := configFromRecord(record)
+	if err != nil {
+		return adminops.Receipt{}, err
+	}
+	tokenSecret := strings.TrimSpace(definition.TokenSecret)
+	if tokenSecret == "" {
+		reference := strings.TrimSpace(record.SecretReferences["token_secret"])
+		if reference == "" {
+			return adminops.Receipt{}, &monitoring.Error{Code: "secret_store_unavailable"}
+		}
+		tokenSecret, err = service.secrets.Resolve(ctx, reference)
+		if err != nil {
+			return adminops.Receipt{}, &monitoring.Error{Code: "secret_store_unavailable"}
+		}
+	}
+	config, err := service.validateProxmoxDefinition(ctx, definition.ProxmoxClusterDefinition, tokenSecret, previous)
+	if err != nil {
+		return adminops.Receipt{}, err
+	}
+
+	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return adminops.Receipt{}, fmt.Errorf("begin proxmox configuration update: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	locked, err := service.loadProxmoxCluster(ctx, tx, definition.ID, true)
+	if err != nil {
+		return adminops.Receipt{}, err
+	}
+	if !locked.UpdatedAt.Equal(definition.ExpectedUpdatedAt) {
+		return adminops.Receipt{}, &monitoring.Error{Code: "integration_config_conflict"}
+	}
+	if strings.TrimSpace(definition.TokenSecret) != "" {
+		reference := strings.TrimSpace(locked.SecretReferences["token_secret"])
+		if reference == "" || service.secrets.Write(ctx, reference, tokenSecret) != nil {
+			return adminops.Receipt{}, &monitoring.Error{Code: "secret_store_unavailable"}
+		}
+	}
+	nonsecret, err := json.Marshal(nonsecretConfig(config))
+	if err != nil {
+		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_integration_config"}
+	}
+	updatedAt := service.now().UTC().Truncate(time.Microsecond)
+	if !updatedAt.After(locked.UpdatedAt) {
+		updatedAt = locked.UpdatedAt.Add(time.Microsecond)
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE integrations SET display_name = $2, interval_seconds = $3,
+			config_nonsecret = $4::jsonb, updated_at = $5
+		WHERE id = $1
+	`, definition.ID, strings.TrimSpace(definition.DisplayName), intervalSeconds(definition.IntervalSeconds), string(nonsecret), updatedAt); err != nil {
+		return adminops.Receipt{}, fmt.Errorf("update proxmox configuration: %w", err)
+	}
+	if err := audit.Append(ctx, tx, audit.Event{
+		ActorUserID: definition.ActorUserID, Action: "integration.configuration.updated",
+		TargetType: "integration", TargetID: definition.ID, Result: "succeeded",
+		SourceAddress: definition.SourceAddress, CorrelationID: definition.CorrelationID,
+		BeforeSummary: configurationSummary(locked),
+		AfterSummary: map[string]any{
+			"enabled": locked.Enabled, "interval_seconds": intervalSeconds(definition.IntervalSeconds),
+			"config_keys":           sortedMapKeys(nonsecretConfig(config)),
+			"secret_reference_keys": sortedMapKeys(locked.SecretReferences),
+		},
+		OccurredAt: updatedAt,
+	}); err != nil {
+		return adminops.Receipt{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return adminops.Receipt{}, fmt.Errorf("commit proxmox configuration update: %w", err)
+	}
+	if service.restarter != nil {
+		service.restarter.RestartIntegration(definition.ID)
+	}
+	receipt := adminops.Receipt{ID: definition.ID, Version: updatedAt.UnixMicro(), RequestID: definition.CorrelationID}
+	if definition.CanReadAudit {
+		receipt.AuditURL = "/audit?correlation_id=" + definition.CorrelationID
+	}
+	return receipt, nil
+}
+
+type proxmoxClusterQuerier interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func (service *Service) loadProxmoxCluster(ctx context.Context, database proxmoxClusterQuerier, id string, lock bool) (proxmoxClusterRecord, error) {
+	query := `SELECT id::text, display_name, enabled, interval_seconds, config_nonsecret, secret_references, updated_at
+		FROM integrations WHERE id = $1 AND adapter_id = $2`
+	if lock {
+		query += " FOR UPDATE"
+	}
+	var record proxmoxClusterRecord
+	if err := database.QueryRow(ctx, query, id, proxmox.AdapterID).Scan(
+		&record.ID, &record.DisplayName, &record.Enabled, &record.IntervalSeconds,
+		&record.Config, &record.SecretReferences, &record.UpdatedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return proxmoxClusterRecord{}, &monitoring.Error{Code: "integration_not_found"}
+		}
+		return proxmoxClusterRecord{}, fmt.Errorf("load proxmox configuration: %w", err)
+	}
+	return record, nil
+}
+
+func configurationFromRecord(record proxmoxClusterRecord) (ProxmoxClusterConfiguration, error) {
+	config, err := configFromRecord(record)
+	if err != nil {
+		return ProxmoxClusterConfiguration{}, err
+	}
+	return ProxmoxClusterConfiguration{
+		ID: record.ID, DisplayName: record.DisplayName, BaseURL: config.BaseURL, ApproveTarget: true,
+		AllowInsecureHTTP: config.AllowInsecureHTTP, TrustSelfSignedCertificate: config.TrustSelfSignedCertificate,
+		DeploymentID: config.DeploymentID, TokenID: config.TokenID,
+		TokenSecretConfigured: strings.TrimSpace(record.SecretReferences["token_secret"]) != "",
+		IntervalSeconds:       record.IntervalSeconds, ExpectedRefreshSeconds: config.ExpectedRefreshSeconds,
+		RequestTimeoutSeconds: config.RequestTimeoutSeconds, StorageWarningPercent: config.StorageWarningPercent,
+		StorageCriticalPercent: config.StorageCriticalPercent, SwapWarningPercent: config.SwapWarningPercent,
+		SwapCriticalPercent: config.SwapCriticalPercent, IOWaitWarningPercent: config.IOWaitWarningPercent,
+		IOWaitCriticalPercent: config.IOWaitCriticalPercent, ExpectedRunningGuests: config.ExpectedRunningGuests,
+		UpdatedAt: record.UpdatedAt, Version: record.UpdatedAt.UnixMicro(),
+	}, nil
+}
+
+func configFromRecord(record proxmoxClusterRecord) (proxmox.Config, error) {
+	encoded, err := json.Marshal(record.Config)
+	if err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: "invalid_integration_config"}
+	}
+	var config proxmox.Config
+	if err := json.Unmarshal(encoded, &config); err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: "invalid_integration_config"}
+	}
+	return proxmox.WithDefaults(config), nil
+}
+
+func (service *Service) validateProxmoxDefinition(ctx context.Context, definition ProxmoxClusterDefinition, tokenSecret string, previous proxmox.Config) (proxmox.Config, error) {
+	if !definition.ApproveTarget {
+		return proxmox.Config{}, &monitoring.Error{Code: "target_approval_required"}
+	}
+	config := proxmox.WithDefaults(proxmox.Config{
+		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID, AllowInsecureHTTP: definition.AllowInsecureHTTP,
+		TrustSelfSignedCertificate: definition.TrustSelfSignedCertificate, TokenID: definition.TokenID, TokenSecret: tokenSecret,
+		ExpectedRefreshSeconds: definition.ExpectedRefreshSeconds, RequestTimeoutSeconds: definition.RequestTimeoutSeconds,
+		StorageWarningPercent: definition.StorageWarningPercent, StorageCriticalPercent: definition.StorageCriticalPercent,
+		SwapWarningPercent: definition.SwapWarningPercent, SwapCriticalPercent: definition.SwapCriticalPercent,
+		IOWaitWarningPercent: definition.IOWaitWarningPercent, IOWaitCriticalPercent: definition.IOWaitCriticalPercent,
+		ExpectedRunningGuests: definition.ExpectedRunningGuests,
+	})
+	host, port, err := approvedTarget(config.BaseURL)
+	if err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: "invalid_proxmox_config"}
+	}
+	config.ApprovedHost, config.ApprovedPort = host, port
+	if config.TrustSelfSignedCertificate && strings.TrimSpace(previous.BaseURL) == strings.TrimSpace(config.BaseURL) && previous.TrustSelfSignedCertificate {
+		config.TrustedCertificateSHA256 = previous.TrustedCertificateSHA256
+	}
+	if err := proxmox.ValidateConfig(config); err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: "invalid_proxmox_config"}
+	}
+	client, err := service.newClient(config)
+	if err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: proxmoxCreateErrorCode(err)}
+	}
+	validationContext, cancel := context.WithTimeout(ctx, proxmox.RequestTimeout(config))
+	defer cancel()
+	if _, err := proxmox.Collect(validationContext, config, client, service.now()); err != nil {
+		return proxmox.Config{}, &monitoring.Error{Code: proxmoxCreateErrorCode(err)}
+	}
+	if config.TrustSelfSignedCertificate && config.TrustedCertificateSHA256 == "" {
+		fingerprinter, ok := client.(interface{ CertificateFingerprint() string })
+		if !ok || fingerprinter.CertificateFingerprint() == "" {
+			return proxmox.Config{}, &monitoring.Error{Code: "tls_certificate_missing"}
+		}
+		config.TrustedCertificateSHA256 = fingerprinter.CertificateFingerprint()
+	}
+	return config, nil
+}
+
+func nonsecretConfig(config proxmox.Config) map[string]any {
+	return map[string]any{
+		"base_url": config.BaseURL, "allow_insecure_http": config.AllowInsecureHTTP,
+		"trust_self_signed_certificate": config.TrustSelfSignedCertificate,
+		"trusted_certificate_sha256":    config.TrustedCertificateSHA256,
+		"approved_host":                 config.ApprovedHost, "approved_port": config.ApprovedPort,
+		"deployment_id": config.DeploymentID, "token_id": config.TokenID,
+		"expected_refresh_seconds": config.ExpectedRefreshSeconds,
+		"request_timeout_seconds":  config.RequestTimeoutSeconds,
+		"storage_warning_percent":  config.StorageWarningPercent,
+		"storage_critical_percent": config.StorageCriticalPercent,
+		"swap_warning_percent":     config.SwapWarningPercent,
+		"swap_critical_percent":    config.SwapCriticalPercent,
+		"io_wait_warning_percent":  config.IOWaitWarningPercent,
+		"io_wait_critical_percent": config.IOWaitCriticalPercent,
+		"expected_running_guests":  config.ExpectedRunningGuests,
+	}
+}
+
+func configurationSummary(record proxmoxClusterRecord) map[string]any {
+	return map[string]any{
+		"enabled": record.Enabled, "interval_seconds": record.IntervalSeconds,
+		"config_keys": sortedMapKeys(record.Config), "secret_reference_keys": sortedMapKeys(record.SecretReferences),
+	}
+}
+
+func sortedMapKeys[T any](values map[string]T) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func approvedTarget(baseURL string) (string, int, error) {
@@ -207,7 +448,8 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 			cluster.ID = valueString(resourceID, integrationID)
 			cluster.State = resourceState
 			cluster.Freshness = freshness(resourceState)
-			cluster.LoadNodes = loadNodes(meta["active_vms_by_node"])
+			cluster.LoadNodes = loadNodes(meta["idle_vms_by_node"], meta["active_vms_by_node"])
+			cluster.ConsoleActivityAvailable = boolValue(meta["console_activity_available"])
 		case proxmox.NodeKind:
 			cluster.Hosts = append(cluster.Hosts, HostSummary{
 				ID:         valueString(displayName, attrString(attr, "node")),
@@ -308,6 +550,11 @@ func number(value any) float64 {
 	}
 }
 
+func boolValue(value any) bool {
+	result, _ := value.(bool)
+	return result
+}
+
 func percent(used, total float64) float64 {
 	if total <= 0 {
 		return 0
@@ -324,32 +571,40 @@ func freshness(state string) string {
 	}
 }
 
-func loadNodes(value any) []LoadNodeSummary {
-	values, ok := value.(map[string]any)
-	if !ok {
-		return nil
+func loadNodes(idleValue, activeValue any) []LoadNodeSummary {
+	idle, _ := idleValue.(map[string]any)
+	active, _ := activeValue.(map[string]any)
+	ids := map[string]struct{}{}
+	for id := range idle {
+		ids[id] = struct{}{}
 	}
-	result := make([]LoadNodeSummary, 0, len(values))
-	for key, count := range values {
-		result = append(result, LoadNodeSummary{ID: key, ActiveVMs: int(number(count))})
+	for id := range active {
+		ids[id] = struct{}{}
+	}
+	result := make([]LoadNodeSummary, 0, len(ids))
+	for id := range ids {
+		result = append(result, LoadNodeSummary{ID: id, IdleVMs: int(number(idle[id])), ActiveVMs: int(number(active[id]))})
 	}
 	return result
 }
 
 func completeLoadNodes(hosts []HostSummary, loads []LoadNodeSummary) []LoadNodeSummary {
-	counts := make(map[string]int, len(hosts)+len(loads))
+	counts := make(map[string]LoadNodeSummary, len(hosts)+len(loads))
 	for _, host := range hosts {
-		counts[host.ID] = 0
+		counts[host.ID] = LoadNodeSummary{ID: host.ID}
 	}
 	for _, load := range loads {
+		if load.IdleVMs < 0 {
+			load.IdleVMs = 0
+		}
 		if load.ActiveVMs < 0 {
 			load.ActiveVMs = 0
 		}
-		counts[load.ID] = load.ActiveVMs
+		counts[load.ID] = load
 	}
 	result := make([]LoadNodeSummary, 0, len(counts))
-	for id, count := range counts {
-		result = append(result, LoadNodeSummary{ID: id, ActiveVMs: count})
+	for _, load := range counts {
+		result = append(result, load)
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result

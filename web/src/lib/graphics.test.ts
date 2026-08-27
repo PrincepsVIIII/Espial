@@ -65,21 +65,22 @@ describe('Hypervisor host graphic data', () => {
 
   it('joins metrics and counts with stable ordering and explicit zero load', () => {
     expect(
-      hostGraphicRows(hosts, [{ id: 'pve-a', active_vms: 3 }]).map(
-        ({ id, active_vms }) => ({ id, active_vms }),
+      hostGraphicRows(hosts, [{ id: 'pve-a', idle_vms: 3, active_vms: 1 }]).map(
+        ({ id, idle_vms, active_vms }) => ({ id, idle_vms, active_vms }),
       ),
     ).toEqual([
-      { id: 'pve-a', active_vms: 3 },
-      { id: 'pve-b', active_vms: 0 },
+      { id: 'pve-a', idle_vms: 3, active_vms: 1 },
+      { id: 'pve-b', idle_vms: 0, active_vms: 0 },
     ]);
   });
 
   it('keeps load-only hosts visible with unknown compute metrics', () => {
     const rows = hostGraphicRows(hosts, [
-      { id: 'pve-c', active_vms: 2 },
-      { id: 'pve-a', active_vms: Number.NaN },
+      { id: 'pve-c', idle_vms: 2, active_vms: 1 },
+      { id: 'pve-a', idle_vms: Number.NaN, active_vms: Number.NaN },
     ]);
     expect(rows.map((row) => row.id)).toEqual(['pve-a', 'pve-b', 'pve-c']);
+    expect(rows[0].idle_vms).toBe(0);
     expect(rows[0].active_vms).toBe(0);
     expect(rows[2].cpu_percent).toBeNull();
     expect(rows[2].health_state).toBe('unknown');

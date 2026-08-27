@@ -46,6 +46,16 @@ type NodeStatus struct {
 	LoadAvg []string `json:"loadavg"`
 }
 
+// Task is the bounded task-list evidence used to identify currently open
+// Proxmox console proxies. It intentionally excludes task-log content and user
+// identity because neither is required for the aggregate load comparison.
+type Task struct {
+	ID      string `json:"id"`
+	Node    string `json:"node"`
+	Type    string `json:"type"`
+	EndTime *int64 `json:"endtime,omitempty"`
+}
+
 type Usage struct {
 	Used  float64 `json:"used"`
 	Total float64 `json:"total"`

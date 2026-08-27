@@ -16,8 +16,11 @@ The next refinement removes the repeated `Observed` timestamp from the cluster/l
 surface. A node's semantic ring now carries its overall health; exception states
 retain visible labels. Selected nodes expand in place rather than receiving a cyan
 ring, and a click in unoccupied load-field space clears the selected detail. The
-running-guest count is labeled `idle VMs`; a user-session-active count remains
-unavailable until a source contract and fixtures establish it authoritatively.
+running-guest count is labeled `idle VMs`. `active VMs` now has a narrow, factual
+meaning: distinct running VMs/CTs with an open Proxmox `vncproxy` console task. It
+does not imply a general guest login or CPU activity. Browser coverage exercises
+both counts, keyboard/touch selection, blank-field clearing, and the retained
+semantic health ring.
 
 ## 2026-07-30 — Pre-Slice 1.3 foundation review
 
@@ -645,8 +648,8 @@ successful production SvelteKit build.
 Reviewed the shared graphics contract, tokens, `GraphicFrame`, `MetricMeter`, and
 Hypervisor host-load comparison against the general UI guidance, design system,
 authoritative Proxmox read model, and the named operator question: “Which Proxmox
-host currently carries the most active VMs, and what is that host's current compute
-health?”
+host currently carries the most idle VMs, which has guests with an open console,
+and what is that host's current compute health?”
 
 - Kept the pilot dependency-free with semantic HTML, CSS, and native Svelte. The
   contract reserves LayerCake, uPlot, and `d3-force` for data shapes that actually
@@ -666,24 +669,24 @@ health?”
   glows, or continuous animation. Unknown/non-finite values have explicit text and
   do not render as zero.
 - Replaced the radial spokes and interim row plot with a deterministic compute-node
-  field titled “Load distribution.” Node size encodes active VM count, each circle
-  shows its host name by default, and hover/focus switches that name to the exact
-  VM count while exposing CPU, RAM, and swap context. The read model contains
+field titled “Load distribution.” Node size encodes idle VM count, each circle
+shows its host name by default, and hover/focus switches that name to the idle and
+console-active VM counts while exposing CPU, RAM, and swap context. The read model contains
   aggregate host/count pairs, so the graphic draws no invented relationship edges.
 - At wide and laptop widths the compact resource columns, vertically stacked
   semicircle gauges, and load distribution share one row. Constrained panels use a
   balanced two-column node layout, while narrower screens return all sections to
   source-order stacking rather than compressing labels or controls.
 - Linked click/tap/Enter/Space selection to a visible host detail region containing
-  CPU, RAM, swap, capacity, and observation time. The duplicate host-metrics table
+  CPU, RAM, swap, capacity, and console-active count. The duplicate host-metrics table
   was removed so the load field receives more space; the node controls and selected
   detail remain the direct textual inspection path. `Escape` clears selection and
   live refetches preserve it by stable host ID while present. Cyan is
   selection/focus only, while marker shape/outline and visible labels retain
   operational status.
-- Kept cluster health and observation time once in the cluster heading. Removed the
-  repeated `Healthy · Fresh observation` treatment from the Load distribution
-  heading and the redundant visible `<host> selected` confirmation from its detail.
+- Kept non-healthy cluster state in the cluster heading, where it is actionable.
+  Removed redundant healthy/fresh wording, the Load distribution observation time,
+  and the visible `<host> selected` confirmation from its detail.
 - Core now initializes every discovered node to zero before counting running QEMU
   and LXC guests. The read service also completes old observations from the host
   list without changing the `load_nodes` JSON shape.
@@ -722,3 +725,22 @@ Repository contracts, generated types, documentation links, formatting, and Go v
 pass. The full Core unit gate continues to expose two unrelated pre-existing
 failures in adapter startup-timeout classification and the notification file-secret
 containment fixture; neither changed package fails.
+
+## 2026-08-26 — Typed Proxmox configuration editor and node-field dismissal
+
+Cluster names are now an administrator-only, keyboard-accessible entry point to a
+dedicated typed Proxmox editor. The editor loads the authoritative non-secret
+configuration, never reveals token material, allows an empty token-secret field to
+retain the configured secret, validates the replacement before persistence, and
+shows the returned audit receipt after saving. Non-managers retain an ordinary
+cluster heading and have no configuration route in the UI. The same flat modal,
+focus trap, Escape/backdrop dismissal, narrow-screen reflow, validation feedback,
+and audit link rules as Add Cluster apply to editing.
+
+The load distribution field now treats only the visible node disc as a pointer
+selection target. Its full grid cell remains focusable for keyboard operation, but
+pointer activation in blank cell space—including the left side—bubbles to the
+field and clears a committed selection. Focus, Enter, Space, Escape, touch, and
+the visible selected detail retain their previous equivalent behavior. Focused
+Chromium coverage verifies the left-side dismissal and audited editor flow; Svelte
+diagnostics and focused Core tests pass.

@@ -23,6 +23,9 @@ for (const viewport of [
     await expect(
       page.getByRole('heading', { name: 'Load distribution' }),
     ).toBeVisible();
+    await expect(page.locator('.load-radar')).toHaveCount(1);
+    await expect(page.locator('.load-radar .radar-grid')).toHaveCount(5);
+    await expect(page.locator('.load-radar .radar-active')).toHaveCount(1);
     await expect(
       page.locator('.cluster-title .status-indicator', { hasText: 'Warning' }),
     ).toBeVisible();
@@ -31,18 +34,13 @@ for (const viewport of [
     await expect(page.getByText(/Storage (Healthy|Warning) · IO/)).toHaveCount(
       0,
     );
-    await expect(
-      page.locator('.node-health', { hasText: 'Healthy' }),
-    ).toHaveCount(0);
-    await expect(
-      page.locator('.node-health', { hasText: 'Warning' }),
-    ).toBeVisible();
+    await expect(page.locator('.node-health')).toHaveCount(0);
     await expect(
       page.getByRole('progressbar', { name: 'CPU total' }),
     ).toHaveAttribute('aria-valuenow', '57.6');
     await expect(
       page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
       }),
     ).toBeVisible();
     await expect(page.getByText('Host metrics table')).toHaveCount(0);
@@ -118,7 +116,7 @@ for (const viewport of [
       );
 
       const longHost = page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
       });
       await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '1');
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '0');
@@ -127,6 +125,7 @@ for (const viewport of [
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '1');
       const tooltip = longHost.locator('xpath=..').locator('[role="tooltip"]');
       await expect(tooltip).toContainText('40 idle VMs');
+      await expect(tooltip).toContainText('6 console-active VMs');
       await expect(tooltip).toContainText('Swap 28%');
       await expect(tooltip).toHaveCSS('opacity', '1');
     }
@@ -158,7 +157,7 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await waitForHydration(page);
 
   const plotHost = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
   });
   await plotHost.focus();
   await expect(plotHost.locator('.node-load')).toHaveCSS('opacity', '1');
@@ -190,16 +189,49 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await expect(page.getByText('Compute-node selection cleared.')).toBeVisible();
 
   const firstHost = page.getByRole('button', {
-    name: /pve-001, 1 idle VM, health Healthy/,
+    name: /pve-001, 1 idle VM, 1 console-active VM, health Healthy/,
   });
   await expect(firstHost.locator('.node-health')).toHaveCount(0);
   await firstHost.focus();
   await page.keyboard.press('Space');
   await expect(firstHost).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('heading', { name: 'pve-001' })).toBeVisible();
-  await page.locator('.node-field-clear').click({ position: { x: 1, y: 1 } });
+  const firstHostBox = await firstHost.boundingBox();
+  expect(firstHostBox).not.toBeNull();
+  await firstHost.click({ position: { x: 2, y: firstHostBox!.height / 2 } });
+  await expect(firstHost).toHaveAttribute('aria-pressed', 'false');
+  await firstHost.focus();
+  await page.keyboard.press('Space');
+  await expect(firstHost).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('.compute-heading').click();
   await expect(firstHost).toHaveAttribute('aria-pressed', 'false');
   await expect(page.locator('.node-detail')).toHaveCount(0);
+});
+
+test('administrator opens the audited cluster configuration editor', async ({
+  page,
+}) => {
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+  await page
+    .getByRole('button', { name: 'Edit settings for Production Proxmox' })
+    .click();
+  await expect(
+    page.getByRole('heading', { name: 'Edit Proxmox research cluster' }),
+  ).toBeVisible();
+  await expect(page.getByLabel('Cluster name')).toHaveValue(
+    'Proxmox research cluster',
+  );
+  await expect(page.getByLabel('Token secret')).toHaveValue('');
+  await expect(
+    page.getByText('Leave empty to retain the stored secret.'),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Validate and save' }).click();
+  await expect(page.getByText('Cluster configuration saved.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Audit record' })).toHaveAttribute(
+    'href',
+    '/audit?correlation_id=proxmox-configuration-request-1',
+  );
 });
 
 test('touch selects a host without topology controls', async ({ browser }) => {
@@ -217,7 +249,7 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   await expect(marker).toHaveAttribute('aria-expanded', 'true');
   await expect(marker.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
   const host = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
   });
   await host.tap();
   await expect(host).toHaveAttribute('aria-pressed', 'true');
@@ -236,7 +268,7 @@ test('selection survives live authoritative data replacement', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const initial = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
   });
   await initial.click();
   await expect(initial).toHaveAttribute('aria-pressed', 'true');
@@ -248,10 +280,12 @@ test('selection survives live authoritative data replacement', async ({
     })
     .toBe(1);
   const updated = page.getByRole('button', {
-    name: /pve-002, 5 idle VMs, health Warning/,
+    name: /pve-002, 5 idle VMs, 2 console-active VMs, health Warning/,
   });
   await expect(updated).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.node-detail p')).toHaveText('5 idle VMs');
+  await expect(page.locator('.node-detail p')).toHaveText(
+    '5 idle VMs · 2 console-active VMs',
+  );
 });
 
 for (const scenario of [
@@ -268,6 +302,9 @@ for (const scenario of [
     await waitForHydration(page);
     await expect(page.locator('.node-button')).toHaveCount(scenario.rows);
     await expect(page.locator('table')).toHaveCount(0);
+    await expect(page.locator('.load-radar')).toHaveCount(
+      scenario.mode === 'zero' ? 1 : 0,
+    );
     if (scenario.mode === 'zero') {
       await expect(page.locator('.node-load strong')).toHaveText([
         '0',

@@ -57,20 +57,20 @@ without checking it against the target cluster and a version-matched fixture.
 Before writing live collection code, record the following without including any
 password, token secret, private key, or unsanitized internal address:
 
-| Fact | Required evidence |
-|---|---|
-| Proxmox release | `pveversion --verbose` and `/version` output |
-| Topology | Single node or cluster, node count, and cluster/quorum behavior |
-| Scale | QEMU VM, LXC container, and storage counts at representative and expected maximum size |
-| Optional subsystems | Whether Proxmox HA and Ceph are used and whether they are in the first adapter scope |
-| API entry point | Approved HTTPS hostname/port and whether one endpoint or bounded failover is required |
-| TLS trust | Public CA, named deployment-managed private trust bundle, or an explicitly approved self-signed endpoint certificate pinned by SHA-256 |
-| Identity | Stable configured deployment ID plus observed node, VMID, container ID, and storage identity behavior |
-| Credentials | Dedicated user/token owner, privilege-separated token, ACL paths, expiry/rotation owner, and secret-reference mechanism |
-| Collection policy | Interval, deadlines, response limits, and representative/oversized payload sizes |
-| Health policy | Expected-running guests and site-owned storage thresholds |
-| Source links | Safe UI base URL and version-checked deep-link forms |
-| Egress | Exact approved hostname/address/port rules from the adapter deployment environment |
+| Fact                | Required evidence                                                                                                                      |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Proxmox release     | `pveversion --verbose` and `/version` output                                                                                           |
+| Topology            | Single node or cluster, node count, and cluster/quorum behavior                                                                        |
+| Scale               | QEMU VM, LXC container, and storage counts at representative and expected maximum size                                                 |
+| Optional subsystems | Whether Proxmox HA and Ceph are used and whether they are in the first adapter scope                                                   |
+| API entry point     | Approved HTTPS hostname/port and whether one endpoint or bounded failover is required                                                  |
+| TLS trust           | Public CA, named deployment-managed private trust bundle, or an explicitly approved self-signed endpoint certificate pinned by SHA-256 |
+| Identity            | Stable configured deployment ID plus observed node, VMID, container ID, and storage identity behavior                                  |
+| Credentials         | Dedicated user/token owner, privilege-separated token, ACL paths, expiry/rotation owner, and secret-reference mechanism                |
+| Collection policy   | Interval, deadlines, response limits, and representative/oversized payload sizes                                                       |
+| Health policy       | Expected-running guests and site-owned storage thresholds                                                                              |
+| Source links        | Safe UI base URL and version-checked deep-link forms                                                                                   |
+| Egress              | Exact approved hostname/address/port rules from the adapter deployment environment                                                     |
 
 Useful discovery commands are:
 
@@ -134,7 +134,13 @@ validates the cluster before saving it, records only the certificate's SHA-256
 fingerprint, and later adapter connections reject any different certificate. This
 is certificate pinning, not an ongoing accept-any-certificate mode. A certificate
 replacement is rejected and requires operator intervention; a certificate-rotation
-workflow is not yet exposed in the current UI.
+workflow is not yet exposed in the current UI. Administrators can reopen the same
+typed configuration editor from the cluster name in Hypervisor. That editor reads
+only non-secret settings, requires an `If-Match` version, validates the replacement
+against Proxmox before saving, retains the stored token when its password field is
+empty, appends a redacted `integration.configuration.updated` audit record, and
+restarts that integration after commit. It must not use the generic integration
+configuration endpoint.
 The adapter must never persist or log the combined authorization header, token
 secret, raw credential error, or resolved secret value.
 
@@ -146,17 +152,20 @@ read-only role after the endpoint list is fixed. No mutation privilege is accept
 
 Start with the smallest source surface that can provide useful health:
 
-| Endpoint | Initial use |
-|---|---|
-| `GET /api2/json/version` | Version and compatibility evidence |
-| `GET /api2/json/cluster/status` | Cluster membership and quorum evidence |
-| `GET /api2/json/cluster/resources` | Cluster-wide node, QEMU, LXC, storage, and current status evidence |
-| `GET /api2/json/nodes/{node}/status` | Additional bounded node evidence when the cluster resource response is insufficient |
+| Endpoint                                               | Initial use                                                                         |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
+| `GET /api2/json/version`                               | Version and compatibility evidence                                                  |
+| `GET /api2/json/cluster/status`                        | Cluster membership and quorum evidence                                              |
+| `GET /api2/json/cluster/resources`                     | Cluster-wide node, QEMU, LXC, storage, and current status evidence                  |
+| `GET /api2/json/nodes/{node}/status`                   | Additional bounded node evidence when the cluster resource response is insufficient |
+| `GET /api2/json/cluster/tasks?source=active&limit=512` | Bounded currently-open task evidence for aggregate guest-console activity           |
 
 Do not add guest configuration, task logs, RRD history, replication history, or
-event polling merely because the API exposes them. Each additional endpoint needs
-an operational question, least-privilege proof, bounded response fixture, and
-normalized mapping.
+event polling merely because the API exposes them. The bounded active-task read is
+an explicit exception: it answers “which host currently has a VM/CT console open?”
+and retains only task node, VM/CT ID, type, and completion state. It never persists
+task-log content or Proxmox user identity. Each future endpoint needs an operational
+question, least-privilege proof, bounded response fixture, and normalized mapping.
 
 The author should first determine whether `/cluster/resources` alone provides the
 required first-version state. Proxmox responses normally wrap results under
@@ -171,13 +180,13 @@ fields used by the adapter. A regression fixture preserves that compatibility.
 Use an administrator-configured `deployment_id` as the stable prefix. Do not use a
 human-readable cluster display name as the only deployment identity.
 
-| Proxmox object | Proposed Espial kind | Proposed external ID |
-|---|---|---|
-| Cluster/deployment | `hypervisor_cluster` | `proxmox:<deployment-id>:cluster` |
-| Node | `hypervisor_node` | `proxmox:<deployment-id>:node:<node-id>` |
-| QEMU virtual machine | `virtual_machine` | `proxmox:<deployment-id>:qemu:<vmid>` |
-| LXC container | `container` | `proxmox:<deployment-id>:lxc:<vmid>` |
-| Storage view | `storage` | `proxmox:<deployment-id>:storage:<scope>:<storage-id>` |
+| Proxmox object       | Proposed Espial kind | Proposed external ID                                   |
+| -------------------- | -------------------- | ------------------------------------------------------ |
+| Cluster/deployment   | `hypervisor_cluster` | `proxmox:<deployment-id>:cluster`                      |
+| Node                 | `hypervisor_node`    | `proxmox:<deployment-id>:node:<node-id>`               |
+| QEMU virtual machine | `virtual_machine`    | `proxmox:<deployment-id>:qemu:<vmid>`                  |
+| LXC container        | `container`          | `proxmox:<deployment-id>:lxc:<vmid>`                   |
+| Storage view         | `storage`            | `proxmox:<deployment-id>:storage:<scope>:<storage-id>` |
 
 Proxmox VMIDs are cluster-wide identifiers and are suitable for guest identity
 when combined with the guest type and Espial deployment ID. Node and storage
@@ -190,11 +199,14 @@ but that is not a Phase 4 dependency relationship. Resource `source_url` values
 must be assembled only from the approved UI base and known version-checked path
 forms. Never copy an arbitrary response URL into `source_url`.
 
-The cluster observation's `active_vms_by_node` metadata is an aggregate comparison,
-not a relationship graph. Collection initializes every discovered node to zero and
-then counts running QEMU and LXC guests, so a node with no running guests remains
-visible. The Hypervisor read model preserves the existing `load_nodes` JSON shape
-and completes older observations from the authoritative host list before returning
+The cluster observation's `idle_vms_by_node` and `active_vms_by_node` metadata are
+aggregate comparisons, not a relationship graph. Collection initializes every
+discovered node to zero, counts running QEMU and LXC guests as idle VMs, then counts
+distinct currently open `vncproxy` tasks for those running guests as console-active
+VMs. A completed task, a task without a numeric VMID, or a task for a guest no
+longer reported as running does not contribute. This records active Proxmox console
+use, not a general in-guest login or CPU-activity claim. The Hypervisor read model
+completes missing observations from the authoritative host list before returning
 stable ID-sorted host/count pairs. The UI must not infer guest placement edges,
 migration paths, or topology from these counts.
 
@@ -202,13 +214,13 @@ migration paths, or topology from these counts.
 
 The first implementation should prefer a few explainable checks:
 
-| Check type | Suggested behavior |
-|---|---|
-| `proxmox.cluster.quorum` | `critical` when authoritative cluster evidence says quorum is lost; otherwise `healthy` |
-| `proxmox.node.availability` | `critical` for an explicitly offline node; `healthy` for online |
-| `proxmox.guest.runtime` | `healthy` when running; `disabled` when stopped unless that typed guest ID is configured as expected-running |
-| `proxmox.storage.availability` | `critical` when authoritative source evidence says unavailable; otherwise `healthy` |
-| `proxmox.storage.capacity` | `warning`/`critical` only at validated site-configured thresholds |
+| Check type                     | Suggested behavior                                                                                           |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `proxmox.cluster.quorum`       | `critical` when authoritative cluster evidence says quorum is lost; otherwise `healthy`                      |
+| `proxmox.node.availability`    | `critical` for an explicitly offline node; `healthy` for online                                              |
+| `proxmox.guest.runtime`        | `healthy` when running; `disabled` when stopped unless that typed guest ID is configured as expected-running |
+| `proxmox.storage.availability` | `critical` when authoritative source evidence says unavailable; otherwise `healthy`                          |
+| `proxmox.storage.capacity`     | `warning`/`critical` only at validated site-configured thresholds                                            |
 
 An expected-running guest that is stopped may be `critical`. A guest without that
 policy must not create an incident merely because it is intentionally stopped.

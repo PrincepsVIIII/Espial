@@ -18,6 +18,7 @@ import (
 )
 
 const defaultBodyLimit = 2 * 1024 * 1024
+const activeTaskLimit = "512"
 
 type Client struct {
 	baseURL                   *url.URL
@@ -162,6 +163,12 @@ func (client *Client) GetClusterResources(ctx context.Context) ([]ClusterResourc
 	return getJSON[[]ClusterResource](ctx, client, "/api2/json/cluster/resources")
 }
 
+// GetActiveTasks fetches the bounded cluster task list with Proxmox's active
+// source filter. Open vncproxy tasks are later mapped to console-active guests.
+func (client *Client) GetActiveTasks(ctx context.Context) ([]Task, error) {
+	return getJSON[[]Task](ctx, client, "/api2/json/cluster/tasks?source=active&limit="+activeTaskLimit)
+}
+
 // GetNodeStatus fetches CPU, memory, swap, and IO-wait counters for one node from
 // /nodes/{node}/status so Espial can render host bars and IO-delay indicators.
 func (client *Client) GetNodeStatus(ctx context.Context, nodeID string) (NodeStatus, error) {
@@ -173,7 +180,11 @@ func (client *Client) GetNodeStatus(ctx context.Context, nodeID string) (NodeSta
 
 func getJSON[T any](ctx context.Context, client *Client, path string) (T, error) {
 	var zero T
-	target := client.baseURL.ResolveReference(&url.URL{Path: path})
+	relative, err := url.Parse(path)
+	if err != nil {
+		return zero, errors.New("invalid_request")
+	}
+	target := client.baseURL.ResolveReference(relative)
 	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
 		return zero, errors.New("invalid_request")

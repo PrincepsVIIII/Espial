@@ -17,6 +17,7 @@ type API interface {
 	GetVersion(context.Context) (VersionResponse, error)
 	GetClusterStatus(context.Context) ([]ClusterStatusItem, error)
 	GetClusterResources(context.Context) ([]ClusterResource, error)
+	GetActiveTasks(context.Context) ([]Task, error)
 	GetNodeStatus(context.Context, string) (NodeStatus, error)
 }
 
@@ -37,6 +38,8 @@ func Collect(ctx context.Context, config Config, api API, observedAt time.Time) 
 	if err != nil {
 		return adapters.CollectionPayload{}, err
 	}
+	activeTasks, err := api.GetActiveTasks(ctx)
+	consoleActivityAvailable := err == nil
 	nodes := nodeIDs(clusterStatus, resources)
 	nodeStatus := make(map[string]NodeStatus, len(nodes))
 	for _, node := range nodes {
@@ -46,10 +49,10 @@ func Collect(ctx context.Context, config Config, api API, observedAt time.Time) 
 		}
 		nodeStatus[node] = status
 	}
-	return mapPayload(config, version, clusterStatus, resources, nodeStatus, observedAt.UTC()), nil
+	return mapPayload(config, version, clusterStatus, resources, nodeStatus, activeTasks, consoleActivityAvailable, observedAt.UTC()), nil
 }
 
-func mapPayload(config Config, version VersionResponse, status []ClusterStatusItem, source []ClusterResource, nodeStatus map[string]NodeStatus, observedAt time.Time) adapters.CollectionPayload {
+func mapPayload(config Config, version VersionResponse, status []ClusterStatusItem, source []ClusterResource, nodeStatus map[string]NodeStatus, activeTasks []Task, consoleActivityAvailable bool, observedAt time.Time) adapters.CollectionPayload {
 	payload := adapters.CollectionPayload{}
 	clusterExternalID := clusterID(config.DeploymentID)
 	clusterState, clusterSummary := clusterHealth(status)
@@ -69,14 +72,32 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 	})
 
 	expected := expectedGuestSet(config.ExpectedRunningGuests)
-	activeByNode := map[string]int{}
+	idleByNode := map[string]int{}
+	runningGuests := map[string]map[int]struct{}{}
 	for _, item := range source {
 		switch item.Type {
 		case "node":
 			node := itemNode(item)
-			if _, exists := activeByNode[node]; !exists {
-				activeByNode[node] = 0
+			idleByNode[node] = 0
+		case "qemu", "lxc":
+			if item.Status != "running" {
+				continue
 			}
+			if _, exists := runningGuests[item.Node]; !exists {
+				runningGuests[item.Node] = map[int]struct{}{}
+			}
+			runningGuests[item.Node][item.VMID] = struct{}{}
+			idleByNode[item.Node]++
+		}
+	}
+	activeByNode := map[string]int{}
+	if consoleActivityAvailable {
+		activeByNode = activeConsoleVMs(activeTasks, runningGuests)
+	}
+	for _, item := range source {
+		switch item.Type {
+		case "node":
+			node := itemNode(item)
 			status := nodeStatus[node]
 			cpuUsed, cpuMax := item.CPU, item.MaxCPU
 			if cpuMax == 0 {
@@ -121,9 +142,6 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 			kind := QEMUKind
 			if item.Type == "lxc" {
 				kind = LXCKind
-			}
-			if item.Status == "running" {
-				activeByNode[item.Node]++
 			}
 			guestKey := item.Type + ":" + strconv.Itoa(item.VMID)
 			state := health.Healthy
@@ -187,9 +205,36 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 		if payload.Observations[index].Metadata == nil {
 			payload.Observations[index].Metadata = map[string]any{}
 		}
+		payload.Observations[index].Metadata["idle_vms_by_node"] = idleByNode
 		payload.Observations[index].Metadata["active_vms_by_node"] = activeByNode
+		payload.Observations[index].Metadata["console_activity_available"] = consoleActivityAvailable
 	}
 	return payload
+}
+
+func activeConsoleVMs(tasks []Task, runningGuests map[string]map[int]struct{}) map[string]int {
+	seen := map[string]map[int]struct{}{}
+	for _, task := range tasks {
+		if task.Type != "vncproxy" || task.EndTime != nil {
+			continue
+		}
+		vmid, err := strconv.Atoi(strings.TrimSpace(task.ID))
+		if err != nil || vmid <= 0 {
+			continue
+		}
+		if _, running := runningGuests[task.Node][vmid]; !running {
+			continue
+		}
+		if _, exists := seen[task.Node]; !exists {
+			seen[task.Node] = map[int]struct{}{}
+		}
+		seen[task.Node][vmid] = struct{}{}
+	}
+	result := make(map[string]int, len(runningGuests))
+	for node := range runningGuests {
+		result[node] = len(seen[node])
+	}
+	return result
 }
 
 func clusterHealth(items []ClusterStatusItem) (health.State, string) {

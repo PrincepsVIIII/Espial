@@ -66,6 +66,25 @@ func TestClientDecodesClusterStatusWithNumericNodeID(t *testing.T) {
 	}
 }
 
+func TestClientReadsBoundedActiveTasks(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api2/json/cluster/tasks" || r.URL.Query().Get("source") != "active" || r.URL.Query().Get("limit") != activeTaskLimit {
+			t.Fatalf("request = %s", r.URL.String())
+		}
+		writeData(t, w, []map[string]any{{"id": "402", "node": "cdr-vhost42", "type": "vncproxy"}})
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	client, err := NewClient(Config{BaseURL: server.URL, DeploymentID: "lab", TokenID: "user@pve!espial", TokenSecret: "secret"}, ClientOptions{HTTPClient: server.Client(), ApprovedHosts: []string{target.Hostname()}, AllowedPorts: []int{mustPort(t, target.Port())}})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	tasks, err := client.GetActiveTasks(context.Background())
+	if err != nil || len(tasks) != 1 || tasks[0].ID != "402" || tasks[0].Type != "vncproxy" {
+		t.Fatalf("GetActiveTasks = %#v, %v", tasks, err)
+	}
+}
+
 func TestClientRejectsUnapprovedTarget(t *testing.T) {
 	_, err := NewClient(Config{
 		BaseURL: "https://proxmox.example:8006", DeploymentID: "lab",

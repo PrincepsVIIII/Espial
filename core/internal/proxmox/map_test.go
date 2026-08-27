@@ -2,6 +2,7 @@ package proxmox
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -27,6 +28,16 @@ func (fixtureAPI) GetClusterResources(context.Context) ([]ClusterResource, error
 		{ID: "qemu/100", Type: "qemu", Node: "pve-a", Name: "auth", Status: "running", VMID: 100},
 		{ID: "lxc/200", Type: "lxc", Node: "pve-a", Name: "dns", Status: "stopped", VMID: 200},
 		{ID: "storage/pve-a/vmstore", Type: "storage", Node: "pve-a", Storage: "vmstore", Status: "available", Disk: 85, MaxDisk: 100, Shared: &shared},
+	}, nil
+}
+
+func (fixtureAPI) GetActiveTasks(context.Context) ([]Task, error) {
+	endedAt := int64(101)
+	return []Task{
+		{ID: "100", Node: "pve-a", Type: "vncproxy"},
+		{ID: "100", Node: "pve-a", Type: "vncproxy"},
+		{ID: "200", Node: "pve-a", Type: "vncproxy", EndTime: &endedAt},
+		{ID: "not-a-vmid", Node: "pve-a", Type: "vncproxy"},
 	}, nil
 }
 
@@ -62,11 +73,40 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	if !foundExpectedStopped || !foundStorageWarning {
 		t.Fatalf("missing expected stopped guest or storage warning")
 	}
-	activeByNode, ok := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int)
+	idleByNode, ok := payload.Observations[0].Metadata["idle_vms_by_node"].(map[string]int)
 	if !ok {
+		t.Fatalf("idle_vms_by_node = %#v", payload.Observations[0].Metadata["idle_vms_by_node"])
+	}
+	if idleByNode["pve-a"] != 1 || idleByNode["pve-b"] != 0 {
+		t.Fatalf("idle_vms_by_node = %#v", idleByNode)
+	}
+	activeByNode, ok := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int)
+	if !ok || activeByNode["pve-a"] != 1 {
 		t.Fatalf("active_vms_by_node = %#v", payload.Observations[0].Metadata["active_vms_by_node"])
 	}
-	if activeByNode["pve-a"] != 1 || activeByNode["pve-b"] != 0 {
-		t.Fatalf("active_vms_by_node = %#v", activeByNode)
+	if available, ok := payload.Observations[0].Metadata["console_activity_available"].(bool); !ok || !available {
+		t.Fatalf("console_activity_available = %#v", payload.Observations[0].Metadata["console_activity_available"])
+	}
+}
+
+type unavailableTasksAPI struct{ fixtureAPI }
+
+func (unavailableTasksAPI) GetActiveTasks(context.Context) ([]Task, error) {
+	return nil, errors.New("forbidden")
+}
+
+func TestCollectPreservesCoreMetricsWhenConsoleActivityIsUnavailable(t *testing.T) {
+	payload, err := Collect(context.Background(), Config{
+		BaseURL: "https://proxmox.example:8006", DeploymentID: "lab",
+		TokenID: "user@pve!espial", TokenSecret: "secret",
+	}, unavailableTasksAPI{}, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if available, ok := payload.Observations[0].Metadata["console_activity_available"].(bool); !ok || available {
+		t.Fatalf("console_activity_available = %#v", payload.Observations[0].Metadata["console_activity_available"])
+	}
+	if active := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int); len(active) != 0 {
+		t.Fatalf("active_vms_by_node = %#v", active)
 	}
 }

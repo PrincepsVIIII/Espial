@@ -13,10 +13,12 @@ export interface HypervisorHostMetric {
 
 export interface HypervisorLoadNode {
   id: string;
+  idle_vms: number;
   active_vms: number;
 }
 
 export interface HostGraphicRow extends HypervisorHostMetric {
+  idle_vms: number;
   active_vms: number;
 }
 
@@ -89,7 +91,13 @@ export function hostGraphicRows(
 ): HostGraphicRow[] {
   const hostsByID = new Map(hosts.map((host) => [host.id, host]));
   const loadsByID = new Map(
-    loads.map((load) => [load.id, activeVMCount(load.active_vms)]),
+    loads.map((load) => [
+      load.id,
+      {
+        idle_vms: activeVMCount(load.idle_vms),
+        active_vms: activeVMCount(load.active_vms),
+      },
+    ]),
   );
   const ids = new Set([...hostsByID.keys(), ...loadsByID.keys()]);
   return [...ids]
@@ -98,7 +106,8 @@ export function hostGraphicRows(
       const host = hostsByID.get(id);
       return {
         id,
-        active_vms: loadsByID.get(id) ?? 0,
+        idle_vms: loadsByID.get(id)?.idle_vms ?? 0,
+        active_vms: loadsByID.get(id)?.active_vms ?? 0,
         cpu_percent: finiteNumber(host?.cpu_percent),
         ram_percent: finiteNumber(host?.ram_percent),
         cpu_cores: finiteNumber(host?.cpu_cores),

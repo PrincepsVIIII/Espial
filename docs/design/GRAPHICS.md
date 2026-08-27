@@ -110,16 +110,17 @@ the [W3C SVG accessibility note](https://www.w3.org/TR/SVG/access) and
 
 ## Hypervisor pilot
 
-The Hypervisor pilot asks: “Which Proxmox host currently carries the most active
-VMs, and what is that host's current compute health?” It uses the existing cluster
-read model: host metrics, cluster freshness, and active-VM counts by host.
+The Hypervisor pilot asks: “Which Proxmox host currently carries the most idle VMs,
+which has guests with an open Proxmox console, and what is that host's current
+compute health?” It uses the existing cluster read model: host metrics, cluster
+freshness, running-guest counts, and active-console counts by host.
 
 The summary surface is flat and divided horizontally. On wide screens the compact
 host/storage tracks, vertically stacked utilization gauges, and Load distribution
 view share one row, with the Load distribution column receiving the most space;
 narrower screens reflow them without changing source order. Load distribution omits
 the redundant observation timestamp; the current node state is conveyed directly by
-each node's semantic ring and exception label.
+each node's semantic ring.
 Resource rows use matched-width, zero-based tracks; the state marker follows the
 track on the same horizontal axis, exposes swap or IO wait on hover, focus, and
 tap, and the exact capacity reading aligns to the track's far edge. Repeated inline
@@ -130,21 +131,21 @@ no gradient, glow, or ornamental animation.
 The host comparison is titled “Load distribution”; it is not topology. It renders
 a deterministic compute-node field from stable ID-sorted host/count pairs, with
 circle size encoding its idle-VM count (the authoritative running-guest count).
-Each node shows its host name by default and switches to the exact idle-VM count on
-hover or focus; its tooltip repeats the count with CPU, RAM, and swap context. The
-semantic ring conveys the overall node state. Non-healthy states retain visible text
-alongside that ring; normal `Healthy` is omitted from individual nodes. Selecting a
-node expands it without introducing a cyan selection ring; clicking unoccupied field
-space or pressing `Escape` clears the selection. Committed selection reveals the
-host's CPU, RAM, swap, and capacity directly below the field. The interactive nodes
-and selected detail are the textual equivalent for this intentionally compact
-comparison; the former duplicate host-metrics table is omitted.
+For a bounded 3–12-node cluster, a compact radar comparison uses a solid idle-VM
+series and a dashed console-active series when Proxmox permits the active-task read;
+otherwise the graphic explicitly says console activity is unavailable rather than
+presenting zero as a count. The node controls remain the textual equivalent and
+source of selection. Each node shows its host name by default and switches to the
+idle and console-active VM counts on hover or focus; its tooltip and selected detail
+repeat both counts with CPU, RAM, and swap context. The semantic ring conveys the
+overall node state without a repeated status word. Selecting a node expands it without introducing a
+cyan selection ring; clicking unoccupied field space or pressing `Escape` clears the
+selection. The interactive nodes and selected detail are the textual equivalent for
+this intentionally compact comparison; the former duplicate host-metrics table is
+omitted.
 
-The current Proxmox read path does not report guest user sessions. It must not
-present CPU use, power state, or an unverified guest-agent response as an active-user
-session. A second, session-active VM series requires an approved source, minimum
-credential scope, supported guest coverage, normalized contract, and fixtures before
-it appears in this graphic. The graphic draws no edges because the source contains
-no relationship data. Individual VM placement, migration paths, traffic, pan/zoom,
-drag, and layout controls remain out of scope until Core exposes authoritative
-relationships.
+Console-active means that Proxmox reports an open `vncproxy` task for a running
+VM/CT. It is not a general in-guest login or CPU-activity claim. The graphic draws
+no edges because the source contains no relationship data. Individual VM placement,
+migration paths, traffic, pan/zoom, drag, and layout controls remain out of scope
+until Core exposes authoritative relationships.

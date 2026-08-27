@@ -117,6 +117,8 @@ type CertificateReader interface {
 type HypervisorManager interface {
 	ProxmoxClusters(context.Context) (hypervisor.ClusterList, error)
 	CreateProxmoxCluster(context.Context, hypervisor.ProxmoxClusterDefinition) (adminops.Receipt, error)
+	ProxmoxClusterConfiguration(context.Context, string) (hypervisor.ProxmoxClusterConfiguration, error)
+	UpdateProxmoxCluster(context.Context, hypervisor.ProxmoxClusterUpdateDefinition) (adminops.Receipt, error)
 }
 
 type UserAdministrator interface {
@@ -233,6 +235,8 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/certificates/{id}", server.certificateDetail)
 	mux.HandleFunc("GET /api/v1/hypervisor/proxmox/clusters", server.proxmoxClusterList)
 	mux.HandleFunc("POST /api/v1/hypervisor/proxmox/clusters", server.createProxmoxCluster)
+	mux.HandleFunc("GET /api/v1/hypervisor/proxmox/clusters/{id}/configuration", server.proxmoxClusterConfiguration)
+	mux.HandleFunc("PUT /api/v1/hypervisor/proxmox/clusters/{id}/configuration", server.updateProxmoxCluster)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

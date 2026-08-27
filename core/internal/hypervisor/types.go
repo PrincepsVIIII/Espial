@@ -28,22 +28,56 @@ type ProxmoxClusterDefinition struct {
 	CanReadAudit               bool
 }
 
+// ProxmoxClusterConfiguration is the administrator-safe view of a typed
+// Proxmox integration. Token material and secret-store references are never
+// included; TokenSecretConfigured only confirms that a secret is available.
+type ProxmoxClusterConfiguration struct {
+	ID                         string    `json:"id"`
+	DisplayName                string    `json:"display_name"`
+	BaseURL                    string    `json:"base_url"`
+	ApproveTarget              bool      `json:"approve_target"`
+	AllowInsecureHTTP          bool      `json:"allow_insecure_http"`
+	TrustSelfSignedCertificate bool      `json:"trust_self_signed_certificate"`
+	DeploymentID               string    `json:"deployment_id"`
+	TokenID                    string    `json:"token_id"`
+	TokenSecretConfigured      bool      `json:"token_secret_configured"`
+	IntervalSeconds            int       `json:"interval_seconds"`
+	ExpectedRefreshSeconds     int       `json:"expected_refresh_seconds"`
+	RequestTimeoutSeconds      int       `json:"request_timeout_seconds"`
+	StorageWarningPercent      float64   `json:"storage_warning_percent"`
+	StorageCriticalPercent     float64   `json:"storage_critical_percent"`
+	SwapWarningPercent         float64   `json:"swap_warning_percent"`
+	SwapCriticalPercent        float64   `json:"swap_critical_percent"`
+	IOWaitWarningPercent       float64   `json:"io_wait_warning_percent"`
+	IOWaitCriticalPercent      float64   `json:"io_wait_critical_percent"`
+	ExpectedRunningGuests      []string  `json:"expected_running_guests"`
+	UpdatedAt                  time.Time `json:"updated_at"`
+	Version                    int64     `json:"version"`
+}
+
+type ProxmoxClusterUpdateDefinition struct {
+	ProxmoxClusterDefinition
+	ID                string
+	ExpectedUpdatedAt time.Time
+}
+
 type ClusterList struct {
 	Items []ClusterCard `json:"items"`
 }
 
 type ClusterCard struct {
-	ID             string            `json:"id"`
-	IntegrationID  string            `json:"integration_id"`
-	Name           string            `json:"name"`
-	State          string            `json:"state"`
-	Freshness      string            `json:"freshness"`
-	LastObservedAt *time.Time        `json:"last_observed_at,omitempty"`
-	LastCollection *time.Time        `json:"last_collection_at,omitempty"`
-	Hosts          []HostSummary     `json:"hosts"`
-	Storage        []StorageSummary  `json:"storage"`
-	Totals         UtilizationTotals `json:"totals"`
-	LoadNodes      []LoadNodeSummary `json:"load_nodes"`
+	ID                       string            `json:"id"`
+	IntegrationID            string            `json:"integration_id"`
+	Name                     string            `json:"name"`
+	State                    string            `json:"state"`
+	Freshness                string            `json:"freshness"`
+	LastObservedAt           *time.Time        `json:"last_observed_at,omitempty"`
+	LastCollection           *time.Time        `json:"last_collection_at,omitempty"`
+	Hosts                    []HostSummary     `json:"hosts"`
+	Storage                  []StorageSummary  `json:"storage"`
+	Totals                   UtilizationTotals `json:"totals"`
+	LoadNodes                []LoadNodeSummary `json:"load_nodes"`
+	ConsoleActivityAvailable bool              `json:"console_activity_available"`
 }
 
 type HostSummary struct {
@@ -76,5 +110,6 @@ type UtilizationTotals struct {
 
 type LoadNodeSummary struct {
 	ID        string `json:"id"`
+	IdleVMs   int    `json:"idle_vms"`
 	ActiveVMs int    `json:"active_vms"`
 }

@@ -15,17 +15,19 @@
     clusterName,
     hosts,
     loadNodes,
+    consoleActivityAvailable,
   }: {
     id: string;
     clusterName: string;
     hosts: HypervisorHostMetric[];
     loadNodes: HypervisorLoadNode[];
+    consoleActivityAvailable: boolean;
   } = $props();
 
   let selectedID = $state<string | null>(null);
   let selectionNotice = $state('');
   let rows = $derived(hostGraphicRows(hosts, loadNodes));
-  let highestLoad = $derived(Math.max(1, ...rows.map((row) => row.active_vms)));
+  let highestLoad = $derived(Math.max(1, ...rows.map((row) => row.idle_vms)));
   let activeRow = $derived(rows.find((row) => row.id === selectedID) ?? null);
 
   $effect(() => {
@@ -44,16 +46,23 @@
     return `${nodeID(hostID)}-tooltip`;
   }
 
-  function nodeSize(activeVMs: number): string {
-    return `${5 + (Math.max(0, activeVMs) / highestLoad) * 2.2}rem`;
+  function nodeSize(idleVMs: number): string {
+    return `${5 + (Math.max(0, idleVMs) / highestLoad) * 2.2}rem`;
   }
 
-  function commit(hostID: string) {
+  function commit(event: MouseEvent, hostID: string) {
+    // The button fills its layout cell for keyboard focus, but only the visible
+    // disc is a pointer target. Blank field space must always dismiss selection.
+    if (event.detail !== 0 && !(event.target as HTMLElement).closest('.node-disc')) {
+      return;
+    }
+    event.stopPropagation();
     selectedID = hostID;
     selectionNotice = '';
   }
 
-  function clearSelectionFromField() {
+  function clearSelectionFromMap(event: MouseEvent) {
+    if ((event.target as HTMLElement).closest('.node-disc')) return;
     if (!selectedID) return;
     selectedID = null;
     selectionNotice = '';
@@ -70,9 +79,34 @@
   function idleVMLabel(count: number): string {
     return `${count} idle ${count === 1 ? 'VM' : 'VMs'}`;
   }
+
+  function activeVMLabel(count: number): string {
+    return `${count} console-active ${count === 1 ? 'VM' : 'VMs'}`;
+  }
+
+  function radarPoint(index: number, ratio: number): string {
+    const angle = -Math.PI / 2 + (Math.PI * 2 * index) / rows.length;
+    const radius = 42 * Math.max(0, Math.min(1, ratio));
+    return `${50 + Math.cos(angle) * radius},${50 + Math.sin(angle) * radius}`;
+  }
+
+  function radarGrid(ratio: number): string {
+    return rows.map((_, index) => radarPoint(index, ratio)).join(' ');
+  }
+
+  function radarSeries(metric: 'idle_vms' | 'active_vms'): string {
+    return rows
+      .map((row, index) => radarPoint(index, row[metric] / highestLoad))
+      .join(' ');
+  }
 </script>
 
-<section class="compute-map" aria-labelledby={`${id}-title`}>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
+<section
+  class="compute-map"
+  aria-labelledby={`${id}-title`}
+  onclick={clearSelectionFromMap}
+>
   <header class="compute-heading">
     <div>
       <h3 id={`${id}-title`}>Load distribution</h3>
@@ -80,24 +114,50 @@
     </div>
   </header>
 
+  {#if rows.length > 2 && rows.length <= 12}
+    <div
+      class="radar-comparison"
+      aria-label="Idle and console-active VM comparison"
+    >
+      <svg class="load-radar" viewBox="0 0 100 100" aria-hidden="true">
+        {#each [0.2, 0.4, 0.6, 0.8, 1] as ratio}
+          <polygon class="radar-grid" points={radarGrid(ratio)} />
+        {/each}
+        {#each rows as _, index}
+          <line
+            x1="50"
+            y1="50"
+            x2={radarPoint(index, 1).split(',')[0]}
+            y2={radarPoint(index, 1).split(',')[1]}
+          />
+        {/each}
+        <polygon class="radar-idle" points={radarSeries('idle_vms')} />
+        {#if consoleActivityAvailable}
+          <polygon class="radar-active" points={radarSeries('active_vms')} />
+        {/if}
+      </svg>
+      <p>
+        <span class="idle-key">Idle VMs</span>
+        {#if consoleActivityAvailable}
+          <span class="active-key">Console-active VMs</span>
+        {:else}
+          <span>Console activity unavailable</span>
+        {/if}
+      </p>
+    </div>
+  {/if}
+
   <div
     class="node-field"
     class:many={rows.length > 12}
     role="group"
     aria-label={`${clusterName} compute nodes`}
   >
-    <button
-      type="button"
-      class="node-field-clear"
-      aria-label="Clear selected compute node"
-      disabled={!selectedID}
-      onclick={clearSelectionFromField}
-    ></button>
     {#each rows as row (row.id)}
       <div
         class="node-item"
         class:selected={selectedID === row.id}
-        style={`--node-size: ${nodeSize(row.active_vms)}`}
+        style={`--node-size: ${nodeSize(row.idle_vms)}`}
       >
         <button
           id={nodeID(row.id)}
@@ -106,8 +166,8 @@
           class:selected={selectedID === row.id}
           aria-pressed={selectedID === row.id}
           aria-describedby={tooltipID(row.id)}
-          aria-label={`${row.id}, ${idleVMLabel(row.active_vms)}, health ${statusLabel(row.health_state)}`}
-          onclick={() => commit(row.id)}
+          aria-label={`${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`}
+          onclick={(event) => commit(event, row.id)}
           onkeydown={clearSelection}
         >
           <span
@@ -116,18 +176,20 @@
           >
             <code class="node-name" title={row.id}>{row.id}</code>
             <span class="node-load">
-              <strong>{row.active_vms}</strong>
+              <strong>{row.idle_vms}</strong>
               <small>Idle VMs</small>
+              {#if consoleActivityAvailable}
+                <span>{row.active_vms} active</span>
+              {/if}
             </span>
           </span>
-          {#if displayState(row.health_state) !== 'healthy'}
-            <span class={`node-health health-${displayState(row.health_state)}`}
-              >{statusLabel(row.health_state)}</span
-            >
-          {/if}
         </button>
         <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
-          <strong>{idleVMLabel(row.active_vms)}</strong>
+          <strong
+            >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
+              ? activeVMLabel(row.active_vms)
+              : 'Console activity unavailable'}</strong
+          >
           <span>
             CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
               row.ram_percent,
@@ -142,7 +204,11 @@
     <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
       <div>
         <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
-        <p>{idleVMLabel(activeRow.active_vms)}</p>
+        <p>
+          {idleVMLabel(activeRow.idle_vms)} · {consoleActivityAvailable
+            ? activeVMLabel(activeRow.active_vms)
+            : 'Console activity unavailable'}
+        </p>
       </div>
       <dl>
         <div>
@@ -165,6 +231,10 @@
               : `${activeRow.cpu_cores.toFixed(0)} cores`}
             / {formatBytes(activeRow.ram_bytes)}
           </dd>
+        </div>
+        <div>
+          <dt>Console-active</dt>
+          <dd>{consoleActivityAvailable ? activeRow.active_vms : 'Unavailable'}</dd>
         </div>
       </dl>
     </section>
@@ -205,6 +275,62 @@
     padding: 0.35rem;
   }
 
+  .radar-comparison {
+    display: grid;
+    justify-items: center;
+    margin-top: 0.7rem;
+  }
+
+  .load-radar {
+    width: min(17rem, 100%);
+    overflow: visible;
+  }
+
+  .load-radar line,
+  .radar-grid {
+    fill: none;
+    stroke: var(--graphic-grid);
+    stroke-width: 0.5;
+  }
+
+  .radar-idle,
+  .radar-active {
+    fill: none;
+    stroke-width: 1.4;
+  }
+
+  .radar-idle {
+    stroke: var(--text);
+  }
+
+  .radar-active {
+    stroke: var(--graphic-label-muted);
+    stroke-dasharray: 2 1.3;
+  }
+
+  .radar-comparison p {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+    margin-top: 0.25rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.7rem;
+  }
+
+  .radar-comparison p span::before {
+    display: inline-block;
+    width: 1rem;
+    margin-right: 0.3rem;
+    border-top: 2px solid currentColor;
+    content: '';
+    vertical-align: middle;
+  }
+
+  .active-key::before {
+    border-top-style: dashed !important;
+  }
+
   .node-field.many {
     max-height: min(34rem, 70vh);
     overflow-y: auto;
@@ -218,25 +344,6 @@
     justify-items: center;
     min-width: 0;
     pointer-events: none;
-  }
-
-  .node-field-clear {
-    position: absolute;
-    inset: 0;
-    min-height: 0;
-    padding: 0;
-    border: 0;
-    background: transparent;
-  }
-
-  .node-field-clear:hover:not(:disabled),
-  .node-field-clear:active:not(:disabled) {
-    background: transparent;
-  }
-
-  .node-field-clear:focus-visible {
-    outline: 2px solid var(--graphic-focus);
-    outline-offset: 2px;
   }
 
   .node-button {
@@ -366,14 +473,13 @@
     text-transform: uppercase;
   }
 
-  .node-health {
-    font-size: 0.75rem;
+  .node-load span {
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    font-size: 0.62rem;
     font-weight: 700;
   }
 
-  .health-warning {
-    color: var(--warning);
-  }
 
   .health-critical {
     color: var(--critical);

@@ -164,6 +164,17 @@ const server = http.createServer((request, response) => {
       hypervisorClusters(hypervisorMode, hypervisorRevision),
     );
   }
+  if (url.pathname.startsWith('/api/v1/hypervisor/proxmox/clusters/') && url.pathname.endsWith('/configuration')) {
+    if (request.method === 'PUT') {
+      return json(response, 200, {
+        id: integrationID,
+        version: 1785508800000001,
+        request_id: 'proxmox-configuration-request-1',
+        audit_url: '/audit?correlation_id=proxmox-configuration-request-1',
+      });
+    }
+    return json(response, 200, hypervisorConfiguration(url.pathname.split('/')[6]));
+  }
   if (url.pathname === '/api/v1/overview') {
     return json(response, 200, {
       generated_at: now,
@@ -716,11 +727,12 @@ function hypervisorClusters(mode, revision) {
   });
   const loadNodes = hosts.map((host, index) => ({
     id: host.id,
-    active_vms: zero
+    idle_vms: zero
       ? 0
       : mode === 'several' && index === 2
         ? 40 + revision
         : (index * 3 + 1 + revision) % 19,
+    active_vms: zero ? 0 : index % 3 === 0 ? 1 : index % 3 === 1 ? 2 : 6,
   }));
   return {
     items: [
@@ -750,9 +762,36 @@ function hypervisorClusters(mode, revision) {
           ram_percent: 68.7,
           storage_percent: 70,
         },
+        console_activity_available: true,
         load_nodes: loadNodes,
       },
     ],
+  };
+}
+
+function hypervisorConfiguration(id) {
+  return {
+    id,
+    display_name: 'Proxmox research cluster',
+    base_url: 'https://pve.example:8006',
+    approve_target: true,
+    allow_insecure_http: false,
+    trust_self_signed_certificate: true,
+    deployment_id: 'research-pve',
+    token_id: 'espial@pve!monitoring',
+    token_secret_configured: true,
+    interval_seconds: 300,
+    expected_refresh_seconds: 300,
+    request_timeout_seconds: 10,
+    storage_warning_percent: 80,
+    storage_critical_percent: 90,
+    swap_warning_percent: 10,
+    swap_critical_percent: 25,
+    io_wait_warning_percent: 5,
+    io_wait_critical_percent: 15,
+    expected_running_guests: ['qemu:100'],
+    updated_at: hypervisorNow,
+    version: 1785508800000000,
   };
 }
 

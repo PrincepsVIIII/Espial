@@ -575,6 +575,54 @@ export interface MonitoringOverview {
   }[];
 }
 
+export interface ProxmoxClusterConfiguration {
+  id: string;
+  display_name: string;
+  base_url: string;
+  approve_target: true;
+  allow_insecure_http: boolean;
+  trust_self_signed_certificate: boolean;
+  deployment_id: string;
+  token_id: string;
+  token_secret_configured: boolean;
+  interval_seconds: number;
+  expected_refresh_seconds: number;
+  request_timeout_seconds: number;
+  storage_warning_percent: number;
+  storage_critical_percent: number;
+  swap_warning_percent: number;
+  swap_critical_percent: number;
+  io_wait_warning_percent: number;
+  io_wait_critical_percent: number;
+  expected_running_guests: string[];
+  updated_at: string;
+  version: number;
+}
+
+export interface ProxmoxClusterConfigurationUpdateRequest {
+  display_name: string;
+  base_url: string;
+  approve_target: true;
+  allow_insecure_http: boolean;
+  trust_self_signed_certificate: boolean;
+  deployment_id: string;
+  token_id: string;
+  token_secret?: string;
+  interval_seconds: number;
+  expected_refresh_seconds: number;
+  request_timeout_seconds: number;
+  storage_warning_percent: number;
+  storage_critical_percent: number;
+  swap_warning_percent: number;
+  swap_critical_percent: number;
+  io_wait_warning_percent: number;
+  io_wait_critical_percent: number;
+  /**
+   * @maxItems 10000
+   */
+  expected_running_guests: string[];
+}
+
 export interface ProxmoxClusterCreateRequest {
   display_name: string;
   base_url: string;
@@ -634,8 +682,10 @@ export interface ProxmoxClusterCard {
   };
   load_nodes: {
     id: string;
+    idle_vms: number;
     active_vms: number;
   }[];
+  console_activity_available: boolean;
 }
 
 export interface ResourceAPIView {
