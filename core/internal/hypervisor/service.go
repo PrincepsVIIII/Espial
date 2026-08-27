@@ -126,6 +126,7 @@ type proxmoxClusterRecord struct {
 	DisplayName      string
 	Enabled          bool
 	IntervalSeconds  int
+	SortOrder        int
 	Config           map[string]any
 	SecretReferences map[string]string
 	UpdatedAt        time.Time
@@ -236,19 +237,91 @@ func (service *Service) UpdateProxmoxCluster(ctx context.Context, definition Pro
 	return receipt, nil
 }
 
+// ReorderProxmoxCluster moves one cluster by one visible position. The complete
+// typed-cluster order is normalized in one transaction, including clusters that
+// existed before an explicit order was stored.
+func (service *Service) ReorderProxmoxCluster(ctx context.Context, definition ProxmoxClusterOrderDefinition) (adminops.Receipt, error) {
+	if service.pool == nil || definition.ID == "" || definition.ExpectedUpdatedAt.IsZero() || (definition.Direction != "up" && definition.Direction != "down") {
+		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_integration_config"}
+	}
+	tx, err := service.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return adminops.Receipt{}, fmt.Errorf("begin proxmox cluster reorder: %w", err)
+	}
+	defer tx.Rollback(ctx)
+	ordered, err := loadOrderedProxmoxClusters(ctx, tx)
+	if err != nil {
+		return adminops.Receipt{}, err
+	}
+	current := -1
+	for index, item := range ordered {
+		if item.ID == definition.ID {
+			current = index
+			break
+		}
+	}
+	if current < 0 {
+		return adminops.Receipt{}, &monitoring.Error{Code: "integration_not_found"}
+	}
+	locked := ordered[current]
+	if !locked.UpdatedAt.Equal(definition.ExpectedUpdatedAt) {
+		return adminops.Receipt{}, &monitoring.Error{Code: "integration_config_conflict"}
+	}
+	target := current - 1
+	if definition.Direction == "down" {
+		target = current + 1
+	}
+	if target < 0 || target >= len(ordered) {
+		return adminops.Receipt{}, &monitoring.Error{Code: "invalid_cluster_order"}
+	}
+	ordered[current], ordered[target] = ordered[target], ordered[current]
+	updatedAt := service.now().UTC().Truncate(time.Microsecond)
+	if !updatedAt.After(locked.UpdatedAt) {
+		updatedAt = locked.UpdatedAt.Add(time.Microsecond)
+	}
+	for index, item := range ordered {
+		if item.ID == definition.ID {
+			if _, err := tx.Exec(ctx, `UPDATE integrations SET sort_order = $2, updated_at = $3 WHERE id = $1`, item.ID, index, updatedAt); err != nil {
+				return adminops.Receipt{}, fmt.Errorf("update proxmox cluster order: %w", err)
+			}
+			continue
+		}
+		if _, err := tx.Exec(ctx, `UPDATE integrations SET sort_order = $2 WHERE id = $1`, item.ID, index); err != nil {
+			return adminops.Receipt{}, fmt.Errorf("normalize proxmox cluster order: %w", err)
+		}
+	}
+	if err := audit.Append(ctx, tx, audit.Event{
+		ActorUserID: definition.ActorUserID, Action: "integration.order.updated",
+		TargetType: "integration", TargetID: definition.ID, Result: "succeeded",
+		SourceAddress: definition.SourceAddress, CorrelationID: definition.CorrelationID,
+		BeforeSummary: map[string]any{"sort_order": locked.SortOrder},
+		AfterSummary:  map[string]any{"sort_order": target}, OccurredAt: updatedAt,
+	}); err != nil {
+		return adminops.Receipt{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return adminops.Receipt{}, fmt.Errorf("commit proxmox cluster reorder: %w", err)
+	}
+	receipt := adminops.Receipt{ID: definition.ID, Version: updatedAt.UnixMicro(), RequestID: definition.CorrelationID}
+	if definition.CanReadAudit {
+		receipt.AuditURL = "/audit?correlation_id=" + definition.CorrelationID
+	}
+	return receipt, nil
+}
+
 type proxmoxClusterQuerier interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 
 func (service *Service) loadProxmoxCluster(ctx context.Context, database proxmoxClusterQuerier, id string, lock bool) (proxmoxClusterRecord, error) {
-	query := `SELECT id::text, display_name, enabled, interval_seconds, config_nonsecret, secret_references, updated_at
+	query := `SELECT id::text, display_name, enabled, interval_seconds, sort_order, config_nonsecret, secret_references, updated_at
 		FROM integrations WHERE id = $1 AND adapter_id = $2`
 	if lock {
 		query += " FOR UPDATE"
 	}
 	var record proxmoxClusterRecord
 	if err := database.QueryRow(ctx, query, id, proxmox.AdapterID).Scan(
-		&record.ID, &record.DisplayName, &record.Enabled, &record.IntervalSeconds,
+		&record.ID, &record.DisplayName, &record.Enabled, &record.IntervalSeconds, &record.SortOrder,
 		&record.Config, &record.SecretReferences, &record.UpdatedAt,
 	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -257,6 +330,27 @@ func (service *Service) loadProxmoxCluster(ctx context.Context, database proxmox
 		return proxmoxClusterRecord{}, fmt.Errorf("load proxmox configuration: %w", err)
 	}
 	return record, nil
+}
+
+func loadOrderedProxmoxClusters(ctx context.Context, tx pgx.Tx) ([]proxmoxClusterRecord, error) {
+	rows, err := tx.Query(ctx, `SELECT id::text, display_name, enabled, interval_seconds, sort_order, config_nonsecret, secret_references, updated_at
+		FROM integrations WHERE adapter_id = $1 ORDER BY sort_order, display_name, id FOR UPDATE`, proxmox.AdapterID)
+	if err != nil {
+		return nil, fmt.Errorf("load proxmox cluster order: %w", err)
+	}
+	defer rows.Close()
+	result := []proxmoxClusterRecord{}
+	for rows.Next() {
+		var record proxmoxClusterRecord
+		if err := rows.Scan(&record.ID, &record.DisplayName, &record.Enabled, &record.IntervalSeconds, &record.SortOrder, &record.Config, &record.SecretReferences, &record.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("scan proxmox cluster order: %w", err)
+		}
+		result = append(result, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read proxmox cluster order: %w", err)
+	}
+	return result, nil
 }
 
 func configurationFromRecord(record proxmoxClusterRecord) (ProxmoxClusterConfiguration, error) {
@@ -274,6 +368,7 @@ func configurationFromRecord(record proxmoxClusterRecord) (ProxmoxClusterConfigu
 		StorageCriticalPercent: config.StorageCriticalPercent, SwapWarningPercent: config.SwapWarningPercent,
 		SwapCriticalPercent: config.SwapCriticalPercent, IOWaitWarningPercent: config.IOWaitWarningPercent,
 		IOWaitCriticalPercent: config.IOWaitCriticalPercent, ExpectedRunningGuests: config.ExpectedRunningGuests,
+		SortOrder: record.SortOrder,
 		UpdatedAt: record.UpdatedAt, Version: record.UpdatedAt.UnixMicro(),
 	}, nil
 }
@@ -398,7 +493,7 @@ func proxmoxClientOptions(policy proxmox.Policy, config proxmox.Config) proxmox.
 
 func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error) {
 	rows, err := service.pool.Query(ctx, `
-		SELECT i.id::text, i.display_name, r.id::text, r.external_id, r.kind, r.display_name,
+		SELECT i.id::text, i.display_name, i.sort_order, r.id::text, r.external_id, r.kind, r.display_name,
 			r.attributes, ch.state, ch.observed_at, o.measurements, o.metadata, run.completed_at
 		FROM integrations i
 		LEFT JOIN resources r ON r.integration_id = i.id
@@ -409,7 +504,7 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 			WHERE integration_id = i.id ORDER BY completed_at DESC LIMIT 1
 		) run ON true
 		WHERE i.adapter_id = $1
-		ORDER BY i.display_name, r.kind, r.display_name
+		ORDER BY i.sort_order, i.display_name, r.kind, r.display_name
 	`, proxmox.AdapterID)
 	if err != nil {
 		return ClusterList{}, fmt.Errorf("read proxmox clusters: %w", err)
@@ -419,17 +514,18 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 	order := []string{}
 	for rows.Next() {
 		var integrationID, integrationName string
+		var sortOrder int
 		var resourceID, kind, displayName *string
 		var attributes, measurements, metadata []byte
 		var state *string
 		var observedAt, lastCollection *time.Time
 		var externalID *string
-		if err := rows.Scan(&integrationID, &integrationName, &resourceID, &externalID, &kind, &displayName, &attributes, &state, &observedAt, &measurements, &metadata, &lastCollection); err != nil {
+		if err := rows.Scan(&integrationID, &integrationName, &sortOrder, &resourceID, &externalID, &kind, &displayName, &attributes, &state, &observedAt, &measurements, &metadata, &lastCollection); err != nil {
 			return ClusterList{}, fmt.Errorf("scan proxmox cluster: %w", err)
 		}
 		cluster := clusters[integrationID]
 		if cluster == nil {
-			cluster = &ClusterCard{ID: integrationID, IntegrationID: integrationID, Name: integrationName, State: "unknown", Freshness: "unknown", LastCollection: lastCollection}
+			cluster = &ClusterCard{ID: integrationID, IntegrationID: integrationID, Name: integrationName, State: "unknown", Freshness: "unknown", LastCollection: lastCollection, SortOrder: sortOrder}
 			clusters[integrationID] = cluster
 			order = append(order, integrationID)
 		}

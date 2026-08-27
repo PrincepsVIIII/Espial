@@ -722,9 +722,8 @@ cluster background/border regression and verify matched tracks, horizontal dots,
 right-aligned readings, and large semicircle SVGs. The complete 55-scenario Chromium suite passes.
 The changed Proxmox and Hypervisor packages pass containerized race tests.
 Repository contracts, generated types, documentation links, formatting, and Go vet
-pass. The full Core unit gate continues to expose two unrelated pre-existing
-failures in adapter startup-timeout classification and the notification file-secret
-containment fixture; neither changed package fails.
+pass. The full Core race-test gate now also passes after correcting adapter
+startup-timeout behavior and file-secret containment canonicalization.
 
 ## 2026-08-26 — Typed Proxmox configuration editor and node-field dismissal
 
@@ -751,3 +750,21 @@ The shared authenticated shell now shows a compact, polite `Loading <section>…
 notice whenever SvelteKit has a pending route load. This keeps the prior route from
 being mistaken for the selected destination during a slower authoritative read,
 without adding permanent connection chrome or obscuring navigation.
+
+## 2026-08-26 — Load distribution, exact meter values, and cluster order
+
+The Proxmox load-distribution view now places its interactive host nodes at the
+corresponding radar vertices. Its solid idle series uses a restrained flat fill so
+the hosts with the greatest idle load are directly legible, and its geometry is
+derived from the observed host count rather than assuming seven nodes. Idle counts
+now exclude guests with an open console proxy; a denied active-task read keeps
+console activity explicitly unavailable without discarding the running-guest count.
+Clusters with more than twelve hosts retain an interactive, textual node list.
+
+Host and storage bars reveal their exact fractional percentages on hover; the
+existing marker control exposes the same values on focus/click. The administrator
+cluster editor includes thin, labeled up/down controls that persistently swap the
+selected cluster with its adjacent page position. The mutation uses `If-Match`,
+returns the existing audit receipt, and exposes the audit record to authorized
+administrators. Focused Svelte diagnostics, frontend unit/contract tests, API
+contracts, generated types, and Proxmox/Hypervisor/API/migration Go tests passed.

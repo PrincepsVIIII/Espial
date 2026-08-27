@@ -595,8 +595,13 @@ export interface ProxmoxClusterConfiguration {
   io_wait_warning_percent: number;
   io_wait_critical_percent: number;
   expected_running_guests: string[];
+  sort_order: number;
   updated_at: string;
   version: number;
+}
+
+export interface ProxmoxClusterOrderUpdateRequest {
+  direction: "up" | "down";
 }
 
 export interface ProxmoxClusterConfigurationUpdateRequest {

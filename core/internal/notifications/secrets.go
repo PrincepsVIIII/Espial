@@ -23,6 +23,10 @@ func (resolver FileSecretResolver) Resolve(ctx context.Context, reference string
 	if err != nil {
 		return "", ErrSecretUnavailable
 	}
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", ErrSecretUnavailable
+	}
 	name, err := filepath.EvalSymlinks(filepath.Join(root, reference))
 	if err != nil {
 		return "", ErrSecretUnavailable

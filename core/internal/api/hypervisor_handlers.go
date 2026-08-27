@@ -184,6 +184,54 @@ func (server *server) updateProxmoxCluster(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, receipt)
 }
 
+func (server *server) reorderProxmoxCluster(w http.ResponseWriter, r *http.Request) {
+	session, ok := server.mutationSession(w, r, "integrations:manage", "hypervisor.proxmox.cluster.order.update")
+	if !ok {
+		return
+	}
+	if server.dependencies.Hypervisor == nil {
+		server.error(w, r, http.StatusServiceUnavailable, "unavailable", "Hypervisor management is unavailable.")
+		return
+	}
+	id := r.PathValue("id")
+	if !uuidPattern.MatchString(id) {
+		server.error(w, r, http.StatusNotFound, "not_found", "The requested cluster was not found.")
+		return
+	}
+	ifMatch := strings.TrimSpace(r.Header.Get("If-Match"))
+	if ifMatch == "" {
+		server.error(w, r, http.StatusPreconditionRequired, "precondition_required", "If-Match is required.")
+		return
+	}
+	expected, err := parseIntegrationETag(ifMatch)
+	if err != nil {
+		server.errorFields(w, r, http.StatusBadRequest, "validation_failed", "Request validation failed.", []APIFieldError{{Field: "If-Match", Code: "invalid"}})
+		return
+	}
+	var body struct {
+		Direction string `json:"direction"`
+	}
+	if err := decodeJSONLimit(w, r, &body, 1024); err != nil {
+		server.decodeError(w, r, err)
+		return
+	}
+	if body.Direction != "up" && body.Direction != "down" {
+		server.validationError(w, r, []APIFieldError{{Field: "direction", Code: "invalid"}})
+		return
+	}
+	receipt, err := server.dependencies.Hypervisor.ReorderProxmoxCluster(r.Context(), hypervisor.ProxmoxClusterOrderDefinition{
+		ID: id, Direction: body.Direction, ExpectedUpdatedAt: expected,
+		ActorUserID: session.User.ID, SourceAddress: sourceAddress(r), CorrelationID: requestID(r),
+		CanReadAudit: hasPermission(session.User.Permissions, "audit:read"),
+	})
+	if err != nil {
+		writeProxmoxConfigurationError(server, w, r, err)
+		return
+	}
+	w.Header().Set("ETag", integrationETag(time.UnixMicro(receipt.Version)))
+	writeJSON(w, http.StatusOK, receipt)
+}
+
 func writeProxmoxConfigurationError(server *server, w http.ResponseWriter, r *http.Request, err error) {
 	var operational *monitoring.Error
 	if errors.As(err, &operational) {

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://espial.ubnetdef.org/schemas/v1/proxmox-cluster-order.schema.json",
+  "title": "Proxmox cluster order update request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["direction"],
+  "properties": {
+    "direction": { "type": "string", "enum": ["up", "down"] }
+  }
+}

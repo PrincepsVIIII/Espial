@@ -20,6 +20,7 @@ here.
 - [`integration-write.schema.json`](schemas/v1/integration-write.schema.json): integration creation and configuration replacement
 - [`proxmox-cluster.schema.json`](schemas/v1/proxmox-cluster.schema.json): Proxmox Hypervisor cluster card read model
 - [`proxmox-cluster-write.schema.json`](schemas/v1/proxmox-cluster-write.schema.json): Proxmox cluster creation request with explicit target approval, optional self-signed-certificate pinning, and a write-only token secret
+- [`proxmox-cluster-order.schema.json`](schemas/v1/proxmox-cluster-order.schema.json): adjacent Proxmox cluster page-order update request
 - [`monitoring-signal.schema.json`](schemas/v1/monitoring-signal.schema.json): durable observation/freshness work item
 - [`incident-rule.schema.json`](schemas/v1/incident-rule.schema.json): bounded declarative incident rule
 - [`incident-summary.schema.json`](schemas/v1/incident-summary.schema.json): incident collection item

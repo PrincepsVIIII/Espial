@@ -45,6 +45,14 @@ export function formatPercentage(value: number | null | undefined): string {
   return normalized === null ? 'Unknown' : `${Math.round(normalized)}%`;
 }
 
+export function formatExactPercentage(
+  value: number | null | undefined,
+): string {
+  const normalized = normalizePercentage(value);
+  if (normalized === null) return 'Unknown';
+  return `${normalized.toFixed(2).replace(/\.?(?:0+)$/, '')}%`;
+}
+
 export function formatBytes(value: number | null | undefined): string {
   const finite = finiteNumber(value);
   if (finite === null || finite < 0) return 'Unknown';

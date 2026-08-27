@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatBytes,
+  formatExactPercentage,
   formatPercentage,
   hostGraphicRows,
   integerDomain,
@@ -18,6 +19,11 @@ describe('graphic value normalization', () => {
     expect(formatPercentage(Number.POSITIVE_INFINITY)).toBe('Unknown');
     expect(formatBytes(Number.NaN)).toBe('Unknown');
     expect(formatBytes(0)).toBe('0.0 B');
+  });
+
+  it('keeps fractional percentages for hover disclosure', () => {
+    expect(formatExactPercentage(42.125)).toBe('42.13%');
+    expect(formatExactPercentage(Number.NaN)).toBe('Unknown');
   });
 
   it('builds bounded integer domains for zero, all-equal, and outlier data', () => {

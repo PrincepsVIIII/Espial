@@ -1,5 +1,9 @@
 <script lang="ts">
-  import { displayState, normalizePercentage } from '$lib/graphics';
+  import {
+    displayState,
+    formatExactPercentage,
+    normalizePercentage,
+  } from '$lib/graphics';
 
   let {
     label,
@@ -23,6 +27,11 @@
   let secondary = $derived(normalizePercentage(secondaryValue));
   let visualState = $derived(displayState(statusState));
   let tooltipOpen = $state(false);
+  let valueDetail = $derived(
+    secondary === null
+      ? `Exact value: ${formatExactPercentage(primary)}`
+      : `Exact values: primary ${formatExactPercentage(primary)} · secondary ${formatExactPercentage(secondary)}`,
+  );
 
   function handleMarkerKeydown(event: KeyboardEvent) {
     if (event.key !== 'Escape') return;
@@ -51,6 +60,7 @@
         <span class="bar-fill secondary-fill" style={`width: ${secondary}%`}
         ></span>
       {/if}
+      <span class="bar-value-tooltip" role="tooltip">{valueDetail}</span>
     </div>
     <button
       type="button"
@@ -64,7 +74,9 @@
     >
       <span class={`bar-marker marker-${visualState}`} aria-hidden="true"
       ></span>
-      <span class="bar-tooltip" role="tooltip">{markerDetail}</span>
+      <span class="bar-tooltip" role="tooltip"
+        >{valueDetail} · {markerDetail}</span
+      >
     </button>
   </div>
   <div class="bar-meta">
@@ -117,6 +129,33 @@
 
   .bar-fill.split {
     bottom: 50%;
+  }
+
+  .bar-value-tooltip {
+    position: absolute;
+    z-index: 6;
+    left: 50%;
+    bottom: calc(100% + 0.55rem);
+    width: max-content;
+    max-width: min(15rem, 90vw);
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border-strong);
+    background: var(--nav-blue);
+    color: var(--text);
+    font-size: 0.75rem;
+    font-weight: 650;
+    line-height: 1.35;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 0.2rem);
+    transition:
+      opacity var(--graphic-transition-duration) ease-out,
+      transform var(--graphic-transition-duration) ease-out;
+  }
+
+  .bar-track:hover .bar-value-tooltip {
+    opacity: 1;
+    transform: translate(-50%, 0);
   }
 
   .secondary-fill {

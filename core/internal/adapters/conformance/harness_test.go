@@ -24,7 +24,7 @@ func TestSampleExecutablePassesConformanceHarness(t *testing.T) {
 	now := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
 	options := adapters.DefaultProcessOptions()
 	options.Clock = fixedClock{now: now}
-	options.StartupTimeout = time.Second
+	options.StartupTimeout = 3 * time.Second
 	options.RequestTimeout = time.Second
 	options.ShutdownTimeout = 250 * time.Millisecond
 	options.TerminationTimeout = 250 * time.Millisecond

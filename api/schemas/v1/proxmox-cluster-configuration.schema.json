@@ -10,7 +10,7 @@
     "interval_seconds", "expected_refresh_seconds", "request_timeout_seconds",
     "storage_warning_percent", "storage_critical_percent", "swap_warning_percent",
     "swap_critical_percent", "io_wait_warning_percent", "io_wait_critical_percent",
-    "expected_running_guests", "updated_at", "version"
+    "expected_running_guests", "sort_order", "updated_at", "version"
   ],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
@@ -32,6 +32,7 @@
     "io_wait_warning_percent": { "type": "number" },
     "io_wait_critical_percent": { "type": "number" },
     "expected_running_guests": { "type": "array", "items": { "type": "string" } },
+    "sort_order": { "type": "integer", "minimum": 0 },
     "updated_at": { "type": "string", "format": "date-time" },
     "version": { "type": "integer", "minimum": 1 }
   }

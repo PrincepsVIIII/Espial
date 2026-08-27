@@ -35,3 +35,19 @@ func TestFileSecretResolverBoundsAndContainment(t *testing.T) {
 		}
 	}
 }
+
+func TestFileSecretResolverAcceptsConfiguredSymlinkedRoot(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "valid-token"), []byte("opaque-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(t.TempDir(), "secrets")
+	if err := os.Symlink(root, alias); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+	resolver := FileSecretResolver{Root: alias}
+	value, err := resolver.Resolve(context.Background(), "valid-token")
+	if err != nil || value != "opaque-token" {
+		t.Fatalf("resolved secret = %q, %v", value, err)
+	}
+}

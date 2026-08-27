@@ -228,7 +228,9 @@ test('administrator opens the audited cluster configuration editor', async ({
   ).toBeVisible();
   await page.getByRole('button', { name: 'Validate and save' }).click();
   await expect(page.getByText('Cluster configuration saved.')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Audit record' })).toHaveAttribute(
+  await expect(
+    page.getByRole('link', { name: 'Audit record' }),
+  ).toHaveAttribute(
     'href',
     '/audit?correlation_id=proxmox-configuration-request-1',
   );

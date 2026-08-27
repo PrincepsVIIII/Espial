@@ -130,11 +130,14 @@ no gradient, glow, or ornamental animation.
 
 The host comparison is titled “Load distribution”; it is not topology. It renders
 a deterministic compute-node field from stable ID-sorted host/count pairs, with
-circle size encoding its idle-VM count (the authoritative running-guest count).
-For a bounded 3–12-node cluster, a compact radar comparison uses a solid idle-VM
-series and a dashed console-active series when Proxmox permits the active-task read;
-otherwise the graphic explicitly says console activity is unavailable rather than
-presenting zero as a count. The node controls remain the textual equivalent and
+circle size encoding its idle-VM count: running guests minus guests with an open
+Proxmox console proxy. For up to 12 hosts, each node control sits on the matching
+radar vertex; the solid idle series is a proportionally filled polygon, while the
+dashed console-active series appears only when Proxmox permits the active-task
+read. The vertex layout derives from the actual host count, including clusters with
+fewer than seven hosts. If the active-task read is unavailable, the graphic says so
+rather than presenting zero as a count, while the running-guest inventory continues
+to determine idle capacity. The node controls remain the textual equivalent and
 source of selection. Each node shows its host name by default and switches to the
 idle and console-active VM counts on hover or focus; its tooltip and selected detail
 repeat both counts with CPU, RAM, and swap context. The semantic ring conveys the

@@ -75,7 +75,11 @@ func Run(input io.Reader, output io.Writer, diagnostic io.Writer, startupFault s
 			return err
 		}
 	case "no_ready":
-		select {}
+		// Keep the child alive so the parent, rather than the Go runtime's
+		// deadlock detector, determines that the ready handshake timed out.
+		for {
+			time.Sleep(time.Hour)
+		}
 	default:
 		return errors.New("unknown startup fault")
 	}

@@ -47,13 +47,16 @@
   }
 
   function nodeSize(idleVMs: number): string {
-    return `${5 + (Math.max(0, idleVMs) / highestLoad) * 2.2}rem`;
+    return `${3.25 + (Math.max(0, idleVMs) / highestLoad) * 1.25}rem`;
   }
 
   function commit(event: MouseEvent, hostID: string) {
     // The button fills its layout cell for keyboard focus, but only the visible
     // disc is a pointer target. Blank field space must always dismiss selection.
-    if (event.detail !== 0 && !(event.target as HTMLElement).closest('.node-disc')) {
+    if (
+      event.detail !== 0 &&
+      !(event.target as HTMLElement).closest('.node-disc, .node-list')
+    ) {
       return;
     }
     event.stopPropagation();
@@ -86,8 +89,13 @@
 
   function radarPoint(index: number, ratio: number): string {
     const angle = -Math.PI / 2 + (Math.PI * 2 * index) / rows.length;
-    const radius = 42 * Math.max(0, Math.min(1, ratio));
+    const radius = 34 * Math.max(0, Math.min(1, ratio));
     return `${50 + Math.cos(angle) * radius},${50 + Math.sin(angle) * radius}`;
+  }
+
+  function radarNodePosition(index: number): { x: number; y: number } {
+    const [x, y] = radarPoint(index, 1).split(',').map(Number);
+    return { x, y };
   }
 
   function radarGrid(ratio: number): string {
@@ -114,28 +122,90 @@
     </div>
   </header>
 
-  {#if rows.length > 2 && rows.length <= 12}
+  {#if rows.length > 1 && rows.length <= 12}
     <div
       class="radar-comparison"
       aria-label="Idle and console-active VM comparison"
     >
-      <svg class="load-radar" viewBox="0 0 100 100" aria-hidden="true">
-        {#each [0.2, 0.4, 0.6, 0.8, 1] as ratio}
-          <polygon class="radar-grid" points={radarGrid(ratio)} />
-        {/each}
-        {#each rows as _, index}
-          <line
-            x1="50"
-            y1="50"
-            x2={radarPoint(index, 1).split(',')[0]}
-            y2={radarPoint(index, 1).split(',')[1]}
-          />
-        {/each}
-        <polygon class="radar-idle" points={radarSeries('idle_vms')} />
-        {#if consoleActivityAvailable}
-          <polygon class="radar-active" points={radarSeries('active_vms')} />
-        {/if}
-      </svg>
+      <div class="radar-stage">
+        <svg class="load-radar" viewBox="0 0 100 100" aria-hidden="true">
+          {#if rows.length > 2}
+            {#each [0.2, 0.4, 0.6, 0.8, 1] as ratio}
+              <polygon class="radar-grid" points={radarGrid(ratio)} />
+            {/each}
+          {/if}
+          {#each rows as _, index}
+            <line
+              x1="50"
+              y1="50"
+              x2={radarPoint(index, 1).split(',')[0]}
+              y2={radarPoint(index, 1).split(',')[1]}
+            />
+          {/each}
+          {#if rows.length > 2}
+            <polygon class="radar-idle" points={radarSeries('idle_vms')} />
+            {#if consoleActivityAvailable}
+              <polygon
+                class="radar-active"
+                points={radarSeries('active_vms')}
+              />
+            {/if}
+          {/if}
+        </svg>
+
+        <div
+          class="node-field"
+          role="group"
+          aria-label={`${clusterName} compute nodes`}
+        >
+          {#each rows as row, index (row.id)}
+            {@const position = radarNodePosition(index)}
+            <div
+              class="node-item"
+              class:selected={selectedID === row.id}
+              style={`--node-size: ${nodeSize(row.idle_vms)}; --node-x: ${position.x}; --node-y: ${position.y}`}
+            >
+              <button
+                id={nodeID(row.id)}
+                type="button"
+                class="node-button"
+                class:selected={selectedID === row.id}
+                aria-pressed={selectedID === row.id}
+                aria-describedby={tooltipID(row.id)}
+                aria-label={`${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`}
+                onclick={(event) => commit(event, row.id)}
+                onkeydown={clearSelection}
+              >
+                <span
+                  class={`node-disc disc-${displayState(row.health_state)}`}
+                  aria-hidden="true"
+                >
+                  <code class="node-name" title={row.id}>{row.id}</code>
+                  <span class="node-load">
+                    <strong>{row.idle_vms}</strong>
+                    <small>Idle VMs</small>
+                    {#if consoleActivityAvailable}
+                      <span>{row.active_vms} active</span>
+                    {/if}
+                  </span>
+                </span>
+              </button>
+              <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
+                <strong
+                  >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
+                    ? activeVMLabel(row.active_vms)
+                    : 'Console activity unavailable'}</strong
+                >
+                <span
+                  >CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
+                    row.ram_percent,
+                  )} · Swap {formatPercentage(row.swap_percent)}</span
+                >
+              </span>
+            </div>
+          {/each}
+        </div>
+      </div>
       <p>
         <span class="idle-key">Idle VMs</span>
         {#if consoleActivityAvailable}
@@ -145,60 +215,31 @@
         {/if}
       </p>
     </div>
-  {/if}
-
-  <div
-    class="node-field"
-    class:many={rows.length > 12}
-    role="group"
-    aria-label={`${clusterName} compute nodes`}
-  >
-    {#each rows as row (row.id)}
-      <div
-        class="node-item"
-        class:selected={selectedID === row.id}
-        style={`--node-size: ${nodeSize(row.idle_vms)}`}
-      >
+  {:else}
+    <p class="too-many-nodes">
+      {rows.length > 12
+        ? 'Load distribution is available in the node list below for clusters with more than 12 hosts.'
+        : 'One compute node is available.'}
+    </p>
+    <div
+      class="node-field node-list many"
+      role="group"
+      aria-label={`${clusterName} compute nodes`}
+    >
+      {#each rows as row (row.id)}
         <button
-          id={nodeID(row.id)}
           type="button"
           class="node-button"
           class:selected={selectedID === row.id}
           aria-pressed={selectedID === row.id}
-          aria-describedby={tooltipID(row.id)}
           aria-label={`${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`}
           onclick={(event) => commit(event, row.id)}
           onkeydown={clearSelection}
+          ><code>{row.id}</code><span>{idleVMLabel(row.idle_vms)}</span></button
         >
-          <span
-            class={`node-disc disc-${displayState(row.health_state)}`}
-            aria-hidden="true"
-          >
-            <code class="node-name" title={row.id}>{row.id}</code>
-            <span class="node-load">
-              <strong>{row.idle_vms}</strong>
-              <small>Idle VMs</small>
-              {#if consoleActivityAvailable}
-                <span>{row.active_vms} active</span>
-              {/if}
-            </span>
-          </span>
-        </button>
-        <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
-          <strong
-            >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
-              ? activeVMLabel(row.active_vms)
-              : 'Console activity unavailable'}</strong
-          >
-          <span>
-            CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
-              row.ram_percent,
-            )} · Swap {formatPercentage(row.swap_percent)}
-          </span>
-        </span>
-      </div>
-    {/each}
-  </div>
+      {/each}
+    </div>
+  {/if}
 
   {#if activeRow}
     <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
@@ -234,7 +275,9 @@
         </div>
         <div>
           <dt>Console-active</dt>
-          <dd>{consoleActivityAvailable ? activeRow.active_vms : 'Unavailable'}</dd>
+          <dd>
+            {consoleActivityAvailable ? activeRow.active_vms : 'Unavailable'}
+          </dd>
         </div>
       </dl>
     </section>
@@ -265,14 +308,10 @@
     line-height: 1.4;
   }
 
-  .node-field {
+  .radar-stage {
     position: relative;
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
-    gap: 1rem 0.7rem;
-    align-items: end;
-    margin-top: 1rem;
-    padding: 0.35rem;
+    width: min(27rem, 100%);
+    aspect-ratio: 1;
   }
 
   .radar-comparison {
@@ -282,7 +321,8 @@
   }
 
   .load-radar {
-    width: min(17rem, 100%);
+    width: 100%;
+    height: 100%;
     overflow: visible;
   }
 
@@ -295,15 +335,17 @@
 
   .radar-idle,
   .radar-active {
-    fill: none;
     stroke-width: 1.4;
   }
 
   .radar-idle {
     stroke: var(--text);
+    fill: #7894a8;
+    fill-opacity: 0.32;
   }
 
   .radar-active {
+    fill: none;
     stroke: var(--graphic-label-muted);
     stroke-dasharray: 2 1.3;
   }
@@ -331,19 +373,21 @@
     border-top-style: dashed !important;
   }
 
-  .node-field.many {
-    max-height: min(34rem, 70vh);
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+  .node-field {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
   }
 
   .node-item {
     position: relative;
     z-index: 1;
-    display: grid;
-    justify-items: center;
-    min-width: 0;
+    position: absolute;
+    top: calc(var(--node-y) * 1%);
+    left: calc(var(--node-x) * 1%);
+    width: calc(var(--node-size) + 1.5rem);
     pointer-events: none;
+    transform: translate(-50%, -50%);
   }
 
   .node-button {
@@ -367,7 +411,7 @@
   .node-disc {
     display: grid;
     place-content: center;
-    width: min(var(--node-size), 100%);
+    width: var(--node-size);
     aspect-ratio: 1;
     border: 3px solid var(--unknown);
     border-radius: 50%;
@@ -480,7 +524,6 @@
     font-weight: 700;
   }
 
-
   .health-critical {
     color: var(--critical);
   }
@@ -501,8 +544,8 @@
   .node-tooltip {
     position: absolute;
     z-index: 4;
-    top: 1.2rem;
-    right: 0;
+    top: calc(100% + 0.45rem);
+    left: 50%;
     display: grid;
     gap: 0.2rem;
     box-sizing: border-box;
@@ -516,7 +559,7 @@
     line-height: 1.35;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(-0.25rem);
+    transform: translate(-50%, -0.25rem);
     transition:
       opacity var(--graphic-transition-duration) ease-out,
       transform var(--graphic-transition-duration) ease-out;
@@ -529,7 +572,7 @@
   .node-item:hover .node-tooltip,
   .node-item:focus-within .node-tooltip {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate(-50%, 0);
   }
 
   .node-detail {
@@ -570,13 +613,57 @@
     font-size: 0.8rem;
   }
 
-  @container load-distribution (max-width: 34rem) {
-    .node-field {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+  .too-many-nodes {
+    margin-top: 1rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.8rem;
+  }
 
-    .node-item:last-child:nth-child(odd) {
-      grid-column: 1 / -1;
+  .node-list {
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.45rem;
+    margin-top: 0.65rem;
+    max-height: min(34rem, 70vh);
+    overflow-y: auto;
+    pointer-events: auto;
+    scrollbar-gutter: stable;
+  }
+
+  .node-list .node-button {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    min-height: 2.2rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid var(--border);
+    border-radius: 0.2rem;
+    background: var(--surface);
+    color: var(--text);
+    text-align: left;
+  }
+
+  .node-list .node-button.selected {
+    border-color: var(--graphic-selection);
+  }
+
+  .node-list code {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .node-list span {
+    color: var(--graphic-label-muted);
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  @container load-distribution (max-width: 34rem) {
+    .radar-stage {
+      width: min(22rem, 100%);
     }
 
     .node-detail {

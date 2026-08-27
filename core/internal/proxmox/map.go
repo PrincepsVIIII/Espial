@@ -72,13 +72,14 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 	})
 
 	expected := expectedGuestSet(config.ExpectedRunningGuests)
-	idleByNode := map[string]int{}
 	runningGuests := map[string]map[int]struct{}{}
 	for _, item := range source {
 		switch item.Type {
 		case "node":
 			node := itemNode(item)
-			idleByNode[node] = 0
+			if _, exists := runningGuests[node]; !exists {
+				runningGuests[node] = map[int]struct{}{}
+			}
 		case "qemu", "lxc":
 			if item.Status != "running" {
 				continue
@@ -87,12 +88,22 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 				runningGuests[item.Node] = map[int]struct{}{}
 			}
 			runningGuests[item.Node][item.VMID] = struct{}{}
-			idleByNode[item.Node]++
 		}
 	}
 	activeByNode := map[string]int{}
 	if consoleActivityAvailable {
 		activeByNode = activeConsoleVMs(activeTasks, runningGuests)
+	}
+	// Idle means a running guest without an open Proxmox console proxy. The
+	// running-guest inventory remains available even when the optional task read
+	// is forbidden; in that case console activity is marked unavailable instead
+	// of silently treating it as zero.
+	idleByNode := make(map[string]int, len(runningGuests))
+	for node, guests := range runningGuests {
+		idleByNode[node] = len(guests) - activeByNode[node]
+		if idleByNode[node] < 0 {
+			idleByNode[node] = 0
+		}
 	}
 	// /cluster/resources can report the same shared storage once per node. The
 	// shared scope deliberately gives those rows one Espial identity, so emit it

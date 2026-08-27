@@ -33,6 +33,7 @@
   let clusterDialog = $state<HTMLDivElement>();
   let editor = $state<ProxmoxClusterConfiguration | null>(null);
   let editorLoading = $state(false);
+  let reordering = $state(false);
   let modalReturnTarget = $state<HTMLElement | null>(null);
 
   async function saveCluster(event: SubmitEvent) {
@@ -86,15 +87,21 @@
       const endpoint = editor
         ? `/api/v1/hypervisor/proxmox/clusters/${editor.id}/configuration`
         : '/api/v1/hypervisor/proxmox/clusters';
-      receipt = await requestJSON<AdministrativeMutationReceipt>(fetch, endpoint, {
-        method: editor ? 'PUT' : 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': readCookie('espial_csrf'),
-          ...(editor ? { 'If-Match': configurationETag(editor.version) } : {}),
+      receipt = await requestJSON<AdministrativeMutationReceipt>(
+        fetch,
+        endpoint,
+        {
+          method: editor ? 'PUT' : 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': readCookie('espial_csrf'),
+            ...(editor
+              ? { 'If-Match': configurationETag(editor.version) }
+              : {}),
+          },
+          body: JSON.stringify(body),
         },
-        body: JSON.stringify(body),
-      });
+      );
       modalOpen = false;
       editor = null;
       await invalidate('espial:monitoring');
@@ -168,6 +175,56 @@
     return `"${Math.trunc(version).toString(16)}"`;
   }
 
+  function editorPosition(): number {
+    if (!editor) return -1;
+    return (data.clusters?.items ?? []).findIndex(
+      (cluster) => cluster.integration_id === editor?.id,
+    );
+  }
+
+  async function reorderCluster(direction: 'up' | 'down') {
+    if (!editor || reordering) return;
+    const position = editorPosition();
+    const clusters = data.clusters?.items ?? [];
+    if (
+      position < 0 ||
+      (direction === 'up' && position === 0) ||
+      (direction === 'down' && position === clusters.length - 1)
+    ) {
+      return;
+    }
+    reordering = true;
+    formProblem = null;
+    try {
+      const result = await requestJSON<AdministrativeMutationReceipt>(
+        fetch,
+        `/api/v1/hypervisor/proxmox/clusters/${editor.id}/configuration/order`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': readCookie('espial_csrf'),
+            'If-Match': configurationETag(editor.version),
+          },
+          body: JSON.stringify({ direction }),
+        },
+      );
+      editor = {
+        ...editor,
+        sort_order: direction === 'up' ? position - 1 : position + 1,
+        version: result.version,
+      };
+      receipt = result;
+      await invalidate('espial:monitoring');
+    } catch (error) {
+      const problem =
+        error instanceof ApiFailure ? error.problem : problemFrom(error);
+      formProblem = clusterFormFeedback(problem);
+    } finally {
+      reordering = false;
+    }
+  }
+
   function handleWindowKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && modalOpen) {
       event.preventDefault();
@@ -216,7 +273,7 @@
   {/if}
 </header>
 
-  {#if receipt}
+{#if receipt}
   <div class="receipt" role="status">
     <strong>Cluster configuration saved.</strong>
     <span>Request ID: <code>{receipt.request_id}</code></span>
@@ -258,8 +315,10 @@
               type="button"
               class="cluster-settings-button"
               aria-label={`Edit settings for ${cluster.name}`}
-              onclick={(event) => openClusterEditor(event, cluster.integration_id)}
-            >{cluster.name}</button>
+              onclick={(event) =>
+                openClusterEditor(event, cluster.integration_id)}
+              >{cluster.name}</button
+            >
           {:else}
             <h2 id={`cluster-${cluster.id}`}>{cluster.name}</h2>
           {/if}
@@ -383,7 +442,9 @@
         >
       </div>
       {#if editorLoading}
-        <div class="editor-loading" aria-live="polite">Loading cluster settings…</div>
+        <div class="editor-loading" aria-live="polite">
+          Loading cluster settings…
+        </div>
       {:else if !editor && formProblem}
         <section class="form-problem editor-problem" role="alert">
           <strong>{formProblem.title}</strong>
@@ -392,258 +453,313 @@
               <li>{detail}</li>
             {/each}
           </ul>
+          {#if formProblem.requestID}
+            <small>Request ID: <code>{formProblem.requestID}</code></small>
+          {/if}
         </section>
       {:else}
-      <form
-        class="cluster-form"
-        aria-describedby="cluster-editor-description"
-        aria-busy={saving}
-        onsubmit={saveCluster}
-      >
-        <fieldset>
-          <legend>Connection</legend>
-          <div class="form-grid">
-            <label class="form-field">
-              <span>Cluster name</span>
-              <input
-                bind:this={firstClusterInput}
-                name="display_name"
-                required
-                maxlength="128"
-                value={editor?.display_name ?? ''}
-              />
-              <small>The operator-facing name shown in Hypervisor.</small>
-            </label>
-            <label class="form-field">
-              <span>Deployment ID</span>
-              <input
-                name="deployment_id"
-                required
-                pattern="[a-z][a-z0-9-]+"
-                minlength="2"
-                maxlength="63"
-                placeholder="production-pve"
-                value={editor?.deployment_id ?? ''}
-              />
-              <small
-                >Stable lowercase identity; this cannot be a display name.</small
-              >
-            </label>
-            <label class="form-field form-field-wide">
-              <span>Base URL</span>
-              <input
-                name="base_url"
-                type="url"
-                required
-                placeholder="https://proxmox.example:8006"
-                value={editor?.base_url ?? ''}
-              />
-              <small
-                >Origin only. Do not include an API path, query, or credentials.</small
-              >
-            </label>
-          </div>
-          <div class="security-options">
-            <label class="check-row">
-              <input name="approve_target" type="checkbox" required checked={editor?.approve_target ?? false} />
-              <span>
-                <strong>Approve this exact target</strong>
-                <small
-                  >Required. Allow read-only collection from the host and port
-                  above.</small
+        <form
+          class="cluster-form"
+          aria-describedby="cluster-editor-description"
+          aria-busy={saving}
+          onsubmit={saveCluster}
+        >
+          {#if editor}
+            {@const position = editorPosition()}
+            <fieldset class="cluster-order">
+              <legend>Page order</legend>
+              <p class="fieldset-description">
+                Position {position + 1} of {(data.clusters?.items ?? [])
+                  .length}. Changes save immediately.
+              </p>
+              <div class="order-controls">
+                <button
+                  type="button"
+                  class="order-arrow"
+                  aria-label="Move cluster up"
+                  title="Move cluster up"
+                  disabled={reordering || position <= 0}
+                  onclick={() => reorderCluster('up')}>↑</button
                 >
-              </span>
-            </label>
-            <label class="check-row">
-              <input name="trust_self_signed_certificate" type="checkbox" checked={editor?.trust_self_signed_certificate ?? false} />
-              <span>
-                <strong>Trust this cluster’s self-signed certificate</strong>
-                <small
-                  >Espial pins the certificate presented during setup and
-                  rejects a later certificate change.</small
+                <button
+                  type="button"
+                  class="order-arrow"
+                  aria-label="Move cluster down"
+                  title="Move cluster down"
+                  disabled={reordering ||
+                    position < 0 ||
+                    position >= (data.clusters?.items ?? []).length - 1}
+                  onclick={() => reorderCluster('down')}>↓</button
                 >
-              </span>
-            </label>
-            <label class="check-row">
-              <input name="allow_insecure_http" type="checkbox" checked={editor?.allow_insecure_http ?? false} />
-              <span>
-                <strong>Allow insecure HTTP</strong>
-                <small
-                  >Not recommended. The API token will travel without TLS. Use
-                  only for a temporary, isolated cluster.</small
-                >
-              </span>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Read-only API token</legend>
-          <div class="form-grid">
-            <label class="form-field">
-              <span>Token ID</span>
-              <input
-                name="token_id"
-                required
-                placeholder="espial@pve!monitoring"
-                autocomplete="username"
-                value={editor?.token_id ?? ''}
-              />
-              <small>Include the user, realm, and token name.</small>
-            </label>
-            <label class="form-field">
-              <span>Token secret</span>
-              <input
-                name="token_secret"
-                type="password"
-                required={!editor}
-                autocomplete="new-password"
-              />
-              <small>{editor ? 'Leave empty to retain the stored secret. Enter a value to replace it.' : 'Accepted once and stored by secret reference.'}</small>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Collection</legend>
-          <div class="form-grid form-grid-three">
-            <label class="form-field">
-              <span>Collection interval</span>
-              <div class="input-unit">
-                <input
-                  name="interval_seconds"
-                  type="number"
-                  min="1"
-                  max="86400"
-                  value={editor?.interval_seconds ?? 300}
-                />
-                <span>seconds</span>
               </div>
-            </label>
-            <label class="form-field">
-              <span>Expected freshness</span>
-              <div class="input-unit">
+            </fieldset>
+          {/if}
+          <fieldset>
+            <legend>Connection</legend>
+            <div class="form-grid">
+              <label class="form-field">
+                <span>Cluster name</span>
                 <input
-                  name="expected_refresh_seconds"
-                  type="number"
-                  min="1"
-                  max="86400"
-                  value={editor?.expected_refresh_seconds ?? 300}
+                  bind:this={firstClusterInput}
+                  name="display_name"
+                  required
+                  maxlength="128"
+                  value={editor?.display_name ?? ''}
                 />
-                <span>seconds</span>
-              </div>
-            </label>
-            <label class="form-field">
-              <span>Request timeout</span>
-              <div class="input-unit">
+                <small>The operator-facing name shown in Hypervisor.</small>
+              </label>
+              <label class="form-field">
+                <span>Deployment ID</span>
                 <input
-                  name="request_timeout_seconds"
-                  type="number"
-                  min="1"
-                  max="60"
-                  value={editor?.request_timeout_seconds ?? 10}
+                  name="deployment_id"
+                  required
+                  pattern="[a-z][a-z0-9-]+"
+                  minlength="2"
+                  maxlength="63"
+                  placeholder="production-pve"
+                  value={editor?.deployment_id ?? ''}
                 />
-                <span>seconds</span>
-              </div>
-            </label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Warning and critical thresholds</legend>
-          <p class="fieldset-description">
-            Warning must be lower than critical for each percentage.
-          </p>
-          <div class="threshold-table">
-            <span class="threshold-heading">Signal</span>
-            <span class="threshold-heading">Warning</span>
-            <span class="threshold-heading">Critical</span>
-            {#each [['Storage used', 'storage', 80, 90], ['Swap used', 'swap', 10, 25], ['IO wait', 'io_wait', 5, 15]] as threshold}
-              <span class="threshold-label">{threshold[0]}</span>
-              <label>
-                <span class="visually-hidden"
-                  >{threshold[0]} warning percent</span
+                <small
+                  >Stable lowercase identity; this cannot be a display name.</small
                 >
-                <div class="input-unit compact">
+              </label>
+              <label class="form-field form-field-wide">
+                <span>Base URL</span>
+                <input
+                  name="base_url"
+                  type="url"
+                  required
+                  placeholder="https://proxmox.example:8006"
+                  value={editor?.base_url ?? ''}
+                />
+                <small
+                  >Origin only. Do not include an API path, query, or
+                  credentials.</small
+                >
+              </label>
+            </div>
+            <div class="security-options">
+              <label class="check-row">
+                <input
+                  name="approve_target"
+                  type="checkbox"
+                  required
+                  checked={editor?.approve_target ?? false}
+                />
+                <span>
+                  <strong>Approve this exact target</strong>
+                  <small
+                    >Required. Allow read-only collection from the host and port
+                    above.</small
+                  >
+                </span>
+              </label>
+              <label class="check-row">
+                <input
+                  name="trust_self_signed_certificate"
+                  type="checkbox"
+                  checked={editor?.trust_self_signed_certificate ?? false}
+                />
+                <span>
+                  <strong>Trust this cluster’s self-signed certificate</strong>
+                  <small
+                    >Espial pins the certificate presented during setup and
+                    rejects a later certificate change.</small
+                  >
+                </span>
+              </label>
+              <label class="check-row">
+                <input
+                  name="allow_insecure_http"
+                  type="checkbox"
+                  checked={editor?.allow_insecure_http ?? false}
+                />
+                <span>
+                  <strong>Allow insecure HTTP</strong>
+                  <small
+                    >Not recommended. The API token will travel without TLS. Use
+                    only for a temporary, isolated cluster.</small
+                  >
+                </span>
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Read-only API token</legend>
+            <div class="form-grid">
+              <label class="form-field">
+                <span>Token ID</span>
+                <input
+                  name="token_id"
+                  required
+                  placeholder="espial@pve!monitoring"
+                  autocomplete="username"
+                  value={editor?.token_id ?? ''}
+                />
+                <small>Include the user, realm, and token name.</small>
+              </label>
+              <label class="form-field">
+                <span>Token secret</span>
+                <input
+                  name="token_secret"
+                  type="password"
+                  required={!editor}
+                  autocomplete="new-password"
+                />
+                <small
+                  >{editor
+                    ? 'Leave empty to retain the stored secret. Enter a value to replace it.'
+                    : 'Accepted once and stored by secret reference.'}</small
+                >
+              </label>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Collection</legend>
+            <div class="form-grid form-grid-three">
+              <label class="form-field">
+                <span>Collection interval</span>
+                <div class="input-unit">
                   <input
-                    name={`${threshold[1]}_warning_percent`}
+                    name="interval_seconds"
                     type="number"
-                    min="0"
-                    max="100"
-                    value={editor
-                      ? threshold[1] === 'storage'
-                        ? editor.storage_warning_percent
-                        : threshold[1] === 'swap'
-                          ? editor.swap_warning_percent
-                          : editor.io_wait_warning_percent
-                      : threshold[2]}
+                    min="1"
+                    max="86400"
+                    value={editor?.interval_seconds ?? 300}
                   />
-                  <span>%</span>
+                  <span>seconds</span>
                 </div>
               </label>
-              <label>
-                <span class="visually-hidden"
-                  >{threshold[0]} critical percent</span
-                >
-                <div class="input-unit compact">
+              <label class="form-field">
+                <span>Expected freshness</span>
+                <div class="input-unit">
                   <input
-                    name={`${threshold[1]}_critical_percent`}
+                    name="expected_refresh_seconds"
                     type="number"
-                    min="0"
-                    max="100"
-                    value={editor
-                      ? threshold[1] === 'storage'
-                        ? editor.storage_critical_percent
-                        : threshold[1] === 'swap'
-                          ? editor.swap_critical_percent
-                          : editor.io_wait_critical_percent
-                      : threshold[3]}
+                    min="1"
+                    max="86400"
+                    value={editor?.expected_refresh_seconds ?? 300}
                   />
-                  <span>%</span>
+                  <span>seconds</span>
                 </div>
               </label>
-            {/each}
-          </div>
-        </fieldset>
+              <label class="form-field">
+                <span>Request timeout</span>
+                <div class="input-unit">
+                  <input
+                    name="request_timeout_seconds"
+                    type="number"
+                    min="1"
+                    max="60"
+                    value={editor?.request_timeout_seconds ?? 10}
+                  />
+                  <span>seconds</span>
+                </div>
+              </label>
+            </div>
+          </fieldset>
 
-        <fieldset>
-          <legend>Guest expectations</legend>
-          <label class="form-field">
-            <span>Expected-running guests <small>Optional</small></span>
-            <input
-              name="expected_running_guests"
-              placeholder="qemu:100, lxc:200"
-              value={editor?.expected_running_guests.join(', ') ?? ''}
-            />
-            <small
-              >Comma-separated qemu:&lt;id&gt; or lxc:&lt;id&gt; values. Stopped
-              guests in this list become critical.</small
-            >
-          </label>
-        </fieldset>
-
-        {#if formProblem}
-          <section class="form-problem" role="alert" aria-live="assertive">
-            <strong>{formProblem.title}</strong>
-            <ul>
-              {#each formProblem.details as detail}
-                <li>{detail}</li>
+          <fieldset>
+            <legend>Warning and critical thresholds</legend>
+            <p class="fieldset-description">
+              Warning must be lower than critical for each percentage.
+            </p>
+            <div class="threshold-table">
+              <span class="threshold-heading">Signal</span>
+              <span class="threshold-heading">Warning</span>
+              <span class="threshold-heading">Critical</span>
+              {#each [['Storage used', 'storage', 80, 90], ['Swap used', 'swap', 10, 25], ['IO wait', 'io_wait', 5, 15]] as threshold}
+                <span class="threshold-label">{threshold[0]}</span>
+                <label>
+                  <span class="visually-hidden"
+                    >{threshold[0]} warning percent</span
+                  >
+                  <div class="input-unit compact">
+                    <input
+                      name={`${threshold[1]}_warning_percent`}
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editor
+                        ? threshold[1] === 'storage'
+                          ? editor.storage_warning_percent
+                          : threshold[1] === 'swap'
+                            ? editor.swap_warning_percent
+                            : editor.io_wait_warning_percent
+                        : threshold[2]}
+                    />
+                    <span>%</span>
+                  </div>
+                </label>
+                <label>
+                  <span class="visually-hidden"
+                    >{threshold[0]} critical percent</span
+                  >
+                  <div class="input-unit compact">
+                    <input
+                      name={`${threshold[1]}_critical_percent`}
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editor
+                        ? threshold[1] === 'storage'
+                          ? editor.storage_critical_percent
+                          : threshold[1] === 'swap'
+                            ? editor.swap_critical_percent
+                            : editor.io_wait_critical_percent
+                        : threshold[3]}
+                    />
+                    <span>%</span>
+                  </div>
+                </label>
               {/each}
-            </ul>
-            {#if formProblem.requestID}
-              <small>Request ID: <code>{formProblem.requestID}</code></small>
-            {/if}
-          </section>
-        {/if}
-        <div class="modal-actions">
-          <button type="button" class="secondary-action" onclick={closeModal}
-            >Cancel</button
-          >
-          <button type="submit" disabled={saving}
-            >{saving ? 'Validating...' : editor ? 'Validate and save' : 'Validate and add'}</button
-          >
-        </div>
-      </form>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Guest expectations</legend>
+            <label class="form-field">
+              <span>Expected-running guests <small>Optional</small></span>
+              <input
+                name="expected_running_guests"
+                placeholder="qemu:100, lxc:200"
+                value={editor?.expected_running_guests.join(', ') ?? ''}
+              />
+              <small
+                >Comma-separated qemu:&lt;id&gt; or lxc:&lt;id&gt; values.
+                Stopped guests in this list become critical.</small
+              >
+            </label>
+          </fieldset>
+
+          {#if formProblem}
+            <section class="form-problem" role="alert" aria-live="assertive">
+              <strong>{formProblem.title}</strong>
+              <ul>
+                {#each formProblem.details as detail}
+                  <li>{detail}</li>
+                {/each}
+              </ul>
+              {#if formProblem.requestID}
+                <small>Request ID: <code>{formProblem.requestID}</code></small>
+              {/if}
+            </section>
+          {/if}
+          <div class="modal-actions">
+            <button type="button" class="secondary-action" onclick={closeModal}
+              >Cancel</button
+            >
+            <button type="submit" disabled={saving}
+              >{saving
+                ? 'Validating...'
+                : editor
+                  ? 'Validate and save'
+                  : 'Validate and add'}</button
+            >
+          </div>
+        </form>
       {/if}
     </div>
   </div>
@@ -842,6 +958,30 @@
     margin: 0.4rem 0 0.9rem;
     color: var(--text-muted);
     line-height: 1.45;
+  }
+
+  .order-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .order-arrow {
+    width: 2.35rem;
+    min-width: 2.35rem;
+    min-height: 2.35rem;
+    padding: 0;
+    border: 1px solid var(--border-strong);
+    border-radius: 0.2rem;
+    background: transparent;
+    color: var(--text);
+    font-size: 1.25rem;
+    font-weight: 400;
+    line-height: 1;
+  }
+
+  .order-arrow:not(:disabled):hover {
+    border-color: var(--netdef-cyan);
+    color: var(--netdef-cyan);
   }
 
   .form-grid {

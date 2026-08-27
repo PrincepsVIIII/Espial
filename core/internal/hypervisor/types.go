@@ -51,6 +51,7 @@ type ProxmoxClusterConfiguration struct {
 	IOWaitWarningPercent       float64   `json:"io_wait_warning_percent"`
 	IOWaitCriticalPercent      float64   `json:"io_wait_critical_percent"`
 	ExpectedRunningGuests      []string  `json:"expected_running_guests"`
+	SortOrder                  int       `json:"sort_order"`
 	UpdatedAt                  time.Time `json:"updated_at"`
 	Version                    int64     `json:"version"`
 }
@@ -59,6 +60,16 @@ type ProxmoxClusterUpdateDefinition struct {
 	ProxmoxClusterDefinition
 	ID                string
 	ExpectedUpdatedAt time.Time
+}
+
+type ProxmoxClusterOrderDefinition struct {
+	ID                string
+	Direction         string
+	ExpectedUpdatedAt time.Time
+	ActorUserID       string
+	SourceAddress     string
+	CorrelationID     string
+	CanReadAudit      bool
 }
 
 type ClusterList struct {
@@ -78,6 +89,7 @@ type ClusterCard struct {
 	Totals                   UtilizationTotals `json:"totals"`
 	LoadNodes                []LoadNodeSummary `json:"load_nodes"`
 	ConsoleActivityAvailable bool              `json:"console_activity_available"`
+	SortOrder                int               `json:"-"`
 }
 
 type HostSummary struct {

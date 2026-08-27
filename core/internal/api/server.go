@@ -119,6 +119,7 @@ type HypervisorManager interface {
 	CreateProxmoxCluster(context.Context, hypervisor.ProxmoxClusterDefinition) (adminops.Receipt, error)
 	ProxmoxClusterConfiguration(context.Context, string) (hypervisor.ProxmoxClusterConfiguration, error)
 	UpdateProxmoxCluster(context.Context, hypervisor.ProxmoxClusterUpdateDefinition) (adminops.Receipt, error)
+	ReorderProxmoxCluster(context.Context, hypervisor.ProxmoxClusterOrderDefinition) (adminops.Receipt, error)
 }
 
 type UserAdministrator interface {
@@ -237,6 +238,7 @@ func New(dependencies Dependencies) http.Handler {
 	mux.HandleFunc("POST /api/v1/hypervisor/proxmox/clusters", server.createProxmoxCluster)
 	mux.HandleFunc("GET /api/v1/hypervisor/proxmox/clusters/{id}/configuration", server.proxmoxClusterConfiguration)
 	mux.HandleFunc("PUT /api/v1/hypervisor/proxmox/clusters/{id}/configuration", server.updateProxmoxCluster)
+	mux.HandleFunc("POST /api/v1/hypervisor/proxmox/clusters/{id}/configuration/order", server.reorderProxmoxCluster)
 	mux.HandleFunc("GET /api/v1/roles", server.managedRoles)
 	mux.HandleFunc("GET /api/v1/users", server.managedUsers)
 	mux.HandleFunc("POST /api/v1/users", server.createManagedUser)

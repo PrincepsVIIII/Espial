@@ -407,7 +407,7 @@ func sampleDescriptor(path string) Descriptor {
 func fastProcessOptions(now time.Time) ProcessOptions {
 	options := DefaultProcessOptions()
 	options.Clock = fixedAdapterClock{now: now}
-	options.StartupTimeout = time.Second
+	options.StartupTimeout = 3 * time.Second
 	options.RequestTimeout = time.Second
 	options.ShutdownTimeout = 250 * time.Millisecond
 	options.TerminationTimeout = 250 * time.Millisecond

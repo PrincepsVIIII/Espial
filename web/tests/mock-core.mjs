@@ -164,7 +164,10 @@ const server = http.createServer((request, response) => {
       hypervisorClusters(hypervisorMode, hypervisorRevision),
     );
   }
-  if (url.pathname.startsWith('/api/v1/hypervisor/proxmox/clusters/') && url.pathname.endsWith('/configuration')) {
+  if (
+    url.pathname.startsWith('/api/v1/hypervisor/proxmox/clusters/') &&
+    url.pathname.endsWith('/configuration')
+  ) {
     if (request.method === 'PUT') {
       return json(response, 200, {
         id: integrationID,
@@ -173,7 +176,11 @@ const server = http.createServer((request, response) => {
         audit_url: '/audit?correlation_id=proxmox-configuration-request-1',
       });
     }
-    return json(response, 200, hypervisorConfiguration(url.pathname.split('/')[6]));
+    return json(
+      response,
+      200,
+      hypervisorConfiguration(url.pathname.split('/')[6]),
+    );
   }
   if (url.pathname === '/api/v1/overview') {
     return json(response, 200, {

@@ -77,7 +77,7 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	if !ok {
 		t.Fatalf("idle_vms_by_node = %#v", payload.Observations[0].Metadata["idle_vms_by_node"])
 	}
-	if idleByNode["pve-a"] != 1 || idleByNode["pve-b"] != 0 {
+	if idleByNode["pve-a"] != 0 || idleByNode["pve-b"] != 0 {
 		t.Fatalf("idle_vms_by_node = %#v", idleByNode)
 	}
 	activeByNode, ok := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int)
@@ -147,5 +147,8 @@ func TestCollectPreservesCoreMetricsWhenConsoleActivityIsUnavailable(t *testing.
 	}
 	if active := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int); len(active) != 0 {
 		t.Fatalf("active_vms_by_node = %#v", active)
+	}
+	if idle := payload.Observations[0].Metadata["idle_vms_by_node"].(map[string]int); idle["pve-a"] != 1 {
+		t.Fatalf("idle_vms_by_node = %#v", idle)
 	}
 }

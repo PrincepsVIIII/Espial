@@ -92,9 +92,12 @@
   }
 
   function navigationLabel(pathname: string): string {
-    return navItems.find(
-      (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
-    )?.label ?? 'page';
+    return (
+      navItems.find(
+        (item) =>
+          pathname === item.href || pathname.startsWith(`${item.href}/`),
+      )?.label ?? 'page'
+    );
   }
 
   function closeNavigation() {
