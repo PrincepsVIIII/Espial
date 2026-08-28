@@ -99,16 +99,17 @@
     selectionNotice = `${view === 'compute' ? 'Compute-node' : 'Storage'} selection cleared.`;
   }
 
-  function toggleView() {
-    view = view === 'compute' ? 'storage' : 'compute';
+  function selectView(nextView: 'compute' | 'storage') {
+    if (view === nextView) return;
+    view = nextView;
     selectedID = null;
     selectionNotice = '';
   }
 
   function description(): string {
     return view === 'compute'
-      ? `Idle VMs by host in ${clusterName}.`
-      : `Idle VMs by the storage backing each running guest's main disk in ${clusterName}. EFI, ISO, and auxiliary volumes are excluded.`;
+      ? `Idle VMs by compute host in ${clusterName}.`
+      : `Idle VMs by NAS (primary drive) in ${clusterName}.`;
   }
 
   function groupLabel(): string {
@@ -167,16 +168,25 @@
       <h3 id={`${id}-title`}>Load distribution</h3>
       <p>{description()}</p>
     </div>
-    <div class="load-view-toggle" aria-label="Load distribution view">
-      <span class:current={view === 'compute'}>Compute</span>
+    <div
+      class="load-view-toggle"
+      role="group"
+      aria-label="Load distribution view"
+      data-view={view}
+    >
       <button
         type="button"
-        role="switch"
-        aria-checked={view === 'storage'}
-        aria-label="Show storage load distribution"
-        onclick={toggleView}><span aria-hidden="true"></span></button
+        class:current={view === 'compute'}
+        aria-pressed={view === 'compute'}
+        onclick={() => selectView('compute')}>Compute</button
       >
-      <span class:current={view === 'storage'}>Storage</span>
+      <button
+        type="button"
+        class:current={view === 'storage'}
+        aria-pressed={view === 'storage'}
+        onclick={() => selectView('storage')}>Storage</button
+      >
+      <span class="load-view-selector" aria-hidden="true"></span>
     </div>
   </header>
 
@@ -447,46 +457,46 @@
   }
 
   .load-view-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    color: var(--graphic-label-muted);
-    font-size: 0.72rem;
+    position: relative;
+    display: grid;
+    flex: 0 0 8rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 8rem;
+    padding-bottom: 0.3rem;
     font-weight: 700;
   }
 
-  .load-view-toggle > span.current {
-    color: var(--text);
-  }
-
   .load-view-toggle button {
-    display: grid;
-    align-items: center;
-    width: 2.35rem;
-    height: 1.25rem;
-    padding: 0.15rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-sm);
-    background: var(--graphic-track);
+    padding: 0.1rem 0.25rem;
+    border: 0;
+    background: transparent;
+    color: var(--graphic-label-muted);
+    font-size: 0.78rem;
+    font-weight: 700;
   }
 
-  .load-view-toggle button > span {
-    width: 0.75rem;
-    height: 0.75rem;
-    border-radius: 50%;
-    background: var(--graphic-mark);
-    transform: translateX(0);
-    transition: transform var(--graphic-transition-duration) ease-out;
-  }
-
-  .load-view-toggle button[aria-checked='true'] > span {
-    background: var(--graphic-selection);
-    transform: translateX(1.05rem);
+  .load-view-toggle button.current {
+    color: var(--text);
   }
 
   .load-view-toggle button:focus-visible {
     outline: 2px solid var(--graphic-focus);
     outline-offset: 2px;
+  }
+
+  .load-view-selector {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 50%;
+    height: 2px;
+    background: var(--graphic-selection);
+    transform: translateX(0);
+    transition: transform var(--graphic-transition-duration) ease-out;
+  }
+
+  .load-view-toggle[data-view='storage'] .load-view-selector {
+    transform: translateX(100%);
   }
 
   .unavailable-storage {

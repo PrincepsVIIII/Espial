@@ -1,6 +1,7 @@
 # Operations and environment records
 
 - [Environment and integration inventory](ENVIRONMENT_INVENTORY.md)
+- [Common local startup commands](COMMON_STARTUP_COMMANDS.md)
 - [Temporary local authentication runbook](LOCAL_AUTH.md)
 - [Deployment, upgrade, rollback, and shutdown](DEPLOYMENT_RUNBOOK.md)
 - [Database backup and restore](BACKUP_RESTORE.md)

@@ -135,8 +135,9 @@ inline health sentences are omitted because Dashboard and Alerts own that triage
 CPU, RAM, and storage totals use large native-SVG semicircles with explicit values
 and no gradient, glow, or ornamental animation.
 
-The comparison is titled “Load distribution”; it is not topology. A labelled switch
-at the section's upper right selects **Compute** or **Storage**. Compute renders a
+The comparison is titled “Load distribution”; it is not topology. Fixed **Compute**
+and **Storage** labels at the section's upper right select the view, with a short
+cyan selector sliding beneath the active word. Compute renders a
 deterministic field from stable ID-sorted host/count pairs; Storage uses matching
 stable ID-sorted main-disk storage/count pairs. In both views, larger circle size
 encodes idle VMs: running guests minus guests with an open Proxmox console proxy.

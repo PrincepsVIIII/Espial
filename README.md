@@ -71,6 +71,7 @@ The frontend and backend run as separate processes. The browser-facing SvelteKit
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Common local startup commands](docs/operations/COMMON_STARTUP_COMMANDS.md)
 - [Project roadmap](docs/ROADMAP.md)
 - [Phase 0 design baseline](docs/phase-0/README.md)
 - [Phase 1 implementation plan](docs/plans/PHASE_1_IMPLEMENTATION.md)

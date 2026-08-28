@@ -244,13 +244,22 @@ test('switches load distribution to storage main-disk attribution', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
 
-  const viewSwitch = page.getByRole('switch', {
-    name: 'Show storage load distribution',
+  const viewSelector = page.locator('.load-view-toggle');
+  const computeView = viewSelector.getByRole('button', {
+    name: 'Compute',
+    exact: true,
   });
-  await expect(viewSwitch).toHaveAttribute('aria-checked', 'false');
-  await viewSwitch.focus();
+  const storageView = viewSelector.getByRole('button', {
+    name: 'Storage',
+    exact: true,
+  });
+  await expect(computeView).toHaveAttribute('aria-pressed', 'true');
+  await expect(storageView).toHaveAttribute('aria-pressed', 'false');
+  await storageView.focus();
   await page.keyboard.press('Space');
-  await expect(viewSwitch).toHaveAttribute('aria-checked', 'true');
+  await expect(viewSelector).toHaveAttribute('data-view', 'storage');
+  await expect(storageView).toHaveAttribute('aria-pressed', 'true');
+  await expect(computeView).toHaveAttribute('aria-pressed', 'false');
   await expect(
     page.getByText(/storage backing each running guest's main disk/i),
   ).toBeVisible();
@@ -298,7 +307,8 @@ test('storage attribution remains explicit when guest disk reads are unavailable
   await page.goto('/hypervisor');
   await waitForHydration(page);
   await page
-    .getByRole('switch', { name: 'Show storage load distribution' })
+    .locator('.load-view-toggle')
+    .getByRole('button', { name: 'Storage', exact: true })
     .click();
   await expect(page.locator('.unavailable-storage')).toBeVisible();
   await expect(page.locator('.load-radar')).toHaveCount(0);

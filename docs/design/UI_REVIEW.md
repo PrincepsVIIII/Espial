@@ -798,8 +798,10 @@ labels.
 
 ## 2026-08-28 — Load distribution storage attribution and active-spoke correction
 
-Load distribution now has a compact, keyboard-accessible Compute/Storage switch in
-the section's upper right. Compute keeps the existing authoritative per-host view.
+Load distribution now has fixed, keyboard-accessible Compute and Storage labels in
+the section's upper right. A short cyan selector slides beneath the active word;
+there is no intermediate toggle knob. Compute keeps the existing authoritative
+per-host view.
 Storage uses an additive Core aggregate that attributes each running VM/CT to the
 configured storage backing its bootable main disk. EFI disks, TPM state, ISO/CD-ROM,
 cloud-init, and auxiliary/unused volumes are excluded. If Core cannot read every
