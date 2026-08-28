@@ -56,6 +56,32 @@ type Task struct {
 	EndTime *int64 `json:"endtime,omitempty"`
 }
 
+// GuestConfig is the small, in-memory subset of a guest configuration needed to
+// identify the storage backing its bootable main disk. Proxmox configurations can
+// carry credential-adjacent fields, so the adapter deliberately retains only
+// string values long enough to derive the aggregate and never persists the raw
+// configuration.
+type GuestConfig map[string]string
+
+func (config *GuestConfig) UnmarshalJSON(data []byte) error {
+	var values map[string]json.RawMessage
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+	result := make(GuestConfig, len(values))
+	for key, value := range values {
+		if key != "boot" && !isDiskDevice(key) {
+			continue
+		}
+		var text string
+		if json.Unmarshal(value, &text) == nil {
+			result[key] = text
+		}
+	}
+	*config = result
+	return nil
+}
+
 type Usage struct {
 	Used  float64 `json:"used"`
 	Total float64 `json:"total"`

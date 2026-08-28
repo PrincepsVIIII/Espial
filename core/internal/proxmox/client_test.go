@@ -68,7 +68,7 @@ func TestClientDecodesClusterStatusWithNumericNodeID(t *testing.T) {
 
 func TestClientReadsBoundedActiveTasks(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api2/json/cluster/tasks" || r.URL.Query().Get("source") != "active" || r.URL.Query().Get("limit") != activeTaskLimit {
+		if r.URL.Path != "/api2/json/nodes/cdr-vhost42/tasks" || r.URL.Query().Get("source") != "active" || r.URL.Query().Get("typefilter") != "vncproxy" || r.URL.Query().Get("limit") != activeTaskLimit {
 			t.Fatalf("request = %s", r.URL.String())
 		}
 		writeData(t, w, []map[string]any{{"id": "402", "node": "cdr-vhost42", "type": "vncproxy"}})
@@ -79,9 +79,31 @@ func TestClientReadsBoundedActiveTasks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
 	}
-	tasks, err := client.GetActiveTasks(context.Background())
+	tasks, err := client.GetActiveTasks(context.Background(), "cdr-vhost42")
 	if err != nil || len(tasks) != 1 || tasks[0].ID != "402" || tasks[0].Type != "vncproxy" {
 		t.Fatalf("GetActiveTasks = %#v, %v", tasks, err)
+	}
+}
+
+func TestClientReadsGuestConfigFromTheCurrentHost(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api2/json/nodes/cdr-vhost42/qemu/402/config" {
+			t.Fatalf("request = %s", r.URL.String())
+		}
+		writeData(t, w, map[string]any{
+			"boot": "order=scsi0;ide2", "scsi0": "iscsi-main:vm-402-disk-0,size=64G",
+			"ide2": "local:iso/installer.iso,media=cdrom", "cipassword": "not-retained",
+		})
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	client, err := NewClient(Config{BaseURL: server.URL, DeploymentID: "lab", TokenID: "user@pve!espial", TokenSecret: "secret"}, ClientOptions{HTTPClient: server.Client(), ApprovedHosts: []string{target.Hostname()}, AllowedPorts: []int{mustPort(t, target.Port())}})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	config, err := client.GetGuestConfig(context.Background(), "cdr-vhost42", "qemu", 402)
+	if err != nil || config["scsi0"] != "iscsi-main:vm-402-disk-0,size=64G" || config["cipassword"] != "" {
+		t.Fatalf("GetGuestConfig = %#v, %v", config, err)
 	}
 }
 

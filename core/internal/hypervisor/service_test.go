@@ -48,3 +48,23 @@ func TestCompleteLoadNodesIncludesZeroGuestHostsAndKeepsCounts(t *testing.T) {
 		}
 	}
 }
+
+func TestCompleteStorageLoadNodesIncludesZeroGuestStorageAndKeepsCounts(t *testing.T) {
+	storage := []StorageSummary{{ID: "iscsi-main"}, {ID: "local-zfs"}}
+	loads := []LoadNodeSummary{{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1}, {ID: "missing-storage", ActiveVMs: -2}}
+
+	got := completeStorageLoadNodes(storage, loads)
+	want := []LoadNodeSummary{
+		{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1},
+		{ID: "local-zfs"},
+		{ID: "missing-storage"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("completeStorageLoadNodes() = %#v", got)
+	}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("completeStorageLoadNodes()[%d] = %#v, want %#v", index, got[index], want[index])
+		}
+	}
+}

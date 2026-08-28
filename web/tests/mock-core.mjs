@@ -739,7 +739,17 @@ function hypervisorClusters(mode, revision) {
       : mode === 'several' && index === 2
         ? 40 + revision
         : (index * 3 + 1 + revision) % 19,
-    active_vms: zero ? 0 : index % 3 === 0 ? 1 : index % 3 === 1 ? 2 : 6,
+    active_vms: zero
+      ? 0
+      : mode === 'console-one'
+        ? index === 0
+          ? 1
+          : 0
+        : index % 3 === 0
+          ? 1
+          : index % 3 === 1
+            ? 2
+            : 6,
   }));
   return {
     items: [
@@ -763,6 +773,26 @@ function hypervisorClusters(mode, revision) {
             io_wait_indicator: 'warning',
             health_state: 'warning',
           },
+          {
+            id: 'iscsi-main',
+            scope: 'shared',
+            used_bytes: 4_100_000_000_000,
+            total_bytes: 8_000_000_000_000,
+            used_percent: 51.25,
+            io_wait_percent: 2,
+            io_wait_indicator: 'healthy',
+            health_state: 'healthy',
+          },
+          {
+            id: 'iscsi-archive',
+            scope: 'shared',
+            used_bytes: 1_900_000_000_000,
+            total_bytes: 8_000_000_000_000,
+            used_percent: 23.75,
+            io_wait_percent: 3,
+            io_wait_indicator: 'healthy',
+            health_state: 'healthy',
+          },
         ],
         totals: {
           cpu_percent: 57.6 + revision,
@@ -771,6 +801,24 @@ function hypervisorClusters(mode, revision) {
         },
         console_activity_available: true,
         load_nodes: loadNodes,
+        storage_load_nodes: [
+          {
+            id: 'shared-vmstore',
+            idle_vms: zero ? 0 : 8 + revision,
+            active_vms: zero ? 0 : mode === 'console-one' ? 1 : 2,
+          },
+          {
+            id: 'iscsi-main',
+            idle_vms: zero ? 0 : 4,
+            active_vms: zero ? 0 : mode === 'console-one' ? 0 : 1,
+          },
+          {
+            id: 'iscsi-archive',
+            idle_vms: zero ? 0 : 2,
+            active_vms: 0,
+          },
+        ],
+        storage_attribution_available: mode !== 'storage-unavailable',
       },
     ],
   };

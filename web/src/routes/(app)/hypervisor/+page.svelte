@@ -10,6 +10,7 @@
   import {
     displayState,
     formatBytes,
+    formatExactPercentage,
     formatPercentage,
     statusLabel,
   } from '$lib/graphics';
@@ -343,7 +344,8 @@
                     secondaryValue={host.ram_percent}
                     description={`${host.id}: CPU ${formatPercentage(host.cpu_percent)}, RAM ${formatPercentage(host.ram_percent)}, health ${statusLabel(host.health_state)}`}
                     state={host.health_state}
-                    markerDetail={`Swap usage ${formatPercentage(host.swap_percent)}`}
+                    trackDetail={`CPU ${formatExactPercentage(host.cpu_percent)} · RAM ${formatExactPercentage(host.ram_percent)}`}
+                    markerDetail={`Swap ${formatExactPercentage(host.swap_percent)}`}
                     reading={`${host.cpu_cores.toFixed(0)} cores / ${formatBytes(host.ram_bytes)}`}
                   />
                 {/each}
@@ -362,7 +364,8 @@
                     value={item.used_percent}
                     description={`${item.id}: ${formatPercentage(item.used_percent)} used, IO wait ${formatPercentage(item.io_wait_percent)}, health ${statusLabel(item.health_state)}`}
                     state={item.health_state}
-                    markerDetail={`IO wait ${formatPercentage(item.io_wait_percent)}`}
+                    trackDetail={`${formatExactPercentage(item.used_percent)} used`}
+                    markerDetail={`I/O wait ${formatExactPercentage(item.io_wait_percent)}`}
                     reading={`${formatBytes(item.used_bytes)} used / ${formatBytes(item.total_bytes)} max`}
                   />
                 {/each}
@@ -398,7 +401,10 @@
             clusterName={cluster.name}
             hosts={cluster.hosts}
             loadNodes={cluster.load_nodes}
+            storage={cluster.storage}
+            storageLoadNodes={cluster.storage_load_nodes}
             consoleActivityAvailable={cluster.console_activity_available}
+            storageAttributionAvailable={cluster.storage_attribution_available}
           />
         </div>
       </article>

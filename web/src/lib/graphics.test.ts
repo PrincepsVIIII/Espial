@@ -8,6 +8,7 @@ import {
   normalizePercentage,
   positionInDomain,
   selectionAfterUpdate,
+  storageGraphicRows,
 } from './graphics';
 
 describe('graphic value normalization', () => {
@@ -102,5 +103,41 @@ describe('Hypervisor host graphic data', () => {
       selectedID: null,
       removedID: 'pve-c',
     });
+  });
+
+  it('joins storage metrics and main-disk counts with stable zero rows', () => {
+    const rows = storageGraphicRows(
+      [
+        {
+          id: 'iscsi-main',
+          used_bytes: 1024,
+          total_bytes: 2048,
+          used_percent: 50,
+          io_wait_percent: 2,
+          io_wait_indicator: 'healthy',
+          health_state: 'healthy',
+        },
+        {
+          id: 'local-zfs',
+          used_bytes: 512,
+          total_bytes: 2048,
+          used_percent: 25,
+          io_wait_percent: 3,
+          io_wait_indicator: 'healthy',
+          health_state: 'healthy',
+        },
+      ],
+      [{ id: 'iscsi-main', idle_vms: 3, active_vms: 1 }],
+    );
+    expect(
+      rows.map(({ id, idle_vms, active_vms }) => ({
+        id,
+        idle_vms,
+        active_vms,
+      })),
+    ).toEqual([
+      { id: 'iscsi-main', idle_vms: 3, active_vms: 1 },
+      { id: 'local-zfs', idle_vms: 0, active_vms: 0 },
+    ]);
   });
 });

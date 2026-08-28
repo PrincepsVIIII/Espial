@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -168,14 +169,41 @@ func (client *Client) GetClusterResources(ctx context.Context) ([]ClusterResourc
 	return getJSON[[]ClusterResource](ctx, client, "/api2/json/cluster/resources")
 }
 
-// GetActiveTasks fetches the bounded cluster task list with Proxmox's active
-// source filter. Open vncproxy tasks are later mapped to console-active guests.
-func (client *Client) GetActiveTasks(ctx context.Context) ([]Task, error) {
-	return getJSON[[]Task](ctx, client, "/api2/json/cluster/tasks?source=active&limit="+activeTaskLimit)
+// GetActiveTasks fetches the bounded active task list for one node. Proxmox
+// exposes task reads below /nodes/{node}/tasks; callers with Sys.Audit on that
+// node can see active console tasks regardless of which user opened them.
+func (client *Client) GetActiveTasks(ctx context.Context, nodeID string) ([]Task, error) {
+	if strings.TrimSpace(nodeID) == "" || strings.ContainsAny(nodeID, "/?#") {
+		return nil, errors.New("invalid_node")
+	}
+	query := url.Values{
+		"source":     []string{"active"},
+		"typefilter": []string{"vncproxy"},
+		"limit":      []string{activeTaskLimit},
+	}
+	path := "/api2/json/nodes/" + url.PathEscape(nodeID) + "/tasks?" + query.Encode()
+	return getJSON[[]Task](ctx, client, path)
 }
 
-// GetNodeStatus fetches CPU, memory, swap, and IO-wait counters for one node from
-// /nodes/{node}/status so Espial can render host bars and IO-delay indicators.
+// GetGuestConfig reads one running guest's configuration only to resolve its
+// bootable main disk to a configured storage name. The caller retains no raw
+// configuration data after building the cluster aggregate.
+func (client *Client) GetGuestConfig(ctx context.Context, nodeID, guestType string, vmid int) (GuestConfig, error) {
+	if strings.TrimSpace(nodeID) == "" || strings.ContainsAny(nodeID, "/?#") {
+		return nil, errors.New("invalid_node")
+	}
+	if guestType != "qemu" && guestType != "lxc" {
+		return nil, errors.New("invalid_guest_type")
+	}
+	if vmid <= 0 {
+		return nil, errors.New("invalid_vmid")
+	}
+	path := "/api2/json/nodes/" + url.PathEscape(nodeID) + "/" + guestType + "/" + strconv.Itoa(vmid) + "/config"
+	return getJSON[GuestConfig](ctx, client, path)
+}
+
+// GetNodeStatus fetches CPU, memory, swap, and I/O-wait counters for one node from
+// /nodes/{node}/status so Espial can render host bars and I/O-wait indicators.
 func (client *Client) GetNodeStatus(ctx context.Context, nodeID string) (NodeStatus, error) {
 	if strings.TrimSpace(nodeID) == "" || strings.ContainsAny(nodeID, "/?#") {
 		return NodeStatus{}, errors.New("invalid_node")

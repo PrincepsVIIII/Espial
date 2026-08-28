@@ -11,6 +11,7 @@
     secondaryValue,
     description,
     state: statusState,
+    trackDetail,
     markerDetail,
     reading,
   }: {
@@ -19,6 +20,7 @@
     secondaryValue?: number | null;
     description: string;
     state: string;
+    trackDetail: string;
     markerDetail: string;
     reading: string;
   } = $props();
@@ -26,12 +28,20 @@
   let primary = $derived(normalizePercentage(value));
   let secondary = $derived(normalizePercentage(secondaryValue));
   let visualState = $derived(displayState(statusState));
+  let trackTooltipOpen = $state(false);
   let tooltipOpen = $state(false);
-  let valueDetail = $derived(
+  let fallbackTrackDetail = $derived(
     secondary === null
       ? `Exact value: ${formatExactPercentage(primary)}`
       : `Exact values: primary ${formatExactPercentage(primary)} · secondary ${formatExactPercentage(secondary)}`,
   );
+  let resolvedTrackDetail = $derived(trackDetail || fallbackTrackDetail);
+
+  function handleTrackKeydown(event: KeyboardEvent) {
+    if (event.key !== 'Escape') return;
+    trackTooltipOpen = false;
+    event.currentTarget instanceof HTMLElement && event.currentTarget.blur();
+  }
 
   function handleMarkerKeydown(event: KeyboardEvent) {
     if (event.key !== 'Escape') return;
@@ -43,11 +53,17 @@
 <div class="resource-bar">
   <code title={label}>{label}</code>
   <div class="bar-line">
-    <div
+    <button
+      type="button"
       class="bar-track"
       class:unknown={primary === null}
-      role="img"
-      aria-label={description}
+      class:open={trackTooltipOpen}
+      aria-label={`${label}: ${resolvedTrackDetail}`}
+      aria-expanded={trackTooltipOpen}
+      title={description}
+      onclick={() => (trackTooltipOpen = !trackTooltipOpen)}
+      onkeydown={handleTrackKeydown}
+      onblur={() => (trackTooltipOpen = false)}
     >
       {#if primary !== null}
         <span
@@ -60,8 +76,9 @@
         <span class="bar-fill secondary-fill" style={`width: ${secondary}%`}
         ></span>
       {/if}
-      <span class="bar-value-tooltip" role="tooltip">{valueDetail}</span>
-    </div>
+      <span class="bar-value-tooltip" role="tooltip">{resolvedTrackDetail}</span
+      >
+    </button>
     <button
       type="button"
       class="marker-wrap"
@@ -74,9 +91,7 @@
     >
       <span class={`bar-marker marker-${visualState}`} aria-hidden="true"
       ></span>
-      <span class="bar-tooltip" role="tooltip"
-        >{valueDetail} · {markerDetail}</span
-      >
+      <span class="bar-tooltip" role="tooltip">{markerDetail}</span>
     </button>
   </div>
   <div class="bar-meta">
@@ -109,10 +124,26 @@
 
   .bar-track {
     position: relative;
+    display: block;
+    width: 100%;
     height: 0.82rem;
-    overflow: hidden;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
     border: 1px solid var(--graphic-grid);
+    border-radius: 0;
     background: var(--graphic-track);
+    color: inherit;
+  }
+
+  .bar-track:hover,
+  .bar-track:active {
+    background: var(--graphic-track);
+  }
+
+  .bar-track:focus-visible {
+    outline: 3px solid var(--graphic-focus);
+    outline-offset: 3px;
   }
 
   .bar-track.unknown {
@@ -153,7 +184,9 @@
       transform var(--graphic-transition-duration) ease-out;
   }
 
-  .bar-track:hover .bar-value-tooltip {
+  .bar-track:hover .bar-value-tooltip,
+  .bar-track:focus .bar-value-tooltip,
+  .bar-track.open .bar-value-tooltip {
     opacity: 1;
     transform: translate(-50%, 0);
   }

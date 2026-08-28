@@ -17,10 +17,29 @@ export interface HypervisorLoadNode {
   active_vms: number;
 }
 
+export interface HypervisorStorageMetric {
+  id: string;
+  used_bytes: number | null;
+  total_bytes: number | null;
+  used_percent: number | null;
+  io_wait_percent: number | null;
+  io_wait_indicator: string;
+  health_state: string;
+}
+
 export interface HostGraphicRow extends HypervisorHostMetric {
+  kind: 'compute';
   idle_vms: number;
   active_vms: number;
 }
+
+export interface StorageGraphicRow extends HypervisorStorageMetric {
+  kind: 'storage';
+  idle_vms: number;
+  active_vms: number;
+}
+
+export type LoadGraphicRow = HostGraphicRow | StorageGraphicRow;
 
 export interface IntegerDomain {
   min: 0;
@@ -113,6 +132,7 @@ export function hostGraphicRows(
     .map((id) => {
       const host = hostsByID.get(id);
       return {
+        kind: 'compute' as const,
         id,
         idle_vms: loadsByID.get(id)?.idle_vms ?? 0,
         active_vms: loadsByID.get(id)?.active_vms ?? 0,
@@ -123,6 +143,40 @@ export function hostGraphicRows(
         swap_percent: finiteNumber(host?.swap_percent),
         swap_indicator: host?.swap_indicator ?? 'unknown',
         health_state: host?.health_state ?? 'unknown',
+      };
+    });
+}
+
+export function storageGraphicRows(
+  storage: readonly HypervisorStorageMetric[],
+  loads: readonly HypervisorLoadNode[],
+): StorageGraphicRow[] {
+  const storageByID = new Map(storage.map((item) => [item.id, item]));
+  const loadsByID = new Map(
+    loads.map((load) => [
+      load.id,
+      {
+        idle_vms: activeVMCount(load.idle_vms),
+        active_vms: activeVMCount(load.active_vms),
+      },
+    ]),
+  );
+  const ids = new Set([...storageByID.keys(), ...loadsByID.keys()]);
+  return [...ids]
+    .sort((left, right) => left.localeCompare(right))
+    .map((id) => {
+      const item = storageByID.get(id);
+      return {
+        kind: 'storage' as const,
+        id,
+        idle_vms: loadsByID.get(id)?.idle_vms ?? 0,
+        active_vms: loadsByID.get(id)?.active_vms ?? 0,
+        used_bytes: finiteNumber(item?.used_bytes),
+        total_bytes: finiteNumber(item?.total_bytes),
+        used_percent: finiteNumber(item?.used_percent),
+        io_wait_percent: finiteNumber(item?.io_wait_percent),
+        io_wait_indicator: item?.io_wait_indicator ?? 'unknown',
+        health_state: item?.health_state ?? 'unknown',
       };
     });
 }

@@ -768,3 +768,55 @@ selected cluster with its adjacent page position. The mutation uses `If-Match`,
 returns the existing audit receipt, and exposes the audit record to authorized
 administrators. Focused Svelte diagnostics, frontend unit/contract tests, API
 contracts, generated types, and Proxmox/Hypervisor/API/migration Go tests passed.
+
+## 2026-08-28 — Hypervisor hover disclosure, console activity, and compact node field
+
+The shared resource rows now expose exact percentages from the track itself instead
+of the adjacent status marker: host tracks disclose CPU and RAM, storage tracks
+disclose used capacity, and their overflow-safe tooltips work with pointer, focus,
+and tap. Marker disclosures contain only Swap or I/O wait. Official Proxmox source
+confirms its node-summary “IO delay” is the percentage-valued `wait`/`iowait`
+signal, not latency in milliseconds, so no delay value is fabricated.
+
+The Proxmox adapter now reads bounded `vncproxy` tasks from the authoritative
+per-node task endpoint with a server-side type filter, maps each task's VMID through
+the running-guest inventory to its current host, and rejects partial node results as
+an authoritative cluster total. The load-distribution view renders the available
+console series as a dashed lavender comparison and prints the cluster-wide
+console-active count below it. Node circles show idle and console-active counts only
+on hover/focus and no longer repeat idle counts below every node; the redundant idle
+footer legend is also omitted.
+
+One- and two-host clusters render direct proportional node controls rather than an
+empty-looking radial comparison. Keyboard, pointer, touch, selection, Escape
+clearing, reduced motion, long labels, and selected-host detail remain intact.
+Full Core tests and vet, repository contracts/docs/generated checks, Svelte
+diagnostics, 63 frontend unit tests, and 13 focused browser scenarios passed. The
+coverage checks the per-node endpoint/filter, partial-read behavior, exact
+disclosures, distinct series, printed console total, and absence of below-node idle
+labels.
+
+## 2026-08-28 — Load distribution storage attribution and active-spoke correction
+
+Load distribution now has a compact, keyboard-accessible Compute/Storage switch in
+the section's upper right. Compute keeps the existing authoritative per-host view.
+Storage uses an additive Core aggregate that attributes each running VM/CT to the
+configured storage backing its bootable main disk. EFI disks, TPM state, ISO/CD-ROM,
+cloud-init, and auxiliary/unused volumes are excluded. If Core cannot read every
+running guest configuration, Storage gives an explicit unavailable explanation and
+does not present a partial or zero-filled distribution; Compute remains usable.
+
+The active-console visual no longer uses a closed dashed polygon or a dashed footer
+key. Each target with a nonzero console-active count now has one solid restrained
+lavender spoke, so one console-active VM produces one visible mark instead of a
+misleading outbound-and-return pair. The footer retains only the factual total.
+The storage controls remain the textual equivalent: selection exposes capacity and
+I/O wait alongside the same idle and console-active counts; Compute retains CPU,
+RAM, swap, and capacity.
+
+Svelte diagnostics, 64 frontend unit tests, the full Core test suite, API contract
+and generated-type checks, and the 16 focused Chromium Hypervisor graphics tests
+passed. Browser coverage exercises the switch by keyboard, storage selection,
+unavailable attribution, a single active spoke, touch selection, reduced motion,
+large/laptop/narrow/zoom-equivalent layouts, and serious/critical accessibility
+findings.

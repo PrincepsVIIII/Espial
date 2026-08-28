@@ -31,13 +31,28 @@ func (fixtureAPI) GetClusterResources(context.Context) ([]ClusterResource, error
 	}, nil
 }
 
-func (fixtureAPI) GetActiveTasks(context.Context) ([]Task, error) {
+func (fixtureAPI) GetActiveTasks(_ context.Context, node string) ([]Task, error) {
+	if node != "pve-a" {
+		return []Task{}, nil
+	}
 	endedAt := int64(101)
 	return []Task{
 		{ID: "100", Node: "pve-a", Type: "vncproxy"},
 		{ID: "100", Node: "pve-a", Type: "vncproxy"},
 		{ID: "200", Node: "pve-a", Type: "vncproxy", EndTime: &endedAt},
 		{ID: "not-a-vmid", Node: "pve-a", Type: "vncproxy"},
+	}, nil
+}
+
+func (fixtureAPI) GetGuestConfig(_ context.Context, node, guestType string, vmid int) (GuestConfig, error) {
+	if node != "pve-a" || guestType != "qemu" || vmid != 100 {
+		return nil, errors.New("unexpected guest")
+	}
+	return GuestConfig{
+		"boot":     "order=efidisk0;ide2;scsi0",
+		"efidisk0": "local-zfs:vm-100-disk-0,size=4M",
+		"ide2":     "local:iso/installer.iso,media=cdrom",
+		"scsi0":    "vmstore:vm-100-disk-1,size=64G",
 	}, nil
 }
 
@@ -87,6 +102,15 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	if available, ok := payload.Observations[0].Metadata["console_activity_available"].(bool); !ok || !available {
 		t.Fatalf("console_activity_available = %#v", payload.Observations[0].Metadata["console_activity_available"])
 	}
+	if available, ok := payload.Observations[0].Metadata["storage_attribution_available"].(bool); !ok || !available {
+		t.Fatalf("storage_attribution_available = %#v", payload.Observations[0].Metadata["storage_attribution_available"])
+	}
+	if idle := payload.Observations[0].Metadata["idle_vms_by_storage"].(map[string]int); len(idle) != 0 {
+		t.Fatalf("idle_vms_by_storage = %#v", idle)
+	}
+	if active := payload.Observations[0].Metadata["active_vms_by_storage"].(map[string]int); active["vmstore"] != 1 || len(active) != 1 {
+		t.Fatalf("active_vms_by_storage = %#v", active)
+	}
 }
 
 type duplicatedSharedStorageAPI struct{ fixtureAPI }
@@ -130,8 +154,11 @@ func TestCollectCollapsesDuplicateSharedStorageEntries(t *testing.T) {
 
 type unavailableTasksAPI struct{ fixtureAPI }
 
-func (unavailableTasksAPI) GetActiveTasks(context.Context) ([]Task, error) {
-	return nil, errors.New("forbidden")
+func (unavailableTasksAPI) GetActiveTasks(ctx context.Context, node string) ([]Task, error) {
+	if node == "pve-b" {
+		return nil, errors.New("forbidden")
+	}
+	return fixtureAPI{}.GetActiveTasks(ctx, node)
 }
 
 func TestCollectPreservesCoreMetricsWhenConsoleActivityIsUnavailable(t *testing.T) {
@@ -150,5 +177,52 @@ func TestCollectPreservesCoreMetricsWhenConsoleActivityIsUnavailable(t *testing.
 	}
 	if idle := payload.Observations[0].Metadata["idle_vms_by_node"].(map[string]int); idle["pve-a"] != 1 {
 		t.Fatalf("idle_vms_by_node = %#v", idle)
+	}
+	if idle := payload.Observations[0].Metadata["idle_vms_by_storage"].(map[string]int); idle["vmstore"] != 1 {
+		t.Fatalf("idle_vms_by_storage = %#v", idle)
+	}
+}
+
+type unavailableGuestConfigAPI struct{ fixtureAPI }
+
+func (unavailableGuestConfigAPI) GetGuestConfig(context.Context, string, string, int) (GuestConfig, error) {
+	return nil, errors.New("forbidden")
+}
+
+func TestCollectWithholdsPartialStorageAttribution(t *testing.T) {
+	payload, err := Collect(context.Background(), Config{
+		BaseURL: "https://proxmox.example:8006", DeploymentID: "lab",
+		TokenID: "user@pve!espial", TokenSecret: "secret",
+	}, unavailableGuestConfigAPI{}, time.Unix(100, 0).UTC())
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if available := payload.Observations[0].Metadata["storage_attribution_available"]; available != false {
+		t.Fatalf("storage_attribution_available = %#v", available)
+	}
+	if idle := payload.Observations[0].Metadata["idle_vms_by_storage"].(map[string]int); len(idle) != 0 {
+		t.Fatalf("idle_vms_by_storage = %#v", idle)
+	}
+	if active := payload.Observations[0].Metadata["active_vms_by_storage"].(map[string]int); len(active) != 0 {
+		t.Fatalf("active_vms_by_storage = %#v", active)
+	}
+}
+
+func TestMainDiskStorageExcludesEFIAndISOVolumes(t *testing.T) {
+	storage, ok := mainDiskStorage(GuestConfig{
+		"boot":     "order=efidisk0;ide2;scsi0",
+		"efidisk0": "local-zfs:vm-100-disk-0,size=4M",
+		"ide2":     "local:iso/installer.iso,media=cdrom",
+		"scsi0":    "iscsi-main:vm-100-disk-1,size=64G",
+	})
+	if !ok || storage != "iscsi-main" {
+		t.Fatalf("mainDiskStorage() = %q, %t", storage, ok)
+	}
+}
+
+func TestMainDiskStorageUsesContainerRootFS(t *testing.T) {
+	storage, ok := mainDiskStorage(GuestConfig{"rootfs": "iscsi-main:subvol-200-disk-0,size=8G"})
+	if !ok || storage != "iscsi-main" {
+		t.Fatalf("mainDiskStorage() = %q, %t", storage, ok)
 	}
 }

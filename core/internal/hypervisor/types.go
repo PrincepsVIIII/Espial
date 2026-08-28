@@ -79,19 +79,21 @@ type ClusterList struct {
 }
 
 type ClusterCard struct {
-	ID                       string            `json:"id"`
-	IntegrationID            string            `json:"integration_id"`
-	Name                     string            `json:"name"`
-	State                    string            `json:"state"`
-	Freshness                string            `json:"freshness"`
-	LastObservedAt           *time.Time        `json:"last_observed_at,omitempty"`
-	LastCollection           *time.Time        `json:"last_collection_at,omitempty"`
-	Hosts                    []HostSummary     `json:"hosts"`
-	Storage                  []StorageSummary  `json:"storage"`
-	Totals                   UtilizationTotals `json:"totals"`
-	LoadNodes                []LoadNodeSummary `json:"load_nodes"`
-	ConsoleActivityAvailable bool              `json:"console_activity_available"`
-	SortOrder                int               `json:"-"`
+	ID                          string            `json:"id"`
+	IntegrationID               string            `json:"integration_id"`
+	Name                        string            `json:"name"`
+	State                       string            `json:"state"`
+	Freshness                   string            `json:"freshness"`
+	LastObservedAt              *time.Time        `json:"last_observed_at,omitempty"`
+	LastCollection              *time.Time        `json:"last_collection_at,omitempty"`
+	Hosts                       []HostSummary     `json:"hosts"`
+	Storage                     []StorageSummary  `json:"storage"`
+	Totals                      UtilizationTotals `json:"totals"`
+	LoadNodes                   []LoadNodeSummary `json:"load_nodes"`
+	ConsoleActivityAvailable    bool              `json:"console_activity_available"`
+	StorageLoadNodes            []LoadNodeSummary `json:"storage_load_nodes"`
+	StorageAttributionAvailable bool              `json:"storage_attribution_available"`
+	SortOrder                   int               `json:"-"`
 }
 
 type HostSummary struct {

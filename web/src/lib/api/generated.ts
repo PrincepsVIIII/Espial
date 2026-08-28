@@ -694,6 +694,12 @@ export interface ProxmoxClusterCard {
     active_vms: number;
   }[];
   console_activity_available: boolean;
+  storage_load_nodes: {
+    id: string;
+    idle_vms: number;
+    active_vms: number;
+  }[];
+  storage_attribution_available: boolean;
 }
 
 export interface ResourceAPIView {

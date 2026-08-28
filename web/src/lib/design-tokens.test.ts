@@ -86,5 +86,8 @@ describe('UBNetDef design tokens', () => {
     expect(
       contrast(token('graphic-focus'), token('surface-1')),
     ).toBeGreaterThanOrEqual(3);
+    expect(
+      contrast(token('graphic-console'), token('canvas')),
+    ).toBeGreaterThanOrEqual(3);
   });
 });

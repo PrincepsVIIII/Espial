@@ -554,6 +554,8 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 			cluster.Freshness = freshness(resourceState)
 			cluster.LoadNodes = loadNodes(meta["idle_vms_by_node"], meta["active_vms_by_node"])
 			cluster.ConsoleActivityAvailable = boolValue(meta["console_activity_available"])
+			cluster.StorageLoadNodes = loadNodes(meta["idle_vms_by_storage"], meta["active_vms_by_storage"])
+			cluster.StorageAttributionAvailable = boolValue(meta["storage_attribution_available"])
 		case proxmox.NodeKind:
 			cluster.Hosts = append(cluster.Hosts, HostSummary{
 				ID:         valueString(displayName, attrString(attr, "node")),
@@ -583,6 +585,7 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 		sort.Slice(cluster.Hosts, func(i, j int) bool { return cluster.Hosts[i].ID < cluster.Hosts[j].ID })
 		sort.Slice(cluster.Storage, func(i, j int) bool { return cluster.Storage[i].ID < cluster.Storage[j].ID })
 		cluster.LoadNodes = completeLoadNodes(cluster.Hosts, cluster.LoadNodes)
+		cluster.StorageLoadNodes = completeStorageLoadNodes(cluster.Storage, cluster.StorageLoadNodes)
 		cluster.Totals = totals(*cluster)
 		items = append(items, *cluster)
 	}
@@ -700,6 +703,28 @@ func completeLoadNodes(hosts []HostSummary, loads []LoadNodeSummary) []LoadNodeS
 	counts := make(map[string]LoadNodeSummary, len(hosts)+len(loads))
 	for _, host := range hosts {
 		counts[host.ID] = LoadNodeSummary{ID: host.ID}
+	}
+	for _, load := range loads {
+		if load.IdleVMs < 0 {
+			load.IdleVMs = 0
+		}
+		if load.ActiveVMs < 0 {
+			load.ActiveVMs = 0
+		}
+		counts[load.ID] = load
+	}
+	result := make([]LoadNodeSummary, 0, len(counts))
+	for _, load := range counts {
+		result = append(result, load)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
+	return result
+}
+
+func completeStorageLoadNodes(storage []StorageSummary, loads []LoadNodeSummary) []LoadNodeSummary {
+	counts := make(map[string]LoadNodeSummary, len(storage)+len(loads))
+	for _, item := range storage {
+		counts[item.ID] = LoadNodeSummary{ID: item.ID}
 	}
 	for _, load := range loads {
 		if load.IdleVMs < 0 {

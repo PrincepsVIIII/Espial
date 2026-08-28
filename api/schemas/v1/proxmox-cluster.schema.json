@@ -14,7 +14,9 @@
     "storage",
     "totals",
     "load_nodes",
-    "console_activity_available"
+    "console_activity_available",
+    "storage_load_nodes",
+    "storage_attribution_available"
   ],
   "properties": {
     "id": { "type": "string", "minLength": 1, "maxLength": 128 },
@@ -101,6 +103,20 @@
         }
       }
     },
-    "console_activity_available": { "type": "boolean" }
+    "console_activity_available": { "type": "boolean" },
+    "storage_load_nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "idle_vms", "active_vms"],
+        "properties": {
+          "id": { "type": "string" },
+          "idle_vms": { "type": "integer", "minimum": 0 },
+          "active_vms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "storage_attribution_available": { "type": "boolean" }
   }
 }

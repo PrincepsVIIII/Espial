@@ -41,10 +41,12 @@ clamped for rendering while the authoritative formatted value policy is tested.
 
 The shared graphic tokens are `--graphic-grid`, `--graphic-track`,
 `--graphic-mark`, `--graphic-selection`, `--graphic-focus`,
-`--graphic-label-muted`, and `--graphic-transition-duration`. Cyan communicates
-focus and selection only. Green, amber, red, stale orange, and gray retain their
-operational meanings. Status always includes visible text and may add an outline,
-shape, or pattern; color alone is insufficient.
+`--graphic-console`, `--graphic-label-muted`, and
+`--graphic-transition-duration`. The restrained lavender console token is a
+categorical comparison encoding, not a status. Cyan communicates focus and
+selection only. Green, amber, red, stale orange, and gray retain their operational
+meanings. Status always includes visible text and may add an outline, shape, or
+pattern; color alone is insufficient.
 
 ## Reactivity and motion
 
@@ -110,10 +112,12 @@ the [W3C SVG accessibility note](https://www.w3.org/TR/SVG/access) and
 
 ## Hypervisor pilot
 
-The Hypervisor pilot asks: “Which Proxmox host currently carries the most idle VMs,
-which has guests with an open Proxmox console, and what is that host's current
-compute health?” It uses the existing cluster read model: host metrics, cluster
-freshness, running-guest counts, and active-console counts by host.
+The Hypervisor pilot asks: “Which Proxmox host or main-disk storage target currently
+carries the most idle VMs, which has guests with an open Proxmox console, and what
+is that target's current health?” It uses the existing cluster read model: host and
+storage metrics, cluster freshness, running-guest counts, active-console counts,
+and a complete in-memory attribution of each running guest to the storage backing
+its bootable main disk.
 
 The summary surface is flat and divided horizontally. On wide screens the compact
 host/storage tracks, vertically stacked utilization gauges, and Load distribution
@@ -121,31 +125,47 @@ view share one row, with the Load distribution column receiving the most space;
 narrower screens reflow them without changing source order. Load distribution omits
 the redundant observation timestamp; the current node state is conveyed directly by
 each node's semantic ring.
-Resource rows use matched-width, zero-based tracks; the state marker follows the
-track on the same horizontal axis, exposes swap or IO wait on hover, focus, and
-tap, and the exact capacity reading aligns to the track's far edge. Repeated inline
-health sentences are omitted because Dashboard and Alerts own that triage. CPU,
-RAM, and storage totals use large native-SVG semicircles with explicit values and
-no gradient, glow, or ornamental animation.
+Resource rows use matched-width, zero-based tracks; host-track hover, focus, and tap
+name the exact CPU and RAM percentages, while the storage track names the exact used
+percentage. The state marker follows the track on the same horizontal axis and
+exposes only swap or I/O wait on hover, focus, and tap. Proxmox reports I/O wait as
+a percentage, not latency in milliseconds, so the adapter and UI do not invent a
+delay value. The exact capacity reading aligns to the track's far edge. Repeated
+inline health sentences are omitted because Dashboard and Alerts own that triage.
+CPU, RAM, and storage totals use large native-SVG semicircles with explicit values
+and no gradient, glow, or ornamental animation.
 
-The host comparison is titled “Load distribution”; it is not topology. It renders
-a deterministic compute-node field from stable ID-sorted host/count pairs, with
-circle size encoding its idle-VM count: running guests minus guests with an open
-Proxmox console proxy. For up to 12 hosts, each node control sits on the matching
-radar vertex; the solid idle series is a proportionally filled polygon, while the
-dashed console-active series appears only when Proxmox permits the active-task
-read. The vertex layout derives from the actual host count, including clusters with
-fewer than seven hosts. If the active-task read is unavailable, the graphic says so
-rather than presenting zero as a count, while the running-guest inventory continues
-to determine idle capacity. The node controls remain the textual equivalent and
-source of selection. Each node shows its host name by default and switches to the
-idle and console-active VM counts on hover or focus; its tooltip and selected detail
-repeat both counts with CPU, RAM, and swap context. The semantic ring conveys the
-overall node state without a repeated status word. Selecting a node expands it without introducing a
-cyan selection ring; clicking unoccupied field space or pressing `Escape` clears the
-selection. The interactive nodes and selected detail are the textual equivalent for
-this intentionally compact comparison; the former duplicate host-metrics table is
-omitted.
+The comparison is titled “Load distribution”; it is not topology. A labelled switch
+at the section's upper right selects **Compute** or **Storage**. Compute renders a
+deterministic field from stable ID-sorted host/count pairs; Storage uses matching
+stable ID-sorted main-disk storage/count pairs. In both views, larger circle size
+encodes idle VMs: running guests minus guests with an open Proxmox console proxy.
+Storage derives its target from the first bootable main disk in a guest's configured
+boot order, with a deterministic normal-disk fallback. EFI disks, CD/DVD ISO media,
+cloud-init media, TPM state, and unused/auxiliary volumes do not participate. Raw
+guest configuration is never persisted or exposed. If Espial cannot read every
+running guest configuration, Storage explicitly says attribution is unavailable
+rather than presenting a partial load distribution; Compute remains available.
+
+One- and two-target views use direct proportional controls rather than a radial
+diagram; three through 12 targets use matching radar vertices and a solid idle
+polygon. Each nonzero console-active value renders as one solid restrained-lavender
+spoke from the center along its target axis. It is deliberately not a closed or
+dashed polygon: a single console-active VM must produce one visible active mark,
+not an outbound-and-return pair. The compact footer prints the console-active total
+without a decorative legend rule; the idle legend and duplicate idle counts below
+node circles are omitted. If any per-node active-task read is unavailable, the
+graphic says so rather than presenting a partial or zero count, while the
+running-guest inventory continues to determine idle capacity. The controls remain
+the textual equivalent and source of selection. Each target shows only its name by
+default, then switches its circle to idle and console-active counts on hover or
+focus; its tooltip and selected detail repeat both counts with CPU, RAM, and swap
+context in Compute, or used capacity and I/O wait in Storage. The semantic ring
+conveys the target state without a repeated status word. Selecting a target expands
+it without introducing a cyan selection ring; clicking unoccupied field space or
+pressing `Escape` clears the selection. The interactive controls and selected detail
+are the textual equivalent for this intentionally compact comparison; the former
+duplicate metrics table is omitted.
 
 Console-active means that Proxmox reports an open `vncproxy` task for a running
 VM/CT. It is not a general in-guest login or CPU-activity claim. The graphic draws

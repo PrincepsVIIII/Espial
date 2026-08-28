@@ -5,9 +5,12 @@
     formatPercentage,
     hostGraphicRows,
     selectionAfterUpdate,
+    storageGraphicRows,
     statusLabel,
     type HypervisorHostMetric,
     type HypervisorLoadNode,
+    type HypervisorStorageMetric,
+    type LoadGraphicRow,
   } from '$lib/graphics';
 
   let {
@@ -15,42 +18,59 @@
     clusterName,
     hosts,
     loadNodes,
+    storage,
+    storageLoadNodes,
     consoleActivityAvailable,
+    storageAttributionAvailable,
   }: {
     id: string;
     clusterName: string;
     hosts: HypervisorHostMetric[];
     loadNodes: HypervisorLoadNode[];
+    storage: HypervisorStorageMetric[];
+    storageLoadNodes: HypervisorLoadNode[];
     consoleActivityAvailable: boolean;
+    storageAttributionAvailable: boolean;
   } = $props();
 
+  let view = $state<'compute' | 'storage'>('compute');
   let selectedID = $state<string | null>(null);
   let selectionNotice = $state('');
-  let rows = $derived(hostGraphicRows(hosts, loadNodes));
-  let highestLoad = $derived(Math.max(1, ...rows.map((row) => row.idle_vms)));
+  let computeRows = $derived(hostGraphicRows(hosts, loadNodes));
+  let storageRows = $derived(storageGraphicRows(storage, storageLoadNodes));
+  let rows = $derived(view === 'compute' ? computeRows : storageRows);
+  let highestIdleLoad = $derived(
+    Math.max(1, ...rows.map((row) => row.idle_vms)),
+  );
+  let highestSeriesValue = $derived(
+    Math.max(1, ...rows.flatMap((row) => [row.idle_vms, row.active_vms])),
+  );
+  let totalActiveVMs = $derived(
+    rows.reduce((total, row) => total + Math.max(0, row.active_vms), 0),
+  );
   let activeRow = $derived(rows.find((row) => row.id === selectedID) ?? null);
 
   $effect(() => {
     const next = selectionAfterUpdate(selectedID, rows);
     if (next.removedID) {
       selectedID = null;
-      selectionNotice = `${next.removedID} is no longer present in the latest cluster observation. Selection was cleared.`;
+      selectionNotice = `${next.removedID} is no longer present in the latest ${view === 'compute' ? 'compute' : 'storage'} observation. Selection was cleared.`;
     }
   });
 
-  function nodeID(hostID: string): string {
-    return `${id}-node-${encodeURIComponent(hostID).replaceAll('%', '-')}`;
+  function nodeID(rowID: string): string {
+    return `${id}-${view}-node-${encodeURIComponent(rowID).replaceAll('%', '-')}`;
   }
 
-  function tooltipID(hostID: string): string {
-    return `${nodeID(hostID)}-tooltip`;
+  function tooltipID(rowID: string): string {
+    return `${nodeID(rowID)}-tooltip`;
   }
 
   function nodeSize(idleVMs: number): string {
-    return `${3.25 + (Math.max(0, idleVMs) / highestLoad) * 1.25}rem`;
+    return `${3.75 + (Math.max(0, idleVMs) / highestIdleLoad) * 1.35}rem`;
   }
 
-  function commit(event: MouseEvent, hostID: string) {
+  function commit(event: MouseEvent, rowID: string) {
     // The button fills its layout cell for keyboard focus, but only the visible
     // disc is a pointer target. Blank field space must always dismiss selection.
     if (
@@ -60,7 +80,7 @@
       return;
     }
     event.stopPropagation();
-    selectedID = hostID;
+    selectedID = rowID;
     selectionNotice = '';
   }
 
@@ -76,7 +96,34 @@
     event.preventDefault();
     event.stopPropagation();
     selectedID = null;
-    selectionNotice = 'Compute-node selection cleared.';
+    selectionNotice = `${view === 'compute' ? 'Compute-node' : 'Storage'} selection cleared.`;
+  }
+
+  function toggleView() {
+    view = view === 'compute' ? 'storage' : 'compute';
+    selectedID = null;
+    selectionNotice = '';
+  }
+
+  function description(): string {
+    return view === 'compute'
+      ? `Idle VMs by host in ${clusterName}.`
+      : `Idle VMs by the storage backing each running guest's main disk in ${clusterName}. EFI, ISO, and auxiliary volumes are excluded.`;
+  }
+
+  function groupLabel(): string {
+    return `${clusterName} ${view === 'compute' ? 'compute nodes' : 'main-disk storage'}`;
+  }
+
+  function rowContext(row: LoadGraphicRow): string {
+    if (row.kind === 'compute') {
+      return `CPU ${formatPercentage(row.cpu_percent)} · RAM ${formatPercentage(row.ram_percent)} · Swap ${formatPercentage(row.swap_percent)}`;
+    }
+    return `Used ${formatPercentage(row.used_percent)} · I/O wait ${formatPercentage(row.io_wait_percent)}`;
+  }
+
+  function accessibleRowLabel(row: LoadGraphicRow): string {
+    return `${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`;
   }
 
   function idleVMLabel(count: number): string {
@@ -102,9 +149,9 @@
     return rows.map((_, index) => radarPoint(index, ratio)).join(' ');
   }
 
-  function radarSeries(metric: 'idle_vms' | 'active_vms'): string {
+  function radarSeries(metric: 'idle_vms'): string {
     return rows
-      .map((row, index) => radarPoint(index, row[metric] / highestLoad))
+      .map((row, index) => radarPoint(index, row[metric] / highestSeriesValue))
       .join(' ');
   }
 </script>
@@ -118,14 +165,31 @@
   <header class="compute-heading">
     <div>
       <h3 id={`${id}-title`}>Load distribution</h3>
-      <p>Idle VMs by host in {clusterName}.</p>
+      <p>{description()}</p>
+    </div>
+    <div class="load-view-toggle" aria-label="Load distribution view">
+      <span class:current={view === 'compute'}>Compute</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={view === 'storage'}
+        aria-label="Show storage load distribution"
+        onclick={toggleView}><span aria-hidden="true"></span></button
+      >
+      <span class:current={view === 'storage'}>Storage</span>
     </div>
   </header>
 
-  {#if rows.length > 1 && rows.length <= 12}
+  {#if view === 'storage' && !storageAttributionAvailable}
+    <p class="unavailable-storage">
+      Storage attribution is unavailable because Espial could not read every
+      running guest's disk configuration. Compute distribution remains
+      available.
+    </p>
+  {:else if rows.length > 2 && rows.length <= 12}
     <div
       class="radar-comparison"
-      aria-label="Idle and console-active VM comparison"
+      aria-label={`Idle and console-active VM comparison by ${view}`}
     >
       <div class="radar-stage">
         <svg class="load-radar" viewBox="0 0 100 100" aria-hidden="true">
@@ -134,30 +198,35 @@
               <polygon class="radar-grid" points={radarGrid(ratio)} />
             {/each}
           {/if}
-          {#each rows as _, index}
+          {#each rows as row, index}
             <line
               x1="50"
               y1="50"
               x2={radarPoint(index, 1).split(',')[0]}
               y2={radarPoint(index, 1).split(',')[1]}
             />
+            {#if consoleActivityAvailable && row.active_vms > 0}
+              <line
+                class="radar-active"
+                x1="50"
+                y1="50"
+                x2={radarPoint(
+                  index,
+                  row.active_vms / highestSeriesValue,
+                ).split(',')[0]}
+                y2={radarPoint(
+                  index,
+                  row.active_vms / highestSeriesValue,
+                ).split(',')[1]}
+              />
+            {/if}
           {/each}
           {#if rows.length > 2}
             <polygon class="radar-idle" points={radarSeries('idle_vms')} />
-            {#if consoleActivityAvailable}
-              <polygon
-                class="radar-active"
-                points={radarSeries('active_vms')}
-              />
-            {/if}
           {/if}
         </svg>
 
-        <div
-          class="node-field"
-          role="group"
-          aria-label={`${clusterName} compute nodes`}
-        >
+        <div class="node-field" role="group" aria-label={groupLabel()}>
           {#each rows as row, index (row.id)}
             {@const position = radarNodePosition(index)}
             <div
@@ -172,7 +241,7 @@
                 class:selected={selectedID === row.id}
                 aria-pressed={selectedID === row.id}
                 aria-describedby={tooltipID(row.id)}
-                aria-label={`${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`}
+                aria-label={accessibleRowLabel(row)}
                 onclick={(event) => commit(event, row.id)}
                 onkeydown={clearSelection}
               >
@@ -196,35 +265,67 @@
                     ? activeVMLabel(row.active_vms)
                     : 'Console activity unavailable'}</strong
                 >
-                <span
-                  >CPU {formatPercentage(row.cpu_percent)} · RAM {formatPercentage(
-                    row.ram_percent,
-                  )} · Swap {formatPercentage(row.swap_percent)}</span
-                >
+                <span>{rowContext(row)}</span>
               </span>
             </div>
           {/each}
         </div>
       </div>
-      <p>
-        <span class="idle-key">Idle VMs</span>
-        {#if consoleActivityAvailable}
-          <span class="active-key">Console-active VMs</span>
-        {:else}
-          <span>Console activity unavailable</span>
-        {/if}
-      </p>
+    </div>
+  {:else if rows.length > 0 && rows.length <= 2}
+    <div class="compact-node-field" role="group" aria-label={groupLabel()}>
+      {#each rows as row (row.id)}
+        <div
+          class="node-item compact"
+          class:selected={selectedID === row.id}
+          style={`--node-size: ${nodeSize(row.idle_vms)}`}
+        >
+          <button
+            id={nodeID(row.id)}
+            type="button"
+            class="node-button"
+            class:selected={selectedID === row.id}
+            aria-pressed={selectedID === row.id}
+            aria-describedby={tooltipID(row.id)}
+            aria-label={accessibleRowLabel(row)}
+            onclick={(event) => commit(event, row.id)}
+            onkeydown={clearSelection}
+          >
+            <span
+              class={`node-disc disc-${displayState(row.health_state)}`}
+              aria-hidden="true"
+            >
+              <code class="node-name" title={row.id}>{row.id}</code>
+              <span class="node-load">
+                <strong>{row.idle_vms}</strong>
+                <small>Idle VMs</small>
+                {#if consoleActivityAvailable}
+                  <span>{row.active_vms} active</span>
+                {/if}
+              </span>
+            </span>
+          </button>
+          <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
+            <strong
+              >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
+                ? activeVMLabel(row.active_vms)
+                : 'Console activity unavailable'}</strong
+            >
+            <span>{rowContext(row)}</span>
+          </span>
+        </div>
+      {/each}
     </div>
   {:else}
     <p class="too-many-nodes">
       {rows.length > 12
-        ? 'Load distribution is available in the node list below for clusters with more than 12 hosts.'
-        : 'One compute node is available.'}
+        ? `Load distribution is available in the ${view === 'compute' ? 'compute-node' : 'storage'} list below for clusters with more than 12 targets.`
+        : `No ${view === 'compute' ? 'compute nodes' : 'storage targets'} are present in the current cluster observation.`}
     </p>
     <div
       class="node-field node-list many"
       role="group"
-      aria-label={`${clusterName} compute nodes`}
+      aria-label={groupLabel()}
     >
       {#each rows as row (row.id)}
         <button
@@ -232,7 +333,7 @@
           class="node-button"
           class:selected={selectedID === row.id}
           aria-pressed={selectedID === row.id}
-          aria-label={`${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`}
+          aria-label={accessibleRowLabel(row)}
           onclick={(event) => commit(event, row.id)}
           onkeydown={clearSelection}
           ><code>{row.id}</code><span>{idleVMLabel(row.idle_vms)}</span></button
@@ -241,10 +342,20 @@
     </div>
   {/if}
 
+  {#if rows.length > 0 && !(view === 'storage' && !storageAttributionAvailable)}
+    <p class="console-summary">
+      {#if consoleActivityAvailable}
+        {activeVMLabel(totalActiveVMs)}
+      {:else}
+        Console activity unavailable
+      {/if}
+    </p>
+  {/if}
+
   {#if activeRow}
-    <section class="node-detail" aria-labelledby={`${id}-detail-title`}>
+    <section class="node-detail" aria-labelledby={`${id}-${view}-detail-title`}>
       <div>
-        <h4 id={`${id}-detail-title`}>{activeRow.id}</h4>
+        <h4 id={`${id}-${view}-detail-title`}>{activeRow.id}</h4>
         <p>
           {idleVMLabel(activeRow.idle_vms)} · {consoleActivityAvailable
             ? activeVMLabel(activeRow.active_vms)
@@ -252,27 +363,46 @@
         </p>
       </div>
       <dl>
-        <div>
-          <dt>CPU</dt>
-          <dd>{formatPercentage(activeRow.cpu_percent)}</dd>
-        </div>
-        <div>
-          <dt>RAM</dt>
-          <dd>{formatPercentage(activeRow.ram_percent)}</dd>
-        </div>
-        <div>
-          <dt>Swap</dt>
-          <dd>{formatPercentage(activeRow.swap_percent)}</dd>
-        </div>
-        <div>
-          <dt>Capacity</dt>
-          <dd>
-            {activeRow.cpu_cores === null
-              ? 'Unknown'
-              : `${activeRow.cpu_cores.toFixed(0)} cores`}
-            / {formatBytes(activeRow.ram_bytes)}
-          </dd>
-        </div>
+        {#if activeRow.kind === 'compute'}
+          <div>
+            <dt>CPU</dt>
+            <dd>{formatPercentage(activeRow.cpu_percent)}</dd>
+          </div>
+          <div>
+            <dt>RAM</dt>
+            <dd>{formatPercentage(activeRow.ram_percent)}</dd>
+          </div>
+          <div>
+            <dt>Swap</dt>
+            <dd>{formatPercentage(activeRow.swap_percent)}</dd>
+          </div>
+          <div>
+            <dt>Capacity</dt>
+            <dd>
+              {activeRow.cpu_cores === null
+                ? 'Unknown'
+                : `${activeRow.cpu_cores.toFixed(0)} cores`}
+              / {formatBytes(activeRow.ram_bytes)}
+            </dd>
+          </div>
+        {:else}
+          <div>
+            <dt>Used</dt>
+            <dd>{formatPercentage(activeRow.used_percent)}</dd>
+          </div>
+          <div>
+            <dt>I/O wait</dt>
+            <dd>{formatPercentage(activeRow.io_wait_percent)}</dd>
+          </div>
+          <div>
+            <dt>Capacity</dt>
+            <dd>
+              {formatBytes(activeRow.used_bytes)} / {formatBytes(
+                activeRow.total_bytes,
+              )}
+            </dd>
+          </div>
+        {/if}
         <div>
           <dt>Console-active</dt>
           <dd>
@@ -306,6 +436,64 @@
     margin-top: 0.3rem;
     color: var(--graphic-label-muted);
     line-height: 1.4;
+  }
+
+  .compute-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: start;
+    justify-content: space-between;
+    gap: 0.75rem 1rem;
+  }
+
+  .load-view-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.72rem;
+    font-weight: 700;
+  }
+
+  .load-view-toggle > span.current {
+    color: var(--text);
+  }
+
+  .load-view-toggle button {
+    display: grid;
+    align-items: center;
+    width: 2.35rem;
+    height: 1.25rem;
+    padding: 0.15rem;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--graphic-track);
+  }
+
+  .load-view-toggle button > span {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--graphic-mark);
+    transform: translateX(0);
+    transition: transform var(--graphic-transition-duration) ease-out;
+  }
+
+  .load-view-toggle button[aria-checked='true'] > span {
+    background: var(--graphic-selection);
+    transform: translateX(1.05rem);
+  }
+
+  .load-view-toggle button:focus-visible {
+    outline: 2px solid var(--graphic-focus);
+    outline-offset: 2px;
+  }
+
+  .unavailable-storage {
+    margin-top: 1rem;
+    color: var(--graphic-label-muted);
+    font-size: 0.84rem;
+    line-height: 1.45;
   }
 
   .radar-stage {
@@ -344,33 +532,18 @@
     fill-opacity: 0.32;
   }
 
-  .radar-active {
+  .load-radar line.radar-active {
     fill: none;
-    stroke: var(--graphic-label-muted);
-    stroke-dasharray: 2 1.3;
+    stroke: var(--graphic-console);
+    stroke-linecap: round;
+    stroke-width: 1.8;
   }
 
-  .radar-comparison p {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0.75rem;
-    margin-top: 0.25rem;
-    color: var(--graphic-label-muted);
+  .console-summary {
+    text-align: center;
+    margin-top: 0.75rem;
+    color: var(--graphic-console);
     font-size: 0.7rem;
-  }
-
-  .radar-comparison p span::before {
-    display: inline-block;
-    width: 1rem;
-    margin-right: 0.3rem;
-    border-top: 2px solid currentColor;
-    content: '';
-    vertical-align: middle;
-  }
-
-  .active-key::before {
-    border-top-style: dashed !important;
   }
 
   .node-field {
@@ -632,6 +805,32 @@
     scrollbar-gutter: stable;
   }
 
+  .compact-node-field {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1.5rem 2.25rem;
+    min-height: 8rem;
+    margin-top: 1.1rem;
+  }
+
+  .node-item.compact {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: calc(var(--node-size) + 2rem);
+    pointer-events: auto;
+    transform: none;
+  }
+
+  .node-item.compact .node-button {
+    width: 100%;
+  }
+
+  .node-item.compact .node-tooltip {
+    width: min(14rem, 90vw);
+  }
+
   .node-list .node-button {
     display: flex;
     justify-content: space-between;
@@ -662,6 +861,14 @@
   }
 
   @container load-distribution (max-width: 34rem) {
+    .compute-heading {
+      align-items: stretch;
+    }
+
+    .load-view-toggle {
+      justify-content: end;
+    }
+
     .radar-stage {
       width: min(22rem, 100%);
     }

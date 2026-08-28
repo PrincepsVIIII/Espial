@@ -49,6 +49,7 @@ altered, recolored, or combined into a new logo.
   --graphic-mark: #9bacb8;
   --graphic-selection: #55d6e2;
   --graphic-focus: #55d6e2;
+  --graphic-console: #d4a4e7;
   --graphic-label-muted: #a9bacb;
   --graphic-transition-duration: 180ms;
 

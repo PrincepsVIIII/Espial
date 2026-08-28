@@ -25,7 +25,19 @@ for (const viewport of [
     ).toBeVisible();
     await expect(page.locator('.load-radar')).toHaveCount(1);
     await expect(page.locator('.load-radar .radar-grid')).toHaveCount(5);
-    await expect(page.locator('.load-radar .radar-active')).toHaveCount(1);
+    await expect(page.locator('.load-radar .radar-active')).toHaveCount(3);
+    await expect(page.locator('.radar-active').first()).toHaveCSS(
+      'stroke',
+      'rgb(212, 164, 231)',
+    );
+    await expect(page.locator('.node-count')).toHaveCount(0);
+    await expect(page.locator('.console-summary')).toHaveText(
+      '9 console-active VMs',
+    );
+    await expect(page.locator('.console-summary')).toHaveCSS(
+      'text-align',
+      'center',
+    );
     await expect(
       page.locator('.cluster-title .status-indicator', { hasText: 'Warning' }),
     ).toBeVisible();
@@ -100,19 +112,37 @@ for (const viewport of [
       expect(loadBox.width).toBeGreaterThan(resourceBox.width);
 
       const hostMarker = page.getByRole('button', {
-        name: 'pve-001: Swap usage 2%',
+        name: 'pve-001: Swap 2%',
       });
       await hostMarker.hover();
       await expect(hostMarker.locator('[role="tooltip"]')).toHaveCSS(
         'opacity',
         '1',
       );
+      await expect(hostMarker.locator('[role="tooltip"]')).toContainText(
+        'Swap 2%',
+      );
+      const hostBarTrack = page.locator('.bar-track').first();
+      await hostBarTrack.hover();
+      await expect(hostBarTrack.locator('[role="tooltip"]')).toContainText(
+        'CPU 18% · RAM 24%',
+      );
+      await hostBarTrack.focus();
+      await expect(hostBarTrack.locator('[role="tooltip"]')).toHaveCSS(
+        'opacity',
+        '1',
+      );
       const storageMarker = page.getByRole('button', {
-        name: 'shared-vmstore: IO wait 7%',
+        name: 'shared-vmstore: I/O wait 7%',
       });
       await storageMarker.focus();
       await expect(storageMarker.locator('[role="tooltip"]')).toContainText(
-        'IO wait 7%',
+        'I/O wait 7%',
+      );
+      const storageBarTrack = page.locator('.bar-track').nth(3);
+      await storageBarTrack.hover();
+      await expect(storageBarTrack.locator('[role="tooltip"]')).toContainText(
+        '70% used',
       );
 
       const longHost = page.getByRole('button', {
@@ -208,6 +238,72 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await expect(page.locator('.node-detail')).toHaveCount(0);
 });
 
+test('switches load distribution to storage main-disk attribution', async ({
+  page,
+}) => {
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  const viewSwitch = page.getByRole('switch', {
+    name: 'Show storage load distribution',
+  });
+  await expect(viewSwitch).toHaveAttribute('aria-checked', 'false');
+  await viewSwitch.focus();
+  await page.keyboard.press('Space');
+  await expect(viewSwitch).toHaveAttribute('aria-checked', 'true');
+  await expect(
+    page.getByText(/storage backing each running guest's main disk/i),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/EFI, ISO, and auxiliary volumes are excluded/),
+  ).toBeVisible();
+  await expect(page.locator('.load-radar .radar-active')).toHaveCount(2);
+
+  const storage = page.getByRole('button', {
+    name: /shared-vmstore, 8 idle VMs, 2 console-active VMs, health Warning/,
+  });
+  await storage.click();
+  await expect(
+    page.getByRole('heading', { name: 'shared-vmstore' }),
+  ).toBeVisible();
+  await expect(page.locator('.node-detail')).toContainText(/Used\s+70%/);
+  await expect(page.locator('.node-detail')).toContainText(/I\/O wait\s+7%/);
+});
+
+test('one console-active VM renders one lavender active spoke', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?hypervisor=console-one`);
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  await expect(page.locator('.load-radar .radar-active')).toHaveCount(1);
+  await expect(page.locator('.radar-active')).toHaveCSS(
+    'stroke-dasharray',
+    'none',
+  );
+  await expect(page.locator('.console-summary')).toHaveText(
+    '1 console-active VM',
+  );
+});
+
+test('storage attribution remains explicit when guest disk reads are unavailable', async ({
+  page,
+  request,
+}) => {
+  await request.get(
+    `${mockCore}/__test/control?hypervisor=storage-unavailable`,
+  );
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+  await page
+    .getByRole('switch', { name: 'Show storage load distribution' })
+    .click();
+  await expect(page.locator('.unavailable-storage')).toBeVisible();
+  await expect(page.locator('.load-radar')).toHaveCount(0);
+});
+
 test('administrator opens the audited cluster configuration editor', async ({
   page,
 }) => {
@@ -245,11 +341,17 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const marker = page.getByRole('button', {
-    name: 'pve-001: Swap usage 2%',
+    name: 'pve-001: Swap 2%',
   });
   await marker.tap();
   await expect(marker).toHaveAttribute('aria-expanded', 'true');
   await expect(marker.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
+  const track = page.getByRole('button', {
+    name: 'pve-001: CPU 18% · RAM 24%',
+  });
+  await track.tap();
+  await expect(track).toHaveAttribute('aria-expanded', 'true');
+  await expect(track.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
   const host = page.getByRole('button', {
     name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
   });
@@ -307,6 +409,13 @@ for (const scenario of [
     await expect(page.locator('.load-radar')).toHaveCount(
       scenario.mode === 'zero' ? 1 : 0,
     );
+    if (scenario.mode === 'one') {
+      await expect(page.locator('.compact-node-field')).toHaveCount(1);
+      await expect(page.locator('.node-count')).toHaveCount(0);
+      await expect(page.locator('.console-summary')).toHaveText(
+        '1 console-active VM',
+      );
+    }
     if (scenario.mode === 'zero') {
       await expect(page.locator('.node-load strong')).toHaveText([
         '0',

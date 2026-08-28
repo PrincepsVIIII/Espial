@@ -151,9 +151,17 @@ records the configuration mutation in the existing audit receipt.
 The adapter must never persist or log the combined authorization header, token
 secret, raw credential error, or resolved secret value.
 
-Start with `PVEAuditor` on only the required ACL paths. If the initial role exposes
-more than the approved endpoints require, define and document a narrower custom
-read-only role after the endpoint list is fixed. No mutation privilege is accepted.
+Start with `PVEAuditor` on only the required ACL paths. The node status and active
+task reads require `Sys.Audit` on every collected `/nodes/<node>` path. In
+particular, Proxmox filters another user's active task out of the node task list
+unless the token has that node-level privilege; granting the role only on guest or
+storage paths makes console activity incomplete. Main-disk storage attribution also
+requires the read-only guest-configuration privilege (`VM.Audit`) for every
+collected running QEMU/LXC guest. If that read is absent on any guest, Espial keeps
+Compute available and explicitly withholds the Storage aggregate. If the initial
+role exposes more than the approved endpoints require, define and document a
+narrower custom read-only role after the endpoint list is fixed. No mutation
+privilege is accepted.
 
 ## 5. Initial API surface
 
@@ -165,14 +173,31 @@ Start with the smallest source surface that can provide useful health:
 | `GET /api2/json/cluster/status`                        | Cluster membership and quorum evidence                                              |
 | `GET /api2/json/cluster/resources`                     | Cluster-wide node, QEMU, LXC, storage, and current status evidence                  |
 | `GET /api2/json/nodes/{node}/status`                   | Additional bounded node evidence when the cluster resource response is insufficient |
-| `GET /api2/json/cluster/tasks?source=active&limit=512` | Bounded currently-open task evidence for aggregate guest-console activity           |
+| `GET /api2/json/nodes/{node}/tasks?source=active&typefilter=vncproxy&limit=512` | Per-node bounded currently-open task evidence for aggregate guest-console activity |
+| `GET /api2/json/nodes/{node}/{qemu\|lxc}/{vmid}/config` | In-memory main-disk storage attribution for each running guest                         |
 
-Do not add guest configuration, task logs, RRD history, replication history, or
-event polling merely because the API exposes them. The bounded active-task read is
-an explicit exception: it answers “which host currently has a VM/CT console open?”
-and retains only task node, VM/CT ID, type, and completion state. It never persists
-task-log content or Proxmox user identity. Each future endpoint needs an operational
+Do not add task logs, RRD history, replication history, or event polling merely
+because the API exposes them. The bounded per-node active-task read is an explicit
+exception: it answers “which host currently has a VM/CT console open?” and retains
+only task node, VM/CT ID, type, and completion state. The bounded guest-config read
+is the other explicit exception: it answers “which configured storage backs this
+running guest's bootable main disk?” The adapter retains only `boot`, `rootfs`, and
+normal disk-device strings in memory long enough to form the aggregate; it never
+persists a raw guest configuration, task-log content, Proxmox user identity, or
+configuration fields such as guest credentials. A failure on any node makes the
+cluster console total unavailable; a failure on any running guest configuration
+makes the storage-attribution total unavailable. Partial counts are discarded
+rather than presented as complete. Each future endpoint needs an operational
 question, least-privilege proof, bounded response fixture, and normalized mapping.
+
+Proxmox's node `status.wait` value and node-summary RRD `iowait` series are
+percentage-valued CPU I/O-wait time—the Proxmox UI itself renders the series with a
+percent unit. They are not storage latency in milliseconds. The adapter therefore
+emits the authoritative `io_wait_percent` measurement and does not invent an
+`io_delay_ms` field. A future latency-in-milliseconds measurement needs a separate,
+version-checked source contract for the actual storage backend (for example a
+specific Ceph or device metric); the generic node and storage status endpoints do
+not provide one.
 
 The author should first determine whether `/cluster/resources` alone provides the
 required first-version state. Proxmox responses normally wrap results under
@@ -211,13 +236,24 @@ forms. Never copy an arbitrary response URL into `source_url`.
 The cluster observation's `idle_vms_by_node` and `active_vms_by_node` metadata are
 aggregate comparisons, not a relationship graph. Collection initializes every
 discovered node to zero, counts running QEMU and LXC guests as idle VMs, then counts
-distinct currently open `vncproxy` tasks for those running guests as console-active
-VMs. A completed task, a task without a numeric VMID, or a task for a guest no
-longer reported as running does not contribute. This records active Proxmox console
-use, not a general in-guest login or CPU-activity claim. The Hypervisor read model
+distinct currently open `vncproxy` tasks from each node's task endpoint for those
+running guests as console-active VMs. A completed task, a task without a numeric
+VMID, or a task for a guest no longer reported as running does not contribute. This
+records active Proxmox console use, not a general in-guest login or CPU-activity
+claim. The Hypervisor read model
 completes missing observations from the authoritative host list before returning
 stable ID-sorted host/count pairs. The UI must not infer guest placement edges,
 migration paths, or topology from these counts.
+
+The additive `idle_vms_by_storage` and `active_vms_by_storage` metadata applies the
+same running/console-active classification to the storage named by each running
+guest's bootable main disk. The adapter follows Proxmox `boot` order when present,
+then falls back deterministically across normal `scsi`, `virtio`, `sata`, `ide`,
+`nvme`, or LXC `rootfs` devices. It excludes EFI disks, TPM state, unused devices,
+cloud-init media, and CD/DVD media including ISO images. The accompanying
+`storage_attribution_available` flag is false unless every running guest's bounded
+configuration read succeeded; the API returns empty storage load counts in that
+case rather than misleadingly zeroing or partially assigning them.
 
 ## 7. Check taxonomy and health semantics
 
