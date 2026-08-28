@@ -72,6 +72,11 @@ const fieldMessages: Record<string, Record<string, string>> = {
     requires_https:
       'Self-signed certificate trust applies only to an https:// Base URL.',
   },
+  allow_unverified_tls: {
+    requires_https: 'Unverified TLS applies only to an https:// Base URL.',
+    conflicts_with_certificate_pin:
+      'Choose either a pinned self-signed certificate or unverified TLS, not both.',
+  },
   deployment_id: {
     invalid:
       'Deployment ID must be 2–63 lowercase letters, numbers, or hyphens, beginning with a letter.',

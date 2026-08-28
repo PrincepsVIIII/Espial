@@ -582,6 +582,7 @@ export interface ProxmoxClusterConfiguration {
   approve_target: true;
   allow_insecure_http: boolean;
   trust_self_signed_certificate: boolean;
+  allow_unverified_tls: boolean;
   deployment_id: string;
   token_id: string;
   token_secret_configured: boolean;
@@ -610,6 +611,7 @@ export interface ProxmoxClusterConfigurationUpdateRequest {
   approve_target: true;
   allow_insecure_http: boolean;
   trust_self_signed_certificate: boolean;
+  allow_unverified_tls: boolean;
   deployment_id: string;
   token_id: string;
   token_secret?: string;
@@ -634,6 +636,7 @@ export interface ProxmoxClusterCreateRequest {
   approve_target: true;
   allow_insecure_http: boolean;
   trust_self_signed_certificate: boolean;
+  allow_unverified_tls: boolean;
   deployment_id: string;
   token_id: string;
   token_secret: string;

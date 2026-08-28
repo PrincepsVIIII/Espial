@@ -65,7 +65,12 @@ func NewClient(config Config, options ClientOptions) (*Client, error) {
 		ExpectContinueTimeout: time.Second,
 		TLSClientConfig:       &tls.Config{MinVersion: tls.VersionTLS12},
 	}
-	if config.TrustSelfSignedCertificate {
+	if config.AllowUnverifiedTLS {
+		transport.TLSClientConfig = &tls.Config{
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: true, // Explicit per-integration operator override; see Config validation.
+		}
+	} else if config.TrustSelfSignedCertificate {
 		transport.TLSClientConfig = &tls.Config{
 			MinVersion:         tls.VersionTLS12,
 			InsecureSkipVerify: true, // Verification is replaced by the exact certificate pin below.

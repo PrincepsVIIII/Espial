@@ -112,6 +112,24 @@ func TestClientRejectsUntrustedSelfSignedCertificateByDefault(t *testing.T) {
 	}
 }
 
+func TestClientAllowsExplicitUnverifiedTLSForAnApprovedTarget(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		writeData(t, w, map[string]string{"version": "8.2"})
+	}))
+	defer server.Close()
+	target, _ := url.Parse(server.URL)
+	client, err := NewClient(Config{
+		BaseURL: server.URL, DeploymentID: "lab", TokenID: "user@pve!espial", TokenSecret: "secret",
+		AllowUnverifiedTLS: true,
+	}, ClientOptions{ApprovedHosts: []string{target.Hostname()}, AllowedPorts: []int{mustPort(t, target.Port())}})
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	if _, err := client.GetVersion(context.Background()); err != nil {
+		t.Fatalf("GetVersion: %v", err)
+	}
+}
+
 func TestClientPinsExplicitlyTrustedSelfSignedCertificate(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeData(t, w, map[string]string{"version": "8.2"})

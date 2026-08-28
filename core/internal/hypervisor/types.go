@@ -9,6 +9,7 @@ type ProxmoxClusterDefinition struct {
 	ApproveTarget              bool
 	AllowInsecureHTTP          bool
 	TrustSelfSignedCertificate bool
+	AllowUnverifiedTLS         bool
 	DeploymentID               string
 	TokenID                    string
 	TokenSecret                string
@@ -38,6 +39,7 @@ type ProxmoxClusterConfiguration struct {
 	ApproveTarget              bool      `json:"approve_target"`
 	AllowInsecureHTTP          bool      `json:"allow_insecure_http"`
 	TrustSelfSignedCertificate bool      `json:"trust_self_signed_certificate"`
+	AllowUnverifiedTLS         bool      `json:"allow_unverified_tls"`
 	DeploymentID               string    `json:"deployment_id"`
 	TokenID                    string    `json:"token_id"`
 	TokenSecretConfigured      bool      `json:"token_secret_configured"`

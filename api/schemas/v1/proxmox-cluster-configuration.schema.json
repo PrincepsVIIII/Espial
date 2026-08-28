@@ -6,7 +6,7 @@
   "additionalProperties": false,
   "required": [
     "id", "display_name", "base_url", "approve_target", "allow_insecure_http",
-    "trust_self_signed_certificate", "deployment_id", "token_id", "token_secret_configured",
+    "trust_self_signed_certificate", "allow_unverified_tls", "deployment_id", "token_id", "token_secret_configured",
     "interval_seconds", "expected_refresh_seconds", "request_timeout_seconds",
     "storage_warning_percent", "storage_critical_percent", "swap_warning_percent",
     "swap_critical_percent", "io_wait_warning_percent", "io_wait_critical_percent",
@@ -19,6 +19,7 @@
     "approve_target": { "type": "boolean", "const": true },
     "allow_insecure_http": { "type": "boolean" },
     "trust_self_signed_certificate": { "type": "boolean" },
+    "allow_unverified_tls": { "type": "boolean" },
     "deployment_id": { "type": "string" },
     "token_id": { "type": "string" },
     "token_secret_configured": { "type": "boolean" },

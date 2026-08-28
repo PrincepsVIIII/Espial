@@ -49,6 +49,7 @@ type Config struct {
 	TokenSecret                string   `json:"token_secret"`
 	AllowInsecureHTTP          bool     `json:"allow_insecure_http,omitempty"`
 	TrustSelfSignedCertificate bool     `json:"trust_self_signed_certificate,omitempty"`
+	AllowUnverifiedTLS         bool     `json:"allow_unverified_tls,omitempty"`
 	TrustedCertificateSHA256   string   `json:"trusted_certificate_sha256,omitempty"`
 	ApprovedHost               string   `json:"approved_host,omitempty"`
 	ApprovedPort               int      `json:"approved_port,omitempty"`
@@ -143,6 +144,15 @@ func ValidateConfigFields(config Config) []ConfigFieldError {
 	}
 	if config.TrustSelfSignedCertificate && (err != nil || target.Scheme != "https") {
 		fields = append(fields, ConfigFieldError{Field: "trust_self_signed_certificate", Code: "requires_https"})
+	}
+	if config.AllowUnverifiedTLS && (err != nil || target.Scheme != "https") {
+		fields = append(fields, ConfigFieldError{Field: "allow_unverified_tls", Code: "requires_https"})
+	}
+	if config.AllowUnverifiedTLS && config.TrustSelfSignedCertificate {
+		fields = append(fields, ConfigFieldError{Field: "allow_unverified_tls", Code: "conflicts_with_certificate_pin"})
+	}
+	if config.AllowUnverifiedTLS && config.TrustedCertificateSHA256 != "" {
+		fields = append(fields, ConfigFieldError{Field: "allow_unverified_tls", Code: "conflicts_with_certificate_pin"})
 	}
 	if config.TrustedCertificateSHA256 != "" {
 		if !config.TrustSelfSignedCertificate || !validSHA256Fingerprint(config.TrustedCertificateSHA256) {

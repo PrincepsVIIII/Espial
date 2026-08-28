@@ -10,6 +10,7 @@
     "approve_target",
     "allow_insecure_http",
     "trust_self_signed_certificate",
+    "allow_unverified_tls",
     "deployment_id",
     "token_id",
     "token_secret",
@@ -30,6 +31,7 @@
     "approve_target": { "type": "boolean", "const": true },
     "allow_insecure_http": { "type": "boolean" },
     "trust_self_signed_certificate": { "type": "boolean" },
+    "allow_unverified_tls": { "type": "boolean" },
     "deployment_id": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]{1,62}$"

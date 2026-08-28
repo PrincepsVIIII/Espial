@@ -110,6 +110,41 @@ func TestValidateConfigFieldsRequiresHTTPSForSelfSignedTrust(t *testing.T) {
 	t.Fatalf("expected trust_self_signed_certificate requires_https, got %#v", fields)
 }
 
+func TestValidateConfigFieldsRejectsUnverifiedTLSWithoutHTTPSOrAlongsidePinning(t *testing.T) {
+	config := Config{
+		BaseURL:                    "http://cdr-debug.cse.buffalo.edu:8006",
+		AllowInsecureHTTP:          true,
+		AllowUnverifiedTLS:         true,
+		TrustSelfSignedCertificate: true,
+		DeploymentID:               "prod-1",
+		TokenID:                    "root@pam!espial",
+		TokenSecret:                "secret-value",
+	}
+
+	fields := ValidateConfigFields(config)
+	got := map[string]string{}
+	for _, field := range fields {
+		got[field.Field] = field.Code
+	}
+	if got["allow_unverified_tls"] != "conflicts_with_certificate_pin" {
+		t.Fatalf("expected unverified TLS pin conflict, got %#v", fields)
+	}
+	if got["trust_self_signed_certificate"] != "requires_https" {
+		t.Fatalf("expected pinned trust HTTPS requirement, got %#v", fields)
+	}
+}
+
+func TestValidateConfigFieldsAcceptsExplicitUnverifiedTLS(t *testing.T) {
+	config := Config{
+		BaseURL: "https://cdr-debug.cse.buffalo.edu:8006", AllowUnverifiedTLS: true,
+		DeploymentID: "prod-1", TokenID: "root@pam!espial", TokenSecret: "secret-value",
+	}
+
+	if fields := ValidateConfigFields(config); len(fields) != 0 {
+		t.Fatalf("expected valid explicit unverified TLS config, got %#v", fields)
+	}
+}
+
 func TestValidateConfigFieldsAcceptsPinnedSelfSignedCertificate(t *testing.T) {
 	config := Config{
 		BaseURL:                    "https://cdr-debug.cse.buffalo.edu:8006",

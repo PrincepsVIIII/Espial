@@ -75,6 +75,7 @@ type proxmoxClusterRequest struct {
 	ApproveTarget              bool     `json:"approve_target"`
 	AllowInsecureHTTP          bool     `json:"allow_insecure_http"`
 	TrustSelfSignedCertificate bool     `json:"trust_self_signed_certificate"`
+	AllowUnverifiedTLS         bool     `json:"allow_unverified_tls"`
 	DeploymentID               string   `json:"deployment_id"`
 	TokenID                    string   `json:"token_id"`
 	TokenSecret                string   `json:"token_secret"`
@@ -93,8 +94,9 @@ type proxmoxClusterRequest struct {
 func (body proxmoxClusterRequest) definition(actorID, address, correlationID string, canReadAudit bool) hypervisor.ProxmoxClusterDefinition {
 	return hypervisor.ProxmoxClusterDefinition{
 		DisplayName: body.DisplayName, BaseURL: body.BaseURL, ApproveTarget: body.ApproveTarget, AllowInsecureHTTP: body.AllowInsecureHTTP,
-		TrustSelfSignedCertificate: body.TrustSelfSignedCertificate, DeploymentID: body.DeploymentID,
-		TokenID: body.TokenID, TokenSecret: body.TokenSecret, IntervalSeconds: body.IntervalSeconds,
+		TrustSelfSignedCertificate: body.TrustSelfSignedCertificate, AllowUnverifiedTLS: body.AllowUnverifiedTLS,
+		DeploymentID: body.DeploymentID,
+		TokenID:      body.TokenID, TokenSecret: body.TokenSecret, IntervalSeconds: body.IntervalSeconds,
 		ExpectedRefreshSeconds: body.ExpectedRefreshSeconds, RequestTimeoutSeconds: body.RequestTimeoutSeconds,
 		StorageWarningPercent: body.StorageWarningPercent, StorageCriticalPercent: body.StorageCriticalPercent,
 		SwapWarningPercent: body.SwapWarningPercent, SwapCriticalPercent: body.SwapCriticalPercent,
@@ -253,6 +255,7 @@ func proxmoxConfigFields(body proxmoxClusterRequest) []APIFieldError {
 		BaseURL: body.BaseURL, DeploymentID: body.DeploymentID,
 		TokenID: body.TokenID, TokenSecret: body.TokenSecret, AllowInsecureHTTP: body.AllowInsecureHTTP,
 		TrustSelfSignedCertificate: body.TrustSelfSignedCertificate,
+		AllowUnverifiedTLS:         body.AllowUnverifiedTLS,
 		ExpectedRefreshSeconds:     body.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds:      body.RequestTimeoutSeconds,
 		StorageWarningPercent:      body.StorageWarningPercent,

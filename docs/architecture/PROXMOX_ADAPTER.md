@@ -141,6 +141,13 @@ against Proxmox before saving, retains the stored token when its password field 
 empty, appends a redacted `integration.configuration.updated` audit record, and
 restarts that integration after commit. It must not use the generic integration
 configuration endpoint.
+
+An explicit `allow_unverified_tls` exception is available for an approved HTTPS
+host and port when an operator accepts rotating certificates. It keeps transport
+encryption but disables certificate identity and chain verification, so it is
+insecure and must not be combined with certificate pinning. The typed editor makes
+the exception visible, validates the target with the retained read-only token, and
+records the configuration mutation in the existing audit receipt.
 The adapter must never persist or log the combined authorization header, token
 secret, raw credential error, or resolved secret value.
 
@@ -304,8 +311,10 @@ disabled.
 
 The Proxmox client must enforce:
 
-- HTTPS with normal hostname and chain verification, or exact SHA-256 leaf
-  certificate verification after explicit self-signed-certificate approval;
+- HTTPS with normal hostname and chain verification, exact SHA-256 leaf
+  certificate verification after explicit self-signed-certificate approval, or an
+  explicit per-integration unverified-TLS exception for the already approved host
+  and port;
 - exact approved host, resolved address, and port policy;
 - no redirects and no ambient proxy environment;
 - explicit connect, TLS, response-header, and whole-request deadlines bounded by
@@ -319,9 +328,10 @@ The Proxmox client must enforce:
 
 Prefer mounting and approving the Proxmox cluster CA or another deployment-managed
 trust bundle. When that is not available, the typed Add Cluster flow may establish
-an exact certificate pin after explicit administrator approval. The adapter must
-never persist a generic skip-verification setting, accept a different certificate,
-or apply this exception to an unapproved target.
+an exact certificate pin after explicit administrator approval. The unverified-TLS
+exception is a deliberate operator-approved fallback, applies only to the typed
+integration's approved target, and must remain visible in its configuration and
+audit evidence.
 
 ## 11. Fixtures and verification
 

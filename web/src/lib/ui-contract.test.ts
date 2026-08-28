@@ -274,6 +274,10 @@ describe('primary route skeletons', () => {
       'Trust this cluster’s self-signed certificate',
     );
     expect(hypervisorPage).toContain('Espial pins the certificate');
+    expect(hypervisorPage).toContain('Accept any TLS certificate');
+    expect(hypervisorPage).toContain(
+      'will not\n                    verify the certificate identity',
+    );
     expect(hypervisorPage).not.toContain('UnavailableSection');
   });
 

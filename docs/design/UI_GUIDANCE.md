@@ -99,6 +99,10 @@ of the last enabled administrator. Role, enablement, identity, creation, and pas
 reset mutations revoke sessions where authorization or credentials change and are
 committed atomically with a redacted audit event.
 
+Security-sensitive integration exceptions must state the protection being relaxed,
+remain scoped to the configured integration, and use the established mutation
+receipt and audit route. They must never be implied by a generic success state.
+
 ## Color and surfaces
 
 Use a consistent cyan, dark-blue, and blackish-gray scheme derived from the supplied

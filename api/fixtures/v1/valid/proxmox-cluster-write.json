@@ -6,6 +6,7 @@
     "approve_target": true,
     "allow_insecure_http": false,
     "trust_self_signed_certificate": true,
+    "allow_unverified_tls": false,
     "deployment_id": "lab-proxmox",
     "token_id": "espial@pve!monitoring",
     "token_secret": "write-only-secret",

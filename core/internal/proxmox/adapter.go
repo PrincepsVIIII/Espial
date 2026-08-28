@@ -23,6 +23,7 @@ func Manifest() adapters.Manifest {
 				"base_url":                      map[string]any{"type": "string", "format": "uri", "maxLength": 2048},
 				"allow_insecure_http":           map[string]any{"type": "boolean"},
 				"trust_self_signed_certificate": map[string]any{"type": "boolean"},
+				"allow_unverified_tls":          map[string]any{"type": "boolean"},
 				"trusted_certificate_sha256":    map[string]any{"type": "string", "pattern": "^[0-9a-f]{64}$"},
 				"approved_host":                 map[string]any{"type": "string", "minLength": 1, "maxLength": 253},
 				"approved_port":                 map[string]any{"type": "integer", "minimum": 1, "maximum": 65535},

@@ -55,6 +55,7 @@
       allow_insecure_http: form.get('allow_insecure_http') === 'on',
       trust_self_signed_certificate:
         form.get('trust_self_signed_certificate') === 'on',
+      allow_unverified_tls: form.get('allow_unverified_tls') === 'on',
       deployment_id: text(form, 'deployment_id'),
       token_id: text(form, 'token_id'),
       token_secret: text(form, 'token_secret'),
@@ -565,6 +566,22 @@
                   <small
                     >Espial pins the certificate presented during setup and
                     rejects a later certificate change.</small
+                  >
+                </span>
+              </label>
+              <label class="check-row">
+                <input
+                  name="allow_unverified_tls"
+                  type="checkbox"
+                  checked={editor?.allow_unverified_tls ?? false}
+                />
+                <span>
+                  <strong>Accept any TLS certificate</strong>
+                  <small
+                    >Insecure. Espial will keep HTTPS encryption but will not
+                    verify the certificate identity. Use only for this approved
+                    host and port when certificate rotation cannot be
+                    controlled.</small
                   >
                 </span>
               </label>

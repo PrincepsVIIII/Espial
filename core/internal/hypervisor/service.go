@@ -61,6 +61,7 @@ func (service *Service) CreateProxmoxCluster(ctx context.Context, definition Pro
 	config := proxmox.WithDefaults(proxmox.Config{
 		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID, AllowInsecureHTTP: definition.AllowInsecureHTTP,
 		TrustSelfSignedCertificate: definition.TrustSelfSignedCertificate,
+		AllowUnverifiedTLS:         definition.AllowUnverifiedTLS,
 		TokenID:                    definition.TokenID, TokenSecret: definition.TokenSecret,
 		ExpectedRefreshSeconds: definition.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds:  definition.RequestTimeoutSeconds,
@@ -361,7 +362,8 @@ func configurationFromRecord(record proxmoxClusterRecord) (ProxmoxClusterConfigu
 	return ProxmoxClusterConfiguration{
 		ID: record.ID, DisplayName: record.DisplayName, BaseURL: config.BaseURL, ApproveTarget: true,
 		AllowInsecureHTTP: config.AllowInsecureHTTP, TrustSelfSignedCertificate: config.TrustSelfSignedCertificate,
-		DeploymentID: config.DeploymentID, TokenID: config.TokenID,
+		AllowUnverifiedTLS: config.AllowUnverifiedTLS,
+		DeploymentID:       config.DeploymentID, TokenID: config.TokenID,
 		TokenSecretConfigured: strings.TrimSpace(record.SecretReferences["token_secret"]) != "",
 		IntervalSeconds:       record.IntervalSeconds, ExpectedRefreshSeconds: config.ExpectedRefreshSeconds,
 		RequestTimeoutSeconds: config.RequestTimeoutSeconds, StorageWarningPercent: config.StorageWarningPercent,
@@ -391,7 +393,8 @@ func (service *Service) validateProxmoxDefinition(ctx context.Context, definitio
 	}
 	config := proxmox.WithDefaults(proxmox.Config{
 		BaseURL: definition.BaseURL, DeploymentID: definition.DeploymentID, AllowInsecureHTTP: definition.AllowInsecureHTTP,
-		TrustSelfSignedCertificate: definition.TrustSelfSignedCertificate, TokenID: definition.TokenID, TokenSecret: tokenSecret,
+		TrustSelfSignedCertificate: definition.TrustSelfSignedCertificate, AllowUnverifiedTLS: definition.AllowUnverifiedTLS,
+		TokenID: definition.TokenID, TokenSecret: tokenSecret,
 		ExpectedRefreshSeconds: definition.ExpectedRefreshSeconds, RequestTimeoutSeconds: definition.RequestTimeoutSeconds,
 		StorageWarningPercent: definition.StorageWarningPercent, StorageCriticalPercent: definition.StorageCriticalPercent,
 		SwapWarningPercent: definition.SwapWarningPercent, SwapCriticalPercent: definition.SwapCriticalPercent,
@@ -432,6 +435,7 @@ func nonsecretConfig(config proxmox.Config) map[string]any {
 	return map[string]any{
 		"base_url": config.BaseURL, "allow_insecure_http": config.AllowInsecureHTTP,
 		"trust_self_signed_certificate": config.TrustSelfSignedCertificate,
+		"allow_unverified_tls":          config.AllowUnverifiedTLS,
 		"trusted_certificate_sha256":    config.TrustedCertificateSHA256,
 		"approved_host":                 config.ApprovedHost, "approved_port": config.ApprovedPort,
 		"deployment_id": config.DeploymentID, "token_id": config.TokenID,
