@@ -238,6 +238,29 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await expect(page.locator('.node-detail')).toHaveCount(0);
 });
 
+test('long zero-load node labels retain a usable circular minimum size', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?hypervisor=zero`);
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  const longNameNode = page.getByRole('button', {
+    name: /pve-compute-host-with-a-long-operator-facing-name, 0 idle VMs, 0 console-active VMs, health Critical/,
+  });
+  const disc = longNameNode.locator('.node-disc');
+  const box = await disc.boundingBox();
+
+  expect(box).not.toBeNull();
+  expect(Math.abs(box!.width - box!.height)).toBeLessThanOrEqual(1);
+  expect(box!.width).toBeGreaterThanOrEqual(76);
+  await expect(longNameNode.locator('.node-name')).toHaveCSS(
+    'overflow-wrap',
+    'break-word',
+  );
+});
+
 test('switches load distribution to storage main-disk attribution', async ({
   page,
 }) => {

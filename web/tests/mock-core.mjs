@@ -715,7 +715,7 @@ function hypervisorClusters(mode, revision) {
   const hosts = Array.from({ length: count }, (_, index) => {
     const number = index + 1;
     const id =
-      mode === 'several' && index === 2
+      (mode === 'several' || mode === 'zero') && index === 2
         ? 'pve-compute-host-with-a-long-operator-facing-name'
         : `pve-${String(number).padStart(3, '0')}`;
     const healthState =

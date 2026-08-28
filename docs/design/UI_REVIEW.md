@@ -3,6 +3,16 @@
 This log records material visual-direction reviews so UI quality remains a delivery
 constraint instead of end-of-phase polish.
 
+## 2026-08-28 — Load-distribution label floor
+
+Load-distribution node diameter continues to encode idle-VM load, but it now has a
+bounded minimum calculated from the longest part of the target name. This prevents
+zero-load nodes with longer names from being stretched into vertical ovals by their
+wrapped labels. The node disc uses explicit equal width and height, and names retain
+normal separator breaks before emergency wrapping. Browser coverage verifies that a
+long, zero-load name remains circular and large enough to read without changing the
+utilization scaling for larger nodes.
+
 ## 2026-08-26 — Healthy-label density refinement
 
 Removed the repeated visible `Healthy` label beneath normal nodes in Hypervisor's

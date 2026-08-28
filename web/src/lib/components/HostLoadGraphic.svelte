@@ -66,8 +66,16 @@
     return `${nodeID(rowID)}-tooltip`;
   }
 
-  function nodeSize(idleVMs: number): string {
-    return `${3.75 + (Math.max(0, idleVMs) / highestIdleLoad) * 1.35}rem`;
+  function nodeSize(row: LoadGraphicRow): string {
+    const loadSize =
+      3.75 + (Math.max(0, row.idle_vms) / highestIdleLoad) * 1.35;
+    const longestLabelPart = row.id
+      .split(/[\s_-]+/)
+      .reduce((longest, part) => Math.max(longest, part.length), 0);
+    // Keep a three-line name readable before idle-VM utilization expands it.
+    // The cap preserves the bounded radar field for exceptionally long IDs.
+    const labelSize = Math.min(5.75, 1.25 + longestLabelPart * 0.45);
+    return `${Math.max(loadSize, labelSize)}rem`;
   }
 
   function commit(event: MouseEvent, rowID: string) {
@@ -109,7 +117,7 @@
   function description(): string {
     return view === 'compute'
       ? `Idle VMs by compute host in ${clusterName}.`
-      : `Idle VMs by NAS (primary drive) in ${clusterName}.`;
+      : `Idle VMs by storage backing each running guest's main disk in ${clusterName}. EFI, ISO, and auxiliary volumes are excluded.`;
   }
 
   function groupLabel(): string {
@@ -242,7 +250,7 @@
             <div
               class="node-item"
               class:selected={selectedID === row.id}
-              style={`--node-size: ${nodeSize(row.idle_vms)}; --node-x: ${position.x}; --node-y: ${position.y}`}
+              style={`--node-size: ${nodeSize(row)}; --node-x: ${position.x}; --node-y: ${position.y}`}
             >
               <button
                 id={nodeID(row.id)}
@@ -288,7 +296,7 @@
         <div
           class="node-item compact"
           class:selected={selectedID === row.id}
-          style={`--node-size: ${nodeSize(row.idle_vms)}`}
+          style={`--node-size: ${nodeSize(row)}`}
         >
           <button
             id={nodeID(row.id)}
@@ -594,14 +602,16 @@
   .node-disc {
     display: grid;
     place-content: center;
+    box-sizing: border-box;
     width: var(--node-size);
-    aspect-ratio: 1;
+    height: var(--node-size);
     border: 3px solid var(--unknown);
     border-radius: 50%;
     background: #0a1820;
     transition:
       transform var(--graphic-transition-duration) ease-out,
-      width var(--graphic-transition-duration) ease-out;
+      width var(--graphic-transition-duration) ease-out,
+      height var(--graphic-transition-duration) ease-out;
   }
 
   .node-button:hover .node-disc,
@@ -663,7 +673,7 @@
     font-size: 0.72rem;
     font-weight: 720;
     line-height: 1.25;
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
     text-align: center;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
