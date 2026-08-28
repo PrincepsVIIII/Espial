@@ -42,6 +42,9 @@
   let highestIdleLoad = $derived(
     Math.max(1, ...rows.map((row) => row.idle_vms)),
   );
+  let nodeBaseSize = $derived(
+    Math.max(3.75, ...rows.map((row) => minimumNodeSizeForName(row.id))),
+  );
   let highestSeriesValue = $derived(
     Math.max(1, ...rows.flatMap((row) => [row.idle_vms, row.active_vms])),
   );
@@ -66,16 +69,21 @@
     return `${nodeID(rowID)}-tooltip`;
   }
 
-  function nodeSize(row: LoadGraphicRow): string {
-    const loadSize =
-      3.75 + (Math.max(0, row.idle_vms) / highestIdleLoad) * 1.35;
-    const longestLabelPart = row.id
+  function displayedNodeName(rowID: string): string {
+    return rowID.length > 15 ? `${rowID.slice(0, 15)}...` : rowID;
+  }
+
+  function minimumNodeSizeForName(rowID: string): number {
+    const longestLabelPart = displayedNodeName(rowID)
       .split(/[\s_-]+/)
       .reduce((longest, part) => Math.max(longest, part.length), 0);
-    // Keep a three-line name readable before idle-VM utilization expands it.
-    // The cap preserves the bounded radar field for exceptionally long IDs.
-    const labelSize = Math.min(5.75, 1.25 + longestLabelPart * 0.45);
-    return `${Math.max(loadSize, labelSize)}rem`;
+    // The floor is shared by every target so idle-VM count remains the only
+    // relative size encoding. The cap preserves the bounded radar field.
+    return Math.min(5.75, 1.25 + longestLabelPart * 0.45);
+  }
+
+  function nodeSize(row: LoadGraphicRow): string {
+    return `${nodeBaseSize + (Math.max(0, row.idle_vms) / highestIdleLoad) * 1.35}rem`;
   }
 
   function commit(event: MouseEvent, rowID: string) {
@@ -267,7 +275,9 @@
                   class={`node-disc disc-${displayState(row.health_state)}`}
                   aria-hidden="true"
                 >
-                  <code class="node-name" title={row.id}>{row.id}</code>
+                  <code class="node-name" title={row.id}
+                    >{displayedNodeName(row.id)}</code
+                  >
                   <span class="node-load">
                     <strong>{row.idle_vms}</strong>
                     <small>Idle VMs</small>
@@ -313,7 +323,9 @@
               class={`node-disc disc-${displayState(row.health_state)}`}
               aria-hidden="true"
             >
-              <code class="node-name" title={row.id}>{row.id}</code>
+              <code class="node-name" title={row.id}
+                >{displayedNodeName(row.id)}</code
+              >
               <span class="node-load">
                 <strong>{row.idle_vms}</strong>
                 <small>Idle VMs</small>

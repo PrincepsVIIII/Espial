@@ -251,14 +251,54 @@ test('long zero-load node labels retain a usable circular minimum size', async (
   });
   const disc = longNameNode.locator('.node-disc');
   const box = await disc.boundingBox();
+  const shortNameBox = await page
+    .getByRole('button', {
+      name: /pve-001, 0 idle VMs, 0 console-active VMs, health Healthy/,
+    })
+    .locator('.node-disc')
+    .boundingBox();
 
   expect(box).not.toBeNull();
+  expect(shortNameBox).not.toBeNull();
   expect(Math.abs(box!.width - box!.height)).toBeLessThanOrEqual(1);
-  expect(box!.width).toBeGreaterThanOrEqual(76);
+  expect(box!.width).toBeGreaterThanOrEqual(70);
+  expect(Math.abs(box!.width - shortNameBox!.width)).toBeLessThanOrEqual(1);
+  await expect(longNameNode.locator('.node-name')).toHaveText(
+    'pve-compute-hos...',
+  );
+  await expect(longNameNode.locator('.node-name')).toHaveAttribute(
+    'title',
+    'pve-compute-host-with-a-long-operator-facing-name',
+  );
   await expect(longNameNode.locator('.node-name')).toHaveCSS(
     'overflow-wrap',
     'break-word',
   );
+});
+
+test('idle-VM load alone determines node diameter ordering', async ({
+  page,
+}) => {
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  const sizes = await Promise.all(
+    [
+      /pve-001, 1 idle VM, 1 console-active VM, health Healthy/,
+      /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
+      /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
+    ].map(async (name) => {
+      const box = await page
+        .getByRole('button', { name })
+        .locator('.node-disc')
+        .boundingBox();
+      expect(box).not.toBeNull();
+      return box!.width;
+    }),
+  );
+
+  expect(sizes[0]).toBeLessThan(sizes[1]);
+  expect(sizes[1]).toBeLessThan(sizes[2]);
 });
 
 test('switches load distribution to storage main-disk attribution', async ({

@@ -5,13 +5,14 @@ constraint instead of end-of-phase polish.
 
 ## 2026-08-28 — Load-distribution label floor
 
-Load-distribution node diameter continues to encode idle-VM load, but it now has a
-bounded minimum calculated from the longest part of the target name. This prevents
-zero-load nodes with longer names from being stretched into vertical ovals by their
-wrapped labels. The node disc uses explicit equal width and height, and names retain
-normal separator breaks before emergency wrapping. Browser coverage verifies that a
-long, zero-load name remains circular and large enough to read without changing the
-utilization scaling for larger nodes.
+Load-distribution node diameter continues to encode idle-VM load from a shared,
+bounded baseline calculated from the longest displayed target-name segment. This
+prevents zero-load nodes with longer names from being stretched into vertical ovals
+without allowing a less-utilized node to appear larger than a more-utilized one. The
+node disc uses explicit equal width and height. Names longer than 15 characters use
+`...` in the disc while their full values remain in native titles, tooltips, selected
+details, and accessible labels. Browser coverage verifies the shared zero-load size,
+the visible abbreviation, and utilization-ordered node diameters.
 
 ## 2026-08-26 — Healthy-label density refinement
 

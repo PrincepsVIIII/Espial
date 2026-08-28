@@ -168,11 +168,14 @@ pressing `Escape` clears the selection. The interactive controls and selected de
 are the textual equivalent for this intentionally compact comparison; the former
 duplicate metrics table is omitted.
 
-Circle diameter follows idle-VM utilization but has a bounded, label-aware minimum
-based on the longest name segment. This keeps a zero-load target with a longer name
-round and readable rather than allowing its wrapped label to stretch it into an
-oval. Names preserve normal word and separator breaks before using emergency word
-wrapping; exceptionally long names remain limited to three visible lines.
+Circle diameter follows idle-VM utilization from a shared, bounded baseline derived
+from the longest displayed name segment in the current view. The shared baseline
+keeps a zero-load target with a longer name round and readable without allowing a
+less-utilized target to appear larger than a more-utilized one. Names longer than
+15 characters display their first 15 characters followed by `...`; full names
+remain available through the native title, tooltip, selection detail, and accessible
+label. Visible names preserve normal word and separator breaks before emergency
+wrapping and remain limited to three lines.
 
 Console-active means that Proxmox reports an open `vncproxy` task for a running
 VM/CT. It is not a general in-guest login or CPU-activity claim. The graphic draws
