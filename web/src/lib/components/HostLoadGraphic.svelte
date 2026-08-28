@@ -125,7 +125,7 @@
   function description(): string {
     return view === 'compute'
       ? `Idle VMs by compute host in ${clusterName}.`
-      : `Idle VMs by storage backing each running guest's main disk in ${clusterName}. EFI, ISO, and auxiliary volumes are excluded.`;
+      : `Idle VMs by main drive's NAS in ${clusterName}.`;
   }
 
   function groupLabel(): string {

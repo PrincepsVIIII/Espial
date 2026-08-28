@@ -324,10 +324,7 @@ test('switches load distribution to storage main-disk attribution', async ({
   await expect(storageView).toHaveAttribute('aria-pressed', 'true');
   await expect(computeView).toHaveAttribute('aria-pressed', 'false');
   await expect(
-    page.getByText(/storage backing each running guest's main disk/i),
-  ).toBeVisible();
-  await expect(
-    page.getByText(/EFI, ISO, and auxiliary volumes are excluded/),
+    page.getByText("Idle VMs by primary drive's NAS in Production Proxmox."),
   ).toBeVisible();
   await expect(page.locator('.load-radar .radar-active')).toHaveCount(2);
 
