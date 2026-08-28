@@ -377,7 +377,7 @@ func appendFreshnessSignal(t *testing.T, pool *pgxpool.Pool, externalID string, 
 	}
 	defer tx.Rollback(context.Background())
 	if err := signals.NewWriter().Append(context.Background(), tx, signals.Input{
-		SourceKey: signals.FreshnessSourceKey(resourceID, state, occurredAt), Kind: signals.KindFreshness,
+		SourceKey: signals.FreshnessSourceKey(resourceID, "availability", state, occurredAt), Kind: signals.KindFreshness,
 		IntegrationID: incidentIntegrationID, ResourceID: resourceID, CheckType: "availability",
 		State: state, Reason: reason, ReasonCode: "freshness", OccurredAt: occurredAt,
 	}); err != nil {

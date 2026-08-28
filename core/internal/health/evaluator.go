@@ -27,6 +27,7 @@ func Evaluate(resourceID string, observation Observation, previous *Current, now
 	observationID := observation.ID
 	result := Current{
 		ResourceID:    resourceID,
+		CheckType:     observation.CheckType,
 		State:         observation.State,
 		Reason:        observation.Summary,
 		ObservationID: &observationID,

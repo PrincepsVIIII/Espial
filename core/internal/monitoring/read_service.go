@@ -49,12 +49,9 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 			WHERE mw.enabled AND mw.revoked_at IS NULL AND mw.starts_at <= now() AND mw.ends_at > now()
 			 AND (mw.integration_id IS NULL OR mw.integration_id=r.integration_id)
 			 AND (mw.resource_id IS NULL OR mw.resource_id=r.id)
-			 AND (mw.check_type IS NULL OR EXISTS (
-				SELECT 1 FROM observations observation
-				WHERE observation.id=ch.observation_id AND observation.check_type=mw.check_type
-			 ))
+			 AND (mw.check_type IS NULL OR mw.check_type=ch.check_type)
 		) THEN 'maintenance' ELSE COALESCE(ch.state, 'unknown') END effective_state, count(*)
-		FROM resources r LEFT JOIN current_health ch ON ch.resource_id = r.id
+		FROM resources r LEFT JOIN current_resource_health ch ON ch.resource_id = r.id
 		GROUP BY effective_state ORDER BY effective_state
 	`)
 	if err != nil {
@@ -110,16 +107,13 @@ func (service *ReadService) Overview(ctx context.Context) (Overview, error) {
 			CASE WHEN mw.id IS NOT NULL THEN 'maintenance' ELSE ch.state END,
 			CASE WHEN mw.id IS NOT NULL THEN 'Maintenance: '||mw.reason ELSE ch.reason END,
 			ch.updated_at
-		FROM current_health ch JOIN resources r ON r.id = ch.resource_id
+		FROM current_resource_health ch JOIN resources r ON r.id = ch.resource_id
 		LEFT JOIN LATERAL (
 			SELECT id,reason FROM maintenance_windows
 			WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
 			 AND (integration_id IS NULL OR integration_id=r.integration_id)
 			 AND (resource_id IS NULL OR resource_id=r.id)
-			 AND (check_type IS NULL OR EXISTS (
-				SELECT 1 FROM observations observation
-				WHERE observation.id=ch.observation_id AND observation.check_type=maintenance_windows.check_type
-			 ))
+			 AND (check_type IS NULL OR check_type=ch.check_type)
 			ORDER BY (resource_id IS NOT NULL) DESC,
 			 ((integration_id IS NOT NULL)::int+(check_type IS NOT NULL)::int) DESC,
 			 starts_at DESC,id LIMIT 1
@@ -259,11 +253,8 @@ func (service *ReadService) Resources(ctx context.Context, filter ResourceFilter
 				COALESCE(ch.updated_at, r.last_seen_at) AS ordered_at
 			FROM resources r
 			JOIN integrations i ON i.id = r.integration_id
-			LEFT JOIN current_health ch ON ch.resource_id = r.id
-			LEFT JOIN LATERAL (
-				SELECT o.* FROM observations o WHERE o.resource_id = r.id
-				ORDER BY o.observed_at DESC, o.received_at DESC, o.id DESC LIMIT 1
-			) lo ON true
+			LEFT JOIN current_resource_health ch ON ch.resource_id = r.id
+			LEFT JOIN observations lo ON lo.id = ch.observation_id
 			LEFT JOIN LATERAL (
 				SELECT id,reason,ends_at FROM maintenance_windows
 				WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
@@ -335,11 +326,8 @@ func (service *ReadService) Resource(ctx context.Context, id string) (ResourceVi
 			COALESCE(ch.updated_at, r.last_seen_at)
 		FROM resources r
 		JOIN integrations i ON i.id = r.integration_id
-		LEFT JOIN current_health ch ON ch.resource_id = r.id
-		LEFT JOIN LATERAL (
-			SELECT o.* FROM observations o WHERE o.resource_id = r.id
-			ORDER BY o.observed_at DESC, o.received_at DESC, o.id DESC LIMIT 1
-		) lo ON true
+		LEFT JOIN current_resource_health ch ON ch.resource_id = r.id
+		LEFT JOIN observations lo ON lo.id = ch.observation_id
 		LEFT JOIN LATERAL (
 			SELECT id,reason,ends_at FROM maintenance_windows
 			WHERE enabled AND revoked_at IS NULL AND starts_at<=now() AND ends_at>now()
@@ -492,7 +480,7 @@ const integrationSelect = `
 		SELECT count(*) AS resource_count,
 			count(*) FILTER (WHERE ch.state = 'stale') AS stale_count,
 			count(*) FILTER (WHERE ch.state = 'unknown' OR ch.state IS NULL) AS unknown_count
-		FROM resources r LEFT JOIN current_health ch ON ch.resource_id = r.id
+		FROM resources r LEFT JOIN current_resource_health ch ON ch.resource_id = r.id
 		WHERE r.integration_id = i.id
 	) rc ON true
 	LEFT JOIN LATERAL (

@@ -29,8 +29,25 @@ func TestMigrateAgainstPostgreSQL(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&migrationCount); err != nil {
 		t.Fatalf("count migrations: %v", err)
 	}
-	if migrationCount != 14 {
+	if migrationCount != 16 {
 		t.Fatalf("migration count = %d", migrationCount)
+	}
+
+	var currentHealthKeyColumns int
+	if err := pool.QueryRow(ctx, `
+		SELECT count(*)
+		FROM information_schema.key_column_usage
+		WHERE table_schema = current_schema()
+		  AND table_name = 'current_health'
+		  AND constraint_name = 'current_health_pkey'
+	`).Scan(&currentHealthKeyColumns); err != nil || currentHealthKeyColumns != 2 {
+		t.Fatalf("current health primary key columns = %d, %v", currentHealthKeyColumns, err)
+	}
+	var resourceProjectionExists bool
+	if err := pool.QueryRow(ctx, `
+		SELECT to_regclass(current_schema() || '.current_resource_health') IS NOT NULL
+	`).Scan(&resourceProjectionExists); err != nil || !resourceProjectionExists {
+		t.Fatalf("current resource health projection = %v, %v", resourceProjectionExists, err)
 	}
 
 	var expectedRefreshNullable string
@@ -183,7 +200,7 @@ func TestMigrateRejectsNewerDatabase(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name) VALUES (15, '000015_future.sql')",
+		"INSERT INTO schema_migrations (version, name) VALUES (17, '000017_future.sql')",
 	); err != nil {
 		t.Fatalf("insert future migration: %v", err)
 	}

@@ -498,11 +498,15 @@ func proxmoxClientOptions(policy proxmox.Policy, config proxmox.Config) proxmox.
 func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error) {
 	rows, err := service.pool.Query(ctx, `
 		SELECT i.id::text, i.display_name, i.sort_order, r.id::text, r.external_id, r.kind, r.display_name,
-			r.attributes, ch.state, ch.observed_at, o.measurements, o.metadata, run.completed_at
+			r.attributes, ch.state, ch.observed_at, o.measurements, o.metadata,
+			capacity.measurements, capacity.metadata, run.completed_at
 		FROM integrations i
 		LEFT JOIN resources r ON r.integration_id = i.id
-		LEFT JOIN current_health ch ON ch.resource_id = r.id
+		LEFT JOIN current_resource_health ch ON ch.resource_id = r.id
 		LEFT JOIN observations o ON o.id = ch.observation_id
+		LEFT JOIN current_health capacity_health
+			ON capacity_health.resource_id = r.id AND capacity_health.check_type = 'proxmox.storage.capacity'
+		LEFT JOIN observations capacity ON capacity.id = capacity_health.observation_id
 		LEFT JOIN LATERAL (
 			SELECT completed_at FROM integration_collection_runs
 			WHERE integration_id = i.id ORDER BY completed_at DESC LIMIT 1
@@ -520,11 +524,11 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 		var integrationID, integrationName string
 		var sortOrder int
 		var resourceID, kind, displayName *string
-		var attributes, measurements, metadata []byte
+		var attributes, measurements, metadata, capacityMeasurements, capacityMetadata []byte
 		var state *string
 		var observedAt, lastCollection *time.Time
 		var externalID *string
-		if err := rows.Scan(&integrationID, &integrationName, &sortOrder, &resourceID, &externalID, &kind, &displayName, &attributes, &state, &observedAt, &measurements, &metadata, &lastCollection); err != nil {
+		if err := rows.Scan(&integrationID, &integrationName, &sortOrder, &resourceID, &externalID, &kind, &displayName, &attributes, &state, &observedAt, &measurements, &metadata, &capacityMeasurements, &capacityMetadata, &lastCollection); err != nil {
 			return ClusterList{}, fmt.Errorf("scan proxmox cluster: %w", err)
 		}
 		cluster := clusters[integrationID]
@@ -558,6 +562,10 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 				SwapPercent: number(measures["swap_percent"]), SwapIndicator: attrString(meta, "swap_indicator"), HealthState: resourceState,
 			})
 		case proxmox.StorageKind:
+			if capacityMeasurements != nil {
+				measures = object(capacityMeasurements)
+				meta = object(capacityMetadata)
+			}
 			cluster.Storage = append(cluster.Storage, StorageSummary{
 				ID: valueString(displayName, attrString(attr, "storage")), Scope: attrString(attr, "scope"),
 				UsedBytes: number(measures["used_bytes"]), TotalBytes: number(measures["total_bytes"]),

@@ -180,7 +180,7 @@ func (repo repository) findConflictingObservation(
 	return result, measurements, metadata, nil
 }
 
-func (repo repository) latestObservation(ctx context.Context, resourceID string) (health.Observation, bool, error) {
+func (repo repository) latestObservation(ctx context.Context, resourceID, checkType string) (health.Observation, bool, error) {
 	var result health.Observation
 	var state string
 	var refreshSeconds int
@@ -188,10 +188,10 @@ func (repo repository) latestObservation(ctx context.Context, resourceID string)
 		SELECT id::text, resource_id::text, check_type, observed_state, summary, observed_at,
 			received_at, expected_refresh_seconds
 		FROM observations
-		WHERE resource_id = $1
+		WHERE resource_id = $1 AND check_type = $2
 		ORDER BY observed_at DESC, received_at DESC, id DESC
 		LIMIT 1
-	`, resourceID).Scan(
+	`, resourceID, checkType).Scan(
 		&result.ID, &result.ResourceID, &result.CheckType, &state, &result.Summary, &result.ObservedAt,
 		&result.ReceivedAt, &refreshSeconds,
 	)
@@ -206,16 +206,16 @@ func (repo repository) latestObservation(ctx context.Context, resourceID string)
 	return result, true, nil
 }
 
-func (repo repository) loadCurrent(ctx context.Context, resourceID string) (health.Current, bool, error) {
+func (repo repository) loadCurrent(ctx context.Context, resourceID, checkType string) (health.Current, bool, error) {
 	var result health.Current
 	var state, observationID string
 	var observedAt, lastSuccessAt, staleAt, unknownAt pgtype.Timestamptz
 	err := repo.tx.QueryRow(ctx, `
-		SELECT resource_id::text, state, reason, COALESCE(observation_id::text, ''),
+		SELECT resource_id::text, check_type, state, reason, COALESCE(observation_id::text, ''),
 			observed_at, last_success_at, stale_at, unknown_at, updated_at
-		FROM current_health WHERE resource_id = $1
-	`, resourceID).Scan(
-		&result.ResourceID, &state, &result.Reason, &observationID,
+		FROM current_health WHERE resource_id = $1 AND check_type = $2
+	`, resourceID, checkType).Scan(
+		&result.ResourceID, &result.CheckType, &state, &result.Reason, &observationID,
 		&observedAt, &lastSuccessAt, &staleAt, &unknownAt, &result.UpdatedAt,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -242,10 +242,10 @@ func (repo repository) saveCurrent(ctx context.Context, current health.Current) 
 	}
 	_, err := repo.tx.Exec(ctx, `
 		INSERT INTO current_health (
-			resource_id, state, reason, observation_id, observed_at, last_success_at,
+			resource_id, check_type, state, reason, observation_id, observed_at, last_success_at,
 			stale_at, unknown_at, updated_at
-		) VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, $6, $7, $8, $9)
-		ON CONFLICT (resource_id) DO UPDATE SET
+		) VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, $6, $7, $8, $9, $10)
+		ON CONFLICT (resource_id, check_type) DO UPDATE SET
 			state = EXCLUDED.state,
 			reason = EXCLUDED.reason,
 			observation_id = EXCLUDED.observation_id,
@@ -254,7 +254,7 @@ func (repo repository) saveCurrent(ctx context.Context, current health.Current) 
 			stale_at = EXCLUDED.stale_at,
 			unknown_at = EXCLUDED.unknown_at,
 			updated_at = EXCLUDED.updated_at
-	`, current.ResourceID, current.State, current.Reason, observationID,
+	`, current.ResourceID, current.CheckType, current.State, current.Reason, observationID,
 		current.ObservedAt, current.LastSuccessAt, current.StaleAt, current.UnknownAt,
 		postgresTime(current.UpdatedAt))
 	if err != nil {

@@ -17,7 +17,7 @@ erDiagram
     INTEGRATIONS ||--o{ RESOURCES : discovers
     INTEGRATIONS ||--o{ INTEGRATION_COLLECTION_RUNS : collects
     RESOURCES ||--o{ OBSERVATIONS : receives
-    RESOURCES ||--|| CURRENT_HEALTH : summarizes
+    RESOURCES ||--o{ CURRENT_HEALTH : summarizes per check
     INTEGRATIONS ||--o{ AUDIT_EVENTS : targets
 
     USERS {
@@ -123,6 +123,7 @@ erDiagram
     }
     CURRENT_HEALTH {
       uuid resource_id PK,FK
+      text check_type PK
       text state
       text reason
       uuid observation_id FK
@@ -222,8 +223,11 @@ erDiagram
 ## Invariants
 
 - `(integration_id, external_id)` uniquely identifies a resource.
-- `current_health` has exactly one row per resource and references the observation
-  that last changed its evaluated state.
+- `current_health` has at most one row for each `(resource_id, check_type)` and
+  references the observation that last changed that exact check's evaluated state.
+  `current_resource_health` is the deterministic resource-level read projection:
+  it selects the most severe current check, then the newest state, rather than
+  letting a newer check overwrite an unrelated one.
 - Observation ingestion and current-state replacement happen in one transaction.
 - A successful collection run and its audit-success record commit in that same
   transaction; rejected/failed runs contain only safe categories and counts.

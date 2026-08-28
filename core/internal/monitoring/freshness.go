@@ -103,7 +103,7 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 	rows, err := tx.Query(ctx, `
 		SELECT
 			r.integration_id::text, ch.resource_id::text, ch.state, ch.reason, ch.observation_id::text,
-			ch.observed_at, ch.last_success_at, ch.stale_at, ch.unknown_at, ch.updated_at,
+			ch.check_type, ch.observed_at, ch.last_success_at, ch.stale_at, ch.unknown_at, ch.updated_at,
 			o.check_type, o.observed_state, o.summary, o.observed_at, o.received_at,
 			o.expected_refresh_seconds
 		FROM current_health ch
@@ -135,6 +135,7 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 		var refreshSeconds int
 		if err := rows.Scan(
 			&row.integrationID, &row.previous.ResourceID, &currentState, &row.previous.Reason, &row.observation.ID,
+			&row.previous.CheckType,
 			&currentObserved, &lastSuccess, &staleAt, &unknownAt, &row.previous.UpdatedAt,
 			&row.observation.CheckType, &observedState, &row.observation.Summary, &row.observation.ObservedAt,
 			&row.observation.ReceivedAt, &refreshSeconds,
@@ -171,17 +172,17 @@ func (worker *FreshnessWorker) RefreshDue(ctx context.Context) ([]health.Change,
 		}
 		if _, err := tx.Exec(ctx, `
 			UPDATE current_health SET
-				state = $2, reason = $3, observation_id = NULLIF($4, '')::uuid,
-				observed_at = $5, last_success_at = $6, stale_at = $7,
-				unknown_at = $8, updated_at = $9
-			WHERE resource_id = $1
-		`, desired.ResourceID, desired.State, desired.Reason, observationID,
+				state = $3, reason = $4, observation_id = NULLIF($5, '')::uuid,
+				observed_at = $6, last_success_at = $7, stale_at = $8,
+				unknown_at = $9, updated_at = $10
+			WHERE resource_id = $1 AND check_type = $2
+		`, desired.ResourceID, desired.CheckType, desired.State, desired.Reason, observationID,
 			desired.ObservedAt, desired.LastSuccessAt, desired.StaleAt, desired.UnknownAt,
 			desired.UpdatedAt); err != nil {
 			return nil, fmt.Errorf("update due freshness row: %w", err)
 		}
 		if err := worker.options.Signals.Append(ctx, tx, signals.Input{
-			SourceKey: signals.FreshnessSourceKey(desired.ResourceID, desired.State, desired.UpdatedAt),
+			SourceKey: signals.FreshnessSourceKey(desired.ResourceID, desired.CheckType, desired.State, desired.UpdatedAt),
 			Kind:      signals.KindFreshness, IntegrationID: row.integrationID,
 			ResourceID: desired.ResourceID, ObservationID: row.observation.ID,
 			CheckType: row.observation.CheckType, State: desired.State,

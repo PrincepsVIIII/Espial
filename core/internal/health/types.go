@@ -45,6 +45,7 @@ type Observation struct {
 
 type Current struct {
 	ResourceID    string
+	CheckType     string
 	State         State
 	Reason        string
 	ObservationID *string

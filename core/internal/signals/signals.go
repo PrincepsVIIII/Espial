@@ -81,8 +81,8 @@ func ObservationSourceKey(observationID string) string {
 	return "observation:" + observationID
 }
 
-func FreshnessSourceKey(resourceID string, state health.State, occurredAt time.Time) string {
-	return fmt.Sprintf("freshness:%s:%s:%d", resourceID, state, occurredAt.UTC().UnixMicro())
+func FreshnessSourceKey(resourceID, checkType string, state health.State, occurredAt time.Time) string {
+	return fmt.Sprintf("freshness:%s:%s:%s:%d", resourceID, checkType, state, occurredAt.UTC().UnixMicro())
 }
 
 type Store struct{ pool *pgxpool.Pool }

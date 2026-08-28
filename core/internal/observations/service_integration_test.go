@@ -114,13 +114,7 @@ func TestResourceUpsertPreservesFirstSeenAndNewestFields(t *testing.T) {
 		!firstSeen.Equal(base.Add(-10*time.Minute)) || !lastSeen.Equal(base.Add(10*time.Minute)) {
 		t.Fatalf("resource = %q %q first=%s last=%s", displayName, version, firstSeen, lastSeen)
 	}
-	var state string
-	if err := pool.QueryRow(context.Background(), "SELECT state FROM current_health").Scan(&state); err != nil {
-		t.Fatal(err)
-	}
-	if state != "unknown" {
-		t.Fatalf("resource without observation state = %q", state)
-	}
+	requireTableCount(t, pool, "current_health", 0)
 }
 
 func TestInvalidBatchAndConflictRollbackEverything(t *testing.T) {
@@ -274,6 +268,68 @@ func TestLateObservationDoesNotReplaceNewerCurrent(t *testing.T) {
 		t.Fatalf("current = %s %q", state, summary)
 	}
 	requireTableCount(t, pool, "observations", 3)
+}
+
+func TestDifferentCheckDoesNotReplaceCurrentCapacity(t *testing.T) {
+	pool := observationTestPool(t)
+	createIntegration(t, pool, integrationA)
+	base := time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC)
+	service := NewService(pool, Options{Clock: health.FixedClock{Time: base.Add(time.Minute)}})
+	batch := Batch{
+		Resources: []ResourceInput{{
+			ExternalID: "storage-01", Kind: "storage", DisplayName: "Storage 01",
+			ObservedAt: base, Attributes: map[string]any{},
+		}},
+		Observations: []ObservationInput{
+			{
+				ExternalResourceID: "storage-01", CheckType: "proxmox.storage.availability",
+				State: health.Healthy, Summary: "storage reachable", ObservedAt: base,
+				ExpectedRefreshSeconds: 300, Measurements: map[string]any{}, Metadata: map[string]any{},
+			},
+			{
+				ExternalResourceID: "storage-01", CheckType: "proxmox.storage.capacity",
+				State: health.Warning, Summary: "capacity elevated", ObservedAt: base,
+				ExpectedRefreshSeconds: 300,
+				Measurements:           map[string]any{"used_bytes": 1_500_000_000_000.0, "total_bytes": 9_400_000_000_000.0},
+				Metadata:               map[string]any{},
+			},
+		},
+	}
+	if result, err := service.Ingest(context.Background(), integrationA, batch); err != nil || len(result.Changes) != 2 {
+		t.Fatalf("initial ingest = %#v, %v", result, err)
+	}
+
+	newAvailability := batch.Observations[0]
+	newAvailability.ObservedAt = base.Add(time.Minute)
+	newAvailability.Summary = "storage reachable again"
+	if result, err := service.Ingest(context.Background(), integrationA, Batch{Observations: []ObservationInput{newAvailability}}); err != nil || len(result.Changes) != 0 {
+		t.Fatalf("availability update = %#v, %v", result, err)
+	}
+
+	rows, err := pool.Query(context.Background(), `
+		SELECT ch.check_type, ch.state, o.summary, COALESCE(o.measurements->>'used_bytes', '')
+		FROM current_health ch JOIN observations o ON o.id = ch.observation_id
+		ORDER BY ch.check_type
+	`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	got := map[string]struct{ state, summary, used string }{}
+	for rows.Next() {
+		var checkType, state, summary, used string
+		if err := rows.Scan(&checkType, &state, &summary, &used); err != nil {
+			t.Fatal(err)
+		}
+		got[checkType] = struct{ state, summary, used string }{state, summary, used}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if got["proxmox.storage.availability"].summary != "storage reachable again" ||
+		got["proxmox.storage.capacity"] != (struct{ state, summary, used string }{"warning", "capacity elevated", "1500000000000"}) {
+		t.Fatalf("per-check current state = %#v", got)
+	}
 }
 
 func TestNewObservationRecoversUnknownAndRetainsHistory(t *testing.T) {

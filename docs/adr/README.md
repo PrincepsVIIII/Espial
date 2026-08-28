@@ -16,3 +16,4 @@ history.
 | [0008](0008-durable-notification-outbox.md) | Durable notification outbox and in-process Mattermost driver | Accepted |
 | [0009](0009-website-monitor-integration-projection.md) | Website monitors are typed integration projections | Accepted |
 | [0010](0010-certificate-resource-projection.md) | Certificate health uses a distinct resource and bounded projection | Accepted |
+| [0011](0011-current-health-per-check.md) | Current health is scoped to a resource and check type | Accepted |

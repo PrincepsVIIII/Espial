@@ -190,11 +190,18 @@ func TestFreshnessBoundaryAndConcurrentClaimAreDeterministic(t *testing.T) {
 			ExternalID: "freshness-node", Kind: "host", DisplayName: "Freshness node",
 			ObservedAt: base, Attributes: map[string]any{},
 		}},
-		Observations: []observations.ObservationInput{{
-			ExternalResourceID: "freshness-node", CheckType: "availability", State: health.Healthy,
-			Summary: "healthy", ObservedAt: base, ExpectedRefreshSeconds: 60,
-			Measurements: map[string]any{}, Metadata: map[string]any{},
-		}},
+		Observations: []observations.ObservationInput{
+			{
+				ExternalResourceID: "freshness-node", CheckType: "availability", State: health.Healthy,
+				Summary: "healthy", ObservedAt: base, ExpectedRefreshSeconds: 60,
+				Measurements: map[string]any{}, Metadata: map[string]any{},
+			},
+			{
+				ExternalResourceID: "freshness-node", CheckType: "capacity", State: health.Healthy,
+				Summary: "capacity healthy", ObservedAt: base, ExpectedRefreshSeconds: 600,
+				Measurements: map[string]any{"used_bytes": 10.0}, Metadata: map[string]any{},
+			},
+		},
 	}
 	if _, err := service.Ingest(context.Background(), pipelineIntegrationID, batch); err != nil {
 		t.Fatal(err)
@@ -223,14 +230,16 @@ func TestFreshnessBoundaryAndConcurrentClaimAreDeterministic(t *testing.T) {
 	if total != 1 {
 		t.Fatalf("concurrent transition count = %d, want 1", total)
 	}
-	requireHealthState(t, pool, "stale")
+	requireCheckHealthState(t, pool, "availability", "stale")
+	requireCheckHealthState(t, pool, "capacity", "healthy")
 
 	clock.set(base.Add(3 * time.Minute))
 	changes, err := workers[0].RefreshDue(context.Background())
 	if err != nil || len(changes) != 1 || changes[0].After.State != health.Unknown {
 		t.Fatalf("unknown transition = %#v, %v", changes, err)
 	}
-	requireHealthState(t, pool, "unknown")
+	requireCheckHealthState(t, pool, "availability", "unknown")
+	requireCheckHealthState(t, pool, "capacity", "healthy")
 }
 
 func TestFreshnessWorkerRejectsMultipleOwners(t *testing.T) {
@@ -404,6 +413,17 @@ func requireHealthState(t *testing.T, pool *pgxpool.Pool, want string) {
 	}
 	if state != want {
 		t.Fatalf("state = %q, want %q", state, want)
+	}
+}
+
+func requireCheckHealthState(t *testing.T, pool *pgxpool.Pool, checkType, want string) {
+	t.Helper()
+	var state string
+	if err := pool.QueryRow(context.Background(), "SELECT state FROM current_health WHERE check_type=$1", checkType).Scan(&state); err != nil {
+		t.Fatal(err)
+	}
+	if state != want {
+		t.Fatalf("state for %s = %q, want %q", checkType, state, want)
 	}
 }
 

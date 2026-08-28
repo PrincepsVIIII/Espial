@@ -96,7 +96,7 @@ func (collector *Collector) Snapshot(ctx context.Context) (Snapshot, error) {
 		return Snapshot{}, fmt.Errorf("read suppression metrics: %w", err)
 	}
 	if err := scanCounts(ctx, collector.pool, `SELECT health.state,count(*) FROM resources resource
-		JOIN current_health health ON health.resource_id=resource.id WHERE resource.kind='webpage' GROUP BY health.state`, result.WebpagesByState); err != nil {
+		JOIN current_resource_health health ON health.resource_id=resource.id WHERE resource.kind='webpage' GROUP BY health.state`, result.WebpagesByState); err != nil {
 		return Snapshot{}, fmt.Errorf("read webpage metrics: %w", err)
 	}
 	if err := scanCounts(ctx, collector.pool, `WITH latest AS (
