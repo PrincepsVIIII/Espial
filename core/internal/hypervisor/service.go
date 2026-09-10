@@ -552,9 +552,9 @@ func (service *Service) ProxmoxClusters(ctx context.Context) (ClusterList, error
 			cluster.ID = valueString(resourceID, integrationID)
 			cluster.State = resourceState
 			cluster.Freshness = freshness(resourceState)
-			cluster.LoadNodes = loadNodes(meta["idle_vms_by_node"], meta["active_vms_by_node"])
-			cluster.ConsoleActivityAvailable = boolValue(meta["console_activity_available"])
-			cluster.StorageLoadNodes = loadNodes(meta["idle_vms_by_storage"], meta["active_vms_by_storage"])
+			cluster.LoadNodes = loadNodes(meta["idle_vms_by_node"], meta["active_vms_by_node"], meta["console_connections_by_node"])
+			cluster.ConsoleActivityAvailable = consoleConnectionsAvailable(meta)
+			cluster.StorageLoadNodes = loadNodes(meta["idle_vms_by_storage"], meta["active_vms_by_storage"], meta["console_connections_by_storage"])
 			cluster.StorageAttributionAvailable = boolValue(meta["storage_attribution_available"])
 		case proxmox.NodeKind:
 			cluster.Hosts = append(cluster.Hosts, HostSummary{
@@ -666,6 +666,14 @@ func boolValue(value any) bool {
 	return result
 }
 
+func consoleConnectionsAvailable(metadata map[string]any) bool {
+	if !boolValue(metadata["console_activity_available"]) {
+		return false
+	}
+	_, present := metadata["console_connections_by_node"]
+	return present
+}
+
 func percent(used, total float64) float64 {
 	if total <= 0 {
 		return 0
@@ -682,9 +690,10 @@ func freshness(state string) string {
 	}
 }
 
-func loadNodes(idleValue, activeValue any) []LoadNodeSummary {
+func loadNodes(idleValue, activeValue, connectionValue any) []LoadNodeSummary {
 	idle, _ := idleValue.(map[string]any)
 	active, _ := activeValue.(map[string]any)
+	connections, _ := connectionValue.(map[string]any)
 	ids := map[string]struct{}{}
 	for id := range idle {
 		ids[id] = struct{}{}
@@ -692,9 +701,12 @@ func loadNodes(idleValue, activeValue any) []LoadNodeSummary {
 	for id := range active {
 		ids[id] = struct{}{}
 	}
+	for id := range connections {
+		ids[id] = struct{}{}
+	}
 	result := make([]LoadNodeSummary, 0, len(ids))
 	for id := range ids {
-		result = append(result, LoadNodeSummary{ID: id, IdleVMs: int(number(idle[id])), ActiveVMs: int(number(active[id]))})
+		result = append(result, LoadNodeSummary{ID: id, IdleVMs: int(number(idle[id])), ActiveVMs: int(number(active[id])), ConsoleConnections: int(number(connections[id]))})
 	}
 	return result
 }
@@ -710,6 +722,9 @@ func completeLoadNodes(hosts []HostSummary, loads []LoadNodeSummary) []LoadNodeS
 		}
 		if load.ActiveVMs < 0 {
 			load.ActiveVMs = 0
+		}
+		if load.ConsoleConnections < 0 {
+			load.ConsoleConnections = 0
 		}
 		counts[load.ID] = load
 	}
@@ -732,6 +747,9 @@ func completeStorageLoadNodes(storage []StorageSummary, loads []LoadNodeSummary)
 		}
 		if load.ActiveVMs < 0 {
 			load.ActiveVMs = 0
+		}
+		if load.ConsoleConnections < 0 {
+			load.ConsoleConnections = 0
 		}
 		counts[load.ID] = load
 	}

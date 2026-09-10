@@ -118,8 +118,8 @@ curl http://127.0.0.1:18080/api/v1/health/live
 curl http://127.0.0.1:18080/api/v1/health/ready
 ```
 
-Run `npm run down` to stop the local stack. The Makefile provides optional aliases
-for environments that already have `make`. See the
+Use `npm start`, `npm stop`, or `npm restart` for the local lifecycle. The Makefile
+provides matching `make start`, `make stop`, and `make restart` aliases. See the
 [local deployment guide](deployments/local/README.md) for configuration and data
 retention details.
 

@@ -31,11 +31,11 @@ func TestProxmoxCreateErrorCodePreservesActionableCategories(t *testing.T) {
 
 func TestCompleteLoadNodesIncludesZeroGuestHostsAndKeepsCounts(t *testing.T) {
 	hosts := []HostSummary{{ID: "pve-b"}, {ID: "pve-a"}}
-	loads := []LoadNodeSummary{{ID: "pve-a", ActiveVMs: 3}, {ID: "pve-c", ActiveVMs: -2}}
+	loads := []LoadNodeSummary{{ID: "pve-a", ActiveVMs: 3, ConsoleConnections: 5}, {ID: "pve-c", ActiveVMs: -2, ConsoleConnections: -2}}
 
 	got := completeLoadNodes(hosts, loads)
 	want := []LoadNodeSummary{
-		{ID: "pve-a", ActiveVMs: 3},
+		{ID: "pve-a", ActiveVMs: 3, ConsoleConnections: 5},
 		{ID: "pve-b", ActiveVMs: 0},
 		{ID: "pve-c", ActiveVMs: 0},
 	}
@@ -51,11 +51,11 @@ func TestCompleteLoadNodesIncludesZeroGuestHostsAndKeepsCounts(t *testing.T) {
 
 func TestCompleteStorageLoadNodesIncludesZeroGuestStorageAndKeepsCounts(t *testing.T) {
 	storage := []StorageSummary{{ID: "iscsi-main"}, {ID: "local-zfs"}}
-	loads := []LoadNodeSummary{{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1}, {ID: "missing-storage", ActiveVMs: -2}}
+	loads := []LoadNodeSummary{{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1, ConsoleConnections: 2}, {ID: "missing-storage", ActiveVMs: -2, ConsoleConnections: -2}}
 
 	got := completeStorageLoadNodes(storage, loads)
 	want := []LoadNodeSummary{
-		{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1},
+		{ID: "iscsi-main", IdleVMs: 4, ActiveVMs: 1, ConsoleConnections: 2},
 		{ID: "local-zfs"},
 		{ID: "missing-storage"},
 	}
@@ -66,5 +66,29 @@ func TestCompleteStorageLoadNodesIncludesZeroGuestStorageAndKeepsCounts(t *testi
 		if got[index] != want[index] {
 			t.Fatalf("completeStorageLoadNodes()[%d] = %#v, want %#v", index, got[index], want[index])
 		}
+	}
+}
+
+func TestLoadNodesIncludesConsoleConnections(t *testing.T) {
+	got := loadNodes(
+		map[string]any{"pve-a": 3},
+		map[string]any{"pve-a": 1},
+		map[string]any{"pve-a": 2},
+	)
+	want := []LoadNodeSummary{{ID: "pve-a", IdleVMs: 3, ActiveVMs: 1, ConsoleConnections: 2}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("loadNodes() = %#v, want %#v", got, want)
+	}
+}
+
+func TestConsoleConnectionsAvailableRequiresTheConnectionAggregate(t *testing.T) {
+	if consoleConnectionsAvailable(map[string]any{"console_activity_available": true}) {
+		t.Fatal("consoleConnectionsAvailable() accepted an observation without connection counts")
+	}
+	if !consoleConnectionsAvailable(map[string]any{
+		"console_activity_available":  true,
+		"console_connections_by_node": map[string]any{},
+	}) {
+		t.Fatal("consoleConnectionsAvailable() rejected an available empty connection aggregate")
 	}
 }

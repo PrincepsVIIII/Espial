@@ -1,0 +1,13 @@
+{
+  "name": "espial-design-preview",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "test": "node tests/browser.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

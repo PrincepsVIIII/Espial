@@ -105,8 +105,12 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 		}
 	}
 	activeByNode := map[string]int{}
+	consoleConnections := map[string]int{}
+	activeConnections := map[string]map[int]int{}
 	if consoleActivityAvailable {
-		activeByNode = activeConsoleVMs(activeTasks, runningGuests)
+		activeConnections = consoleConnectionsByGuest(activeTasks, runningGuestNodes(runningGuests))
+		activeByNode = activeConsoleVMs(activeConnections, runningGuests)
+		consoleConnections = consoleConnectionsByNode(activeConnections, runningGuests)
 	}
 	// Idle means a running guest without an open Proxmox console proxy. The
 	// running-guest inventory remains available even when the optional task read
@@ -121,9 +125,10 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 	}
 	storageIdleVMs := map[string]int{}
 	storageActiveVMs := map[string]int{}
+	storageConsoleConnections := map[string]int{}
 	if storageAttributionAvailable {
-		activeGuests := activeConsoleGuests(activeTasks, runningGuests)
-		storageIdleVMs, storageActiveVMs = storageVMCounts(guestConfigs, activeGuests)
+		activeGuests := activeConsoleGuests(activeConnections)
+		storageIdleVMs, storageActiveVMs, storageConsoleConnections = storageVMCounts(guestConfigs, activeGuests, activeConnections)
 	}
 	// /cluster/resources can report the same shared storage once per node. The
 	// shared scope deliberately gives those rows one Espial identity, so emit it
@@ -246,25 +251,31 @@ func mapPayload(config Config, version VersionResponse, status []ClusterStatusIt
 		}
 		payload.Observations[index].Metadata["idle_vms_by_node"] = idleByNode
 		payload.Observations[index].Metadata["active_vms_by_node"] = activeByNode
+		payload.Observations[index].Metadata["console_connections_by_node"] = consoleConnections
 		payload.Observations[index].Metadata["console_activity_available"] = consoleActivityAvailable
 		payload.Observations[index].Metadata["idle_vms_by_storage"] = storageIdleVMs
 		payload.Observations[index].Metadata["active_vms_by_storage"] = storageActiveVMs
+		payload.Observations[index].Metadata["console_connections_by_storage"] = storageConsoleConnections
 		payload.Observations[index].Metadata["storage_attribution_available"] = storageAttributionAvailable
 	}
 	return payload
 }
 
-func activeConsoleVMs(tasks []Task, runningGuests map[string]map[int]struct{}) map[string]int {
-	seen := activeConsoleGuests(tasks, runningGuests)
+func activeConsoleVMs(connections map[string]map[int]int, runningGuests map[string]map[int]struct{}) map[string]int {
 	result := make(map[string]int, len(runningGuests))
 	for node := range runningGuests {
-		result[node] = len(seen[node])
+		result[node] = len(connections[node])
 	}
 	return result
 }
 
-func activeConsoleGuests(tasks []Task, runningGuests map[string]map[int]struct{}) map[string]map[int]struct{} {
-	seen := map[string]map[int]struct{}{}
+// consoleConnectionsByGuest accepts an active vncproxy task when its VMID belongs
+// to any currently running guest. Proxmox keeps a console task on the node where
+// it was opened while a guest can migrate, so task.Node is not a reliable current
+// guest-location filter. Aggregate to the current guest node instead, keeping the
+// compute and storage comparisons aligned with the resource inventory.
+func consoleConnectionsByGuest(tasks []Task, runningNodes map[int]string) map[string]map[int]int {
+	connections := map[string]map[int]int{}
 	for _, task := range tasks {
 		if task.Type != "vncproxy" || task.EndTime != nil {
 			continue
@@ -273,15 +284,47 @@ func activeConsoleGuests(tasks []Task, runningGuests map[string]map[int]struct{}
 		if err != nil || vmid <= 0 {
 			continue
 		}
-		if _, running := runningGuests[task.Node][vmid]; !running {
+		node, running := runningNodes[vmid]
+		if !running {
 			continue
 		}
-		if _, exists := seen[task.Node]; !exists {
-			seen[task.Node] = map[int]struct{}{}
+		if _, exists := connections[node]; !exists {
+			connections[node] = map[int]int{}
 		}
-		seen[task.Node][vmid] = struct{}{}
+		connections[node][vmid]++
 	}
-	return seen
+	return connections
+}
+
+func runningGuestNodes(guests map[string]map[int]struct{}) map[int]string {
+	nodes := map[int]string{}
+	for node, vmids := range guests {
+		for vmid := range vmids {
+			nodes[vmid] = node
+		}
+	}
+	return nodes
+}
+
+func activeConsoleGuests(connections map[string]map[int]int) map[string]map[int]struct{} {
+	guests := make(map[string]map[int]struct{}, len(connections))
+	for node, byGuest := range connections {
+		guests[node] = make(map[int]struct{}, len(byGuest))
+		for vmid := range byGuest {
+			guests[node][vmid] = struct{}{}
+		}
+	}
+	return guests
+}
+
+func consoleConnectionsByNode(connections map[string]map[int]int, runningGuests map[string]map[int]struct{}) map[string]int {
+	result := make(map[string]int, len(runningGuests))
+	for node := range runningGuests {
+		for _, count := range connections[node] {
+			result[node] += count
+		}
+	}
+	return result
 }
 
 type guestReference struct {
@@ -324,9 +367,10 @@ func runningGuestConfigs(ctx context.Context, api API, source []ClusterResource)
 	return configs, true
 }
 
-func storageVMCounts(configs map[guestReference]GuestConfig, activeGuests map[string]map[int]struct{}) (map[string]int, map[string]int) {
+func storageVMCounts(configs map[guestReference]GuestConfig, activeGuests map[string]map[int]struct{}, connections map[string]map[int]int) (map[string]int, map[string]int, map[string]int) {
 	idle := map[string]int{}
 	active := map[string]int{}
+	consoleConnections := map[string]int{}
 	for ref, config := range configs {
 		storage, ok := mainDiskStorage(config)
 		if !ok {
@@ -334,11 +378,12 @@ func storageVMCounts(configs map[guestReference]GuestConfig, activeGuests map[st
 		}
 		if _, open := activeGuests[ref.Node][ref.VMID]; open {
 			active[storage]++
-			continue
+			consoleConnections[storage] += connections[ref.Node][ref.VMID]
+		} else {
+			idle[storage]++
 		}
-		idle[storage]++
 	}
-	return idle, active
+	return idle, active, consoleConnections
 }
 
 func mainDiskStorage(config GuestConfig) (string, bool) {

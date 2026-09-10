@@ -105,12 +105,17 @@ const exampleClusters: ProxmoxClusterList = {
       },
       console_activity_available: true,
       load_nodes: [
-        { id: 'pve-a', idle_vms: 3, active_vms: 1 },
-        { id: 'pve-b', idle_vms: 7, active_vms: 2 },
+        { id: 'pve-a', idle_vms: 3, active_vms: 1, console_connections: 1 },
+        { id: 'pve-b', idle_vms: 7, active_vms: 2, console_connections: 2 },
       ],
       storage_load_nodes: [
-        { id: 'local-zfs', idle_vms: 3, active_vms: 1 },
-        { id: 'shared-vmstore', idle_vms: 7, active_vms: 2 },
+        { id: 'local-zfs', idle_vms: 3, active_vms: 1, console_connections: 1 },
+        {
+          id: 'shared-vmstore',
+          idle_vms: 7,
+          active_vms: 2,
+          console_connections: 2,
+        },
       ],
       storage_attribution_available: true,
     },

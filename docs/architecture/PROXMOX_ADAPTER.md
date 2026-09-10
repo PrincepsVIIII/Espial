@@ -167,14 +167,14 @@ privilege is accepted.
 
 Start with the smallest source surface that can provide useful health:
 
-| Endpoint                                               | Initial use                                                                         |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------- |
-| `GET /api2/json/version`                               | Version and compatibility evidence                                                  |
-| `GET /api2/json/cluster/status`                        | Cluster membership and quorum evidence                                              |
-| `GET /api2/json/cluster/resources`                     | Cluster-wide node, QEMU, LXC, storage, and current status evidence                  |
-| `GET /api2/json/nodes/{node}/status`                   | Additional bounded node evidence when the cluster resource response is insufficient |
-| `GET /api2/json/nodes/{node}/tasks?source=active&typefilter=vncproxy&limit=512` | Per-node bounded currently-open task evidence for aggregate guest-console activity |
-| `GET /api2/json/nodes/{node}/{qemu\|lxc}/{vmid}/config` | In-memory main-disk storage attribution for each running guest                         |
+| Endpoint                                                                        | Initial use                                                                         |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `GET /api2/json/version`                                                        | Version and compatibility evidence                                                  |
+| `GET /api2/json/cluster/status`                                                 | Cluster membership and quorum evidence                                              |
+| `GET /api2/json/cluster/resources`                                              | Cluster-wide node, QEMU, LXC, storage, and current status evidence                  |
+| `GET /api2/json/nodes/{node}/status`                                            | Additional bounded node evidence when the cluster resource response is insufficient |
+| `GET /api2/json/nodes/{node}/tasks?source=active&typefilter=vncproxy&limit=512` | Per-node bounded currently-open task evidence for aggregate guest-console activity  |
+| `GET /api2/json/nodes/{node}/{qemu\|lxc}/{vmid}/config`                         | In-memory main-disk storage attribution for each running guest                      |
 
 Do not add task logs, RRD history, replication history, or event polling merely
 because the API exposes them. The bounded per-node active-task read is an explicit
@@ -233,20 +233,29 @@ but that is not a Phase 4 dependency relationship. Resource `source_url` values
 must be assembled only from the approved UI base and known version-checked path
 forms. Never copy an arbitrary response URL into `source_url`.
 
-The cluster observation's `idle_vms_by_node` and `active_vms_by_node` metadata are
-aggregate comparisons, not a relationship graph. Collection initializes every
-discovered node to zero, counts running QEMU and LXC guests as idle VMs, then counts
-distinct currently open `vncproxy` tasks from each node's task endpoint for those
-running guests as console-active VMs. A completed task, a task without a numeric
-VMID, or a task for a guest no longer reported as running does not contribute. This
+The cluster observation's `idle_vms_by_node`, `active_vms_by_node`, and
+`console_connections_by_node` metadata are aggregate comparisons, not a relationship
+graph. Collection initializes every discovered node to zero, counts running QEMU and
+LXC guests without an open console as idle VMs, counts distinct currently open
+`vncproxy` tasks for running guests as console-active VMs, and counts every such
+task as one console connection. Multiple open tasks for the same guest therefore
+contribute one active VM and multiple console connections. A completed task, a task
+without a numeric VMID, or a task for a guest no longer reported as running does not
+contribute. Proxmox can retain an open console task on the node where it was opened
+after the guest migrates. The VMID is cluster-wide, so collection accepts a task for
+any currently running guest with that VMID and attributes it to the guest's current
+resource node; it does not discard it because the historical task node differs. This
 records active Proxmox console use, not a general in-guest login or CPU-activity
-claim. The Hypervisor read model
-completes missing observations from the authoritative host list before returning
-stable ID-sorted host/count pairs. The UI must not infer guest placement edges,
-migration paths, or topology from these counts.
+claim. The Hypervisor read model completes missing observations from the
+authoritative host list before returning stable ID-sorted host/count pairs. The UI
+must not infer guest placement edges, migration paths, or topology from these
+counts. A pre-connection-count observation is presented as console activity
+unavailable until the next complete collection rather than treating its missing
+connection aggregate as zero.
 
-The additive `idle_vms_by_storage` and `active_vms_by_storage` metadata applies the
-same running/console-active classification to the storage named by each running
+The additive `idle_vms_by_storage`, `active_vms_by_storage`, and
+`console_connections_by_storage` metadata applies the same idle-VM, distinct-active
+VM, and per-task-connection classifications to the storage named by each running
 guest's bootable main disk. The adapter follows Proxmox `boot` order when present,
 then falls back deterministically across normal `scsi`, `virtio`, `sata`, `ide`,
 `nvme`, or LXC `rootfs` devices. It excludes EFI disks, TPM state, unused devices,

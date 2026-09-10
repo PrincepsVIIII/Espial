@@ -732,14 +732,13 @@ function hypervisorClusters(mode, revision) {
       health_state: healthState,
     };
   });
-  const loadNodes = hosts.map((host, index) => ({
-    id: host.id,
-    idle_vms: zero
+  const loadNodes = hosts.map((host, index) => {
+    const idleVMs = zero
       ? 0
       : mode === 'several' && index === 2
         ? 40 + revision
-        : (index * 3 + 1 + revision) % 19,
-    active_vms: zero
+        : (index * 3 + 1 + revision) % 19;
+    const consoleActiveVMs = zero
       ? 0
       : mode === 'console-one'
         ? index === 0
@@ -749,8 +748,15 @@ function hypervisorClusters(mode, revision) {
           ? 1
           : index % 3 === 1
             ? 2
-            : 6,
-  }));
+            : 6;
+    return {
+      id: host.id,
+      idle_vms: idleVMs,
+      active_vms: consoleActiveVMs,
+      console_connections:
+        mode === 'console-two' ? (index === 0 ? 2 : 0) : consoleActiveVMs,
+    };
+  });
   return {
     items: [
       {
@@ -793,7 +799,7 @@ function hypervisorClusters(mode, revision) {
             io_wait_indicator: 'healthy',
             health_state: 'healthy',
           },
-        ],
+        ].slice(0, mode === 'storage-one' ? 1 : undefined),
         totals: {
           cpu_percent: 57.6 + revision,
           ram_percent: 68.7,
@@ -806,18 +812,21 @@ function hypervisorClusters(mode, revision) {
             id: 'shared-vmstore',
             idle_vms: zero ? 0 : 8 + revision,
             active_vms: zero ? 0 : mode === 'console-one' ? 1 : 2,
+            console_connections: zero ? 0 : mode === 'console-one' ? 1 : 2,
           },
           {
             id: 'iscsi-main',
             idle_vms: zero ? 0 : 4,
             active_vms: zero ? 0 : mode === 'console-one' ? 0 : 1,
+            console_connections: zero ? 0 : mode === 'console-one' ? 0 : 1,
           },
           {
             id: 'iscsi-archive',
             idle_vms: zero ? 0 : 2,
             active_vms: 0,
+            console_connections: 0,
           },
-        ],
+        ].slice(0, mode === 'storage-one' ? 1 : undefined),
         storage_attribution_available: mode !== 'storage-unavailable',
       },
     ],

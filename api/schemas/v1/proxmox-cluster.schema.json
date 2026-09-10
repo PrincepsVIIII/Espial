@@ -95,11 +95,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "idle_vms", "active_vms"],
+        "required": ["id", "idle_vms", "active_vms", "console_connections"],
         "properties": {
           "id": { "type": "string" },
           "idle_vms": { "type": "integer", "minimum": 0 },
-          "active_vms": { "type": "integer", "minimum": 0 }
+          "active_vms": { "type": "integer", "minimum": 0 },
+          "console_connections": { "type": "integer", "minimum": 0 }
         }
       }
     },
@@ -109,11 +110,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "idle_vms", "active_vms"],
+        "required": ["id", "idle_vms", "active_vms", "console_connections"],
         "properties": {
           "id": { "type": "string" },
           "idle_vms": { "type": "integer", "minimum": 0 },
-          "active_vms": { "type": "integer", "minimum": 0 }
+          "active_vms": { "type": "integer", "minimum": 0 },
+          "console_connections": { "type": "integer", "minimum": 0 }
         }
       }
     },

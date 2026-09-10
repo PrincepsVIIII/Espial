@@ -1,4 +1,4 @@
-.PHONY: check contracts dev down format generate lint test
+.PHONY: check contracts dev down start stop restart format generate lint test
 
 check:
 	npm run check
@@ -11,6 +11,15 @@ dev:
 
 down:
 	npm run down
+
+start:
+	npm run start
+
+stop:
+	npm run stop
+
+restart:
+	npm run restart
 
 format:
 	npm run format

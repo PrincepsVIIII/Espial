@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080c10" />
+    <meta
+      name="description"
+      content="An interactive, front-end-only design preview for Espial infrastructure monitoring. All data is fictional."
+    />
+    <title>Dashboard · Espial design preview</title>
+    <link rel="icon" type="image/png" href="./assets/ubnetdef.png" />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./datacenter.css" />
+    <script type="module" src="./app.js"></script>
+  </head>
+  <body>
+    <a href="#main" class="skip-link">Skip to content</a>
+    <div id="app"></div>
+    <dialog id="detail" aria-labelledby="detail-title"></dialog>
+    <div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
+    <noscript
+      >This interactive design preview needs JavaScript. All data is local
+      sample data.</noscript
+    >
+  </body>
+</html>

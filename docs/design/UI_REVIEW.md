@@ -3,6 +3,49 @@
 This log records material visual-direction reviews so UI quality remains a delivery
 constraint instead of end-of-phase polish.
 
+## 2026-09-10 — Unified console-connection distribution
+
+Compute now uses the same restrained-lavender filled console-connection polygon as
+Storage for three through 12 targets. One- and two-target Compute views likewise
+use the same proportional lavender ring. The purple series remains a categorical
+comparison rather than health status: accessible controls, tooltips, selected
+detail, and the visible footer retain the exact console-connection counts. The idle
+polygon and node-disc sizes continue to encode idle VMs only.
+
+## 2026-09-03 — Console-connection count and scale
+
+Load distribution now treats every open Proxmox `vncproxy` task as one console
+connection, even when several tasks belong to the same running VM/CT. The UI labels
+those values as Proxmox console connections rather than console-active VMs; idle VM
+counts remain a distinct measure of running guests without an open console.
+
+An open task can retain its original Proxmox node after the guest migrates. The
+aggregate therefore matches each task against the cluster-wide running VMID inventory
+and places the connection on the guest's current compute host, rather than dropping
+it for a task-node mismatch. This preserves a complete connection total while
+keeping the graphic's idle-VM and storage data aligned to current inventory.
+
+The lavender console-connection polygon/ring uses the total console connections in
+the displayed view as its zero-based domain. Idle-VM node discs and polygon retain
+their own idle-VM domain, so a large idle inventory can no longer visually shrink a
+target's share of active console connections. The visible summary, accessible
+labels, tooltips, and selected detail disclose the exact connection counts. Browser
+coverage verifies multiple connections to one VM and the total-based connection
+scale.
+
+## 2026-08-28 — Storage active-console distribution
+
+The Storage side of Load distribution renders Proxmox console connections as a
+lavender polygon, making their distribution across NAS targets part of the graph
+geometry instead of merely a caption or per-target label. The later 2026-09-03
+review changes the lavender series domain from idle VMs to total console
+connections. The existing console total, accessible controls, hover disclosure, and
+selected detail retain the exact count and prevent the lavender comparison encoding
+from depending on color alone. One- and two-target Storage views use a concentric
+lavender ring, so direct proportional controls preserve the connection-load
+encoding.
+Browser coverage verifies the shared active-distribution treatment in both views.
+
 ## 2026-08-28 — Load-distribution label floor
 
 Load-distribution node diameter continues to encode idle-VM load from a shared,
@@ -680,9 +723,9 @@ and what is that host's current compute health?”
   glows, or continuous animation. Unknown/non-finite values have explicit text and
   do not render as zero.
 - Replaced the radial spokes and interim row plot with a deterministic compute-node
-field titled “Load distribution.” Node size encodes idle VM count, each circle
-shows its host name by default, and hover/focus switches that name to the idle and
-console-active VM counts while exposing CPU, RAM, and swap context. The read model contains
+  field titled “Load distribution.” Node size encodes idle VM count, each circle
+  shows its host name by default, and hover/focus switches that name to the idle and
+  console-active VM counts while exposing CPU, RAM, and swap context. The read model contains
   aggregate host/count pairs, so the graphic draws no invented relationship edges.
 - At wide and laptop widths the compact resource columns, vertically stacked
   semicircle gauges, and load distribution share one row. Constrained panels use a
@@ -833,3 +876,17 @@ passed. Browser coverage exercises the switch by keyboard, storage selection,
 unavailable attribution, a single active spoke, touch selection, reduced motion,
 large/laptop/narrow/zoom-equivalent layouts, and serious/critical accessibility
 findings.
+
+## 2026-09-10 — Isolated front-end design preview
+
+The user requested a separate runnable visual mockup with hardcoded data while
+preserving the existing UI and logo. The [mockup review](../../mockup/UI_REVIEW.md)
+records the design decisions, explicit sample-data exception, interactions, and
+verification. The prototype lives in `mockup/`; it does not change production
+routes, behavior, dependencies, or Phase 2 implementation status. Existing review
+records and in-progress implementation work remain intact.
+
+The prototype's 20 Chromium browser checks passed, with zero axe violations in
+the tested routes, dialogs, and states. Visual review covers 1440px, 1280px, and
+390px layouts, plus keyboard/touch physical drill-down. No production verification
+or backend capability is implied by this mockup acceptance.

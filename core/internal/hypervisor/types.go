@@ -125,7 +125,8 @@ type UtilizationTotals struct {
 }
 
 type LoadNodeSummary struct {
-	ID        string `json:"id"`
-	IdleVMs   int    `json:"idle_vms"`
-	ActiveVMs int    `json:"active_vms"`
+	ID                 string `json:"id"`
+	IdleVMs            int    `json:"idle_vms"`
+	ActiveVMs          int    `json:"active_vms"`
+	ConsoleConnections int    `json:"console_connections"`
 }

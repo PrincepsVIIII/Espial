@@ -38,7 +38,7 @@ func (fixtureAPI) GetActiveTasks(_ context.Context, node string) ([]Task, error)
 	endedAt := int64(101)
 	return []Task{
 		{ID: "100", Node: "pve-a", Type: "vncproxy"},
-		{ID: "100", Node: "pve-a", Type: "vncproxy"},
+		{ID: "100", Node: "pve-b", Type: "vncproxy"},
 		{ID: "200", Node: "pve-a", Type: "vncproxy", EndTime: &endedAt},
 		{ID: "not-a-vmid", Node: "pve-a", Type: "vncproxy"},
 	}, nil
@@ -99,6 +99,10 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	if !ok || activeByNode["pve-a"] != 1 {
 		t.Fatalf("active_vms_by_node = %#v", payload.Observations[0].Metadata["active_vms_by_node"])
 	}
+	connectionsByNode, ok := payload.Observations[0].Metadata["console_connections_by_node"].(map[string]int)
+	if !ok || connectionsByNode["pve-a"] != 2 || connectionsByNode["pve-b"] != 0 {
+		t.Fatalf("console_connections_by_node = %#v", payload.Observations[0].Metadata["console_connections_by_node"])
+	}
 	if available, ok := payload.Observations[0].Metadata["console_activity_available"].(bool); !ok || !available {
 		t.Fatalf("console_activity_available = %#v", payload.Observations[0].Metadata["console_activity_available"])
 	}
@@ -110,6 +114,22 @@ func TestCollectMapsProxmoxResourcesAndIndicators(t *testing.T) {
 	}
 	if active := payload.Observations[0].Metadata["active_vms_by_storage"].(map[string]int); active["vmstore"] != 1 || len(active) != 1 {
 		t.Fatalf("active_vms_by_storage = %#v", active)
+	}
+	if connections := payload.Observations[0].Metadata["console_connections_by_storage"].(map[string]int); connections["vmstore"] != 2 || len(connections) != 1 {
+		t.Fatalf("console_connections_by_storage = %#v", connections)
+	}
+}
+
+func TestConsoleConnectionsFollowTheCurrentGuestNodeAfterMigration(t *testing.T) {
+	connections := consoleConnectionsByGuest(
+		[]Task{{ID: "100", Node: "pve-source", Type: "vncproxy"}},
+		map[int]string{100: "pve-destination"},
+	)
+	if got := connections["pve-destination"][100]; got != 1 {
+		t.Fatalf("connection count at current guest node = %d, want 1", got)
+	}
+	if _, found := connections["pve-source"]; found {
+		t.Fatalf("connection was attributed to the prior task node: %#v", connections)
 	}
 }
 
@@ -175,6 +195,9 @@ func TestCollectPreservesCoreMetricsWhenConsoleActivityIsUnavailable(t *testing.
 	if active := payload.Observations[0].Metadata["active_vms_by_node"].(map[string]int); len(active) != 0 {
 		t.Fatalf("active_vms_by_node = %#v", active)
 	}
+	if connections := payload.Observations[0].Metadata["console_connections_by_node"].(map[string]int); len(connections) != 0 {
+		t.Fatalf("console_connections_by_node = %#v", connections)
+	}
 	if idle := payload.Observations[0].Metadata["idle_vms_by_node"].(map[string]int); idle["pve-a"] != 1 {
 		t.Fatalf("idle_vms_by_node = %#v", idle)
 	}
@@ -205,6 +228,9 @@ func TestCollectWithholdsPartialStorageAttribution(t *testing.T) {
 	}
 	if active := payload.Observations[0].Metadata["active_vms_by_storage"].(map[string]int); len(active) != 0 {
 		t.Fatalf("active_vms_by_storage = %#v", active)
+	}
+	if connections := payload.Observations[0].Metadata["console_connections_by_storage"].(map[string]int); len(connections) != 0 {
+		t.Fatalf("console_connections_by_storage = %#v", connections)
 	}
 }
 

@@ -45,11 +45,11 @@
   let nodeBaseSize = $derived(
     Math.max(3.75, ...rows.map((row) => minimumNodeSizeForName(row.id))),
   );
-  let highestSeriesValue = $derived(
-    Math.max(1, ...rows.flatMap((row) => [row.idle_vms, row.active_vms])),
-  );
-  let totalActiveVMs = $derived(
-    rows.reduce((total, row) => total + Math.max(0, row.active_vms), 0),
+  let totalConsoleConnections = $derived(
+    rows.reduce(
+      (total, row) => total + Math.max(0, row.console_connections),
+      0,
+    ),
   );
   let activeRow = $derived(rows.find((row) => row.id === selectedID) ?? null);
 
@@ -78,12 +78,16 @@
       .split(/[\s_-]+/)
       .reduce((longest, part) => Math.max(longest, part.length), 0);
     // The floor is shared by every target so idle-VM count remains the only
-    // relative size encoding. The cap preserves the bounded radar field.
+    // node-disc size encoding. The cap preserves the bounded radar field.
     return Math.min(5.75, 1.25 + longestLabelPart * 0.45);
   }
 
   function nodeSize(row: LoadGraphicRow): string {
     return `${nodeBaseSize + (Math.max(0, row.idle_vms) / highestIdleLoad) * 1.35}rem`;
+  }
+
+  function consoleConnectionNodeSize(row: LoadGraphicRow): string {
+    return `${nodeBaseSize + (Math.max(0, row.console_connections) / Math.max(1, totalConsoleConnections)) * 1.35}rem`;
   }
 
   function commit(event: MouseEvent, rowID: string) {
@@ -140,15 +144,15 @@
   }
 
   function accessibleRowLabel(row: LoadGraphicRow): string {
-    return `${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? activeVMLabel(row.active_vms) : 'console activity unavailable'}, health ${statusLabel(row.health_state)}`;
+    return `${row.id}, ${idleVMLabel(row.idle_vms)}, ${consoleActivityAvailable ? consoleConnectionLabel(row.console_connections) : 'console connection count unavailable'}, health ${statusLabel(row.health_state)}`;
   }
 
   function idleVMLabel(count: number): string {
     return `${count} idle ${count === 1 ? 'VM' : 'VMs'}`;
   }
 
-  function activeVMLabel(count: number): string {
-    return `${count} console-active ${count === 1 ? 'VM' : 'VMs'}`;
+  function consoleConnectionLabel(count: number): string {
+    return `${count} Proxmox console ${count === 1 ? 'connection' : 'connections'}`;
   }
 
   function radarPoint(index: number, ratio: number): string {
@@ -166,9 +170,13 @@
     return rows.map((_, index) => radarPoint(index, ratio)).join(' ');
   }
 
-  function radarSeries(metric: 'idle_vms'): string {
+  function radarSeries(metric: 'idle_vms' | 'console_connections'): string {
+    const denominator =
+      metric === 'idle_vms'
+        ? highestIdleLoad
+        : Math.max(1, totalConsoleConnections);
     return rows
-      .map((row, index) => radarPoint(index, row[metric] / highestSeriesValue))
+      .map((row, index) => radarPoint(index, row[metric] / denominator))
       .join(' ');
   }
 </script>
@@ -215,7 +223,7 @@
   {:else if rows.length > 2 && rows.length <= 12}
     <div
       class="radar-comparison"
-      aria-label={`Idle and console-active VM comparison by ${view}`}
+      aria-label={`Idle-VM and console-connection comparison by ${view}`}
     >
       <div class="radar-stage">
         <svg class="load-radar" viewBox="0 0 100 100" aria-hidden="true">
@@ -231,24 +239,15 @@
               x2={radarPoint(index, 1).split(',')[0]}
               y2={radarPoint(index, 1).split(',')[1]}
             />
-            {#if consoleActivityAvailable && row.active_vms > 0}
-              <line
-                class="radar-active"
-                x1="50"
-                y1="50"
-                x2={radarPoint(
-                  index,
-                  row.active_vms / highestSeriesValue,
-                ).split(',')[0]}
-                y2={radarPoint(
-                  index,
-                  row.active_vms / highestSeriesValue,
-                ).split(',')[1]}
-              />
-            {/if}
           {/each}
           {#if rows.length > 2}
             <polygon class="radar-idle" points={radarSeries('idle_vms')} />
+          {/if}
+          {#if consoleActivityAvailable && totalConsoleConnections > 0}
+            <polygon
+              class="radar-active-distribution"
+              points={radarSeries('console_connections')}
+            />
           {/if}
         </svg>
 
@@ -282,7 +281,7 @@
                     <strong>{row.idle_vms}</strong>
                     <small>Idle VMs</small>
                     {#if consoleActivityAvailable}
-                      <span>{row.active_vms} active</span>
+                      <span>{row.console_connections} connections</span>
                     {/if}
                   </span>
                 </span>
@@ -290,8 +289,8 @@
               <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
                 <strong
                   >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
-                    ? activeVMLabel(row.active_vms)
-                    : 'Console activity unavailable'}</strong
+                    ? consoleConnectionLabel(row.console_connections)
+                    : 'Console connection count unavailable'}</strong
                 >
                 <span>{rowContext(row)}</span>
               </span>
@@ -330,16 +329,23 @@
                 <strong>{row.idle_vms}</strong>
                 <small>Idle VMs</small>
                 {#if consoleActivityAvailable}
-                  <span>{row.active_vms} active</span>
+                  <span>{row.console_connections} connections</span>
                 {/if}
               </span>
             </span>
+            {#if consoleActivityAvailable && row.console_connections > 0}
+              <span
+                class="active-distribution-ring"
+                style={`--active-node-size: ${consoleConnectionNodeSize(row)}`}
+                aria-hidden="true"
+              ></span>
+            {/if}
           </button>
           <span class="node-tooltip" id={tooltipID(row.id)} role="tooltip">
             <strong
               >{idleVMLabel(row.idle_vms)} · {consoleActivityAvailable
-                ? activeVMLabel(row.active_vms)
-                : 'Console activity unavailable'}</strong
+                ? consoleConnectionLabel(row.console_connections)
+                : 'Console connection count unavailable'}</strong
             >
             <span>{rowContext(row)}</span>
           </span>
@@ -375,9 +381,9 @@
   {#if rows.length > 0 && !(view === 'storage' && !storageAttributionAvailable)}
     <p class="console-summary">
       {#if consoleActivityAvailable}
-        {activeVMLabel(totalActiveVMs)}
+        {consoleConnectionLabel(totalConsoleConnections)}
       {:else}
-        Console activity unavailable
+        Console connection count unavailable
       {/if}
     </p>
   {/if}
@@ -388,8 +394,8 @@
         <h4 id={`${id}-${view}-detail-title`}>{activeRow.id}</h4>
         <p>
           {idleVMLabel(activeRow.idle_vms)} · {consoleActivityAvailable
-            ? activeVMLabel(activeRow.active_vms)
-            : 'Console activity unavailable'}
+            ? consoleConnectionLabel(activeRow.console_connections)
+            : 'Console connection count unavailable'}
         </p>
       </div>
       <dl>
@@ -434,9 +440,11 @@
           </div>
         {/if}
         <div>
-          <dt>Console-active</dt>
+          <dt>Console connections</dt>
           <dd>
-            {consoleActivityAvailable ? activeRow.active_vms : 'Unavailable'}
+            {consoleActivityAvailable
+              ? activeRow.console_connections
+              : 'Unavailable'}
           </dd>
         </div>
       </dl>
@@ -552,7 +560,7 @@
   }
 
   .radar-idle,
-  .radar-active {
+  .radar-active-distribution {
     stroke-width: 1.4;
   }
 
@@ -562,11 +570,10 @@
     fill-opacity: 0.32;
   }
 
-  .load-radar line.radar-active {
-    fill: none;
+  .radar-active-distribution {
+    fill: var(--graphic-console);
+    fill-opacity: 0.2;
     stroke: var(--graphic-console);
-    stroke-linecap: round;
-    stroke-width: 1.8;
   }
 
   .console-summary {
@@ -594,6 +601,7 @@
   }
 
   .node-button {
+    position: relative;
     display: grid;
     justify-items: center;
     gap: 0.3rem;
@@ -633,6 +641,20 @@
 
   .node-button.selected .node-disc {
     transform: scale(1.18);
+  }
+
+  .active-distribution-ring {
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    box-sizing: border-box;
+    width: var(--active-node-size);
+    height: var(--active-node-size);
+    border: 2px solid var(--graphic-console);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
   }
 
   .node-button.selected:hover .node-disc,

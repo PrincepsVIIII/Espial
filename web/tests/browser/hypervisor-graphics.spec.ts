@@ -25,14 +25,16 @@ for (const viewport of [
     ).toBeVisible();
     await expect(page.locator('.load-radar')).toHaveCount(1);
     await expect(page.locator('.load-radar .radar-grid')).toHaveCount(5);
-    await expect(page.locator('.load-radar .radar-active')).toHaveCount(3);
-    await expect(page.locator('.radar-active').first()).toHaveCSS(
-      'stroke',
+    await expect(
+      page.locator('.load-radar .radar-active-distribution'),
+    ).toHaveCount(1);
+    await expect(page.locator('.radar-active-distribution')).toHaveCSS(
+      'fill',
       'rgb(212, 164, 231)',
     );
     await expect(page.locator('.node-count')).toHaveCount(0);
     await expect(page.locator('.console-summary')).toHaveText(
-      '9 console-active VMs',
+      '9 Proxmox console connections',
     );
     await expect(page.locator('.console-summary')).toHaveCSS(
       'text-align',
@@ -52,7 +54,7 @@ for (const viewport of [
     ).toHaveAttribute('aria-valuenow', '57.6');
     await expect(
       page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 Proxmox console connections, health Critical/,
       }),
     ).toBeVisible();
     await expect(page.getByText('Host metrics table')).toHaveCount(0);
@@ -146,7 +148,7 @@ for (const viewport of [
       );
 
       const longHost = page.getByRole('button', {
-        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
+        name: /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 Proxmox console connections, health Critical/,
       });
       await expect(longHost.locator('.node-name')).toHaveCSS('opacity', '1');
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '0');
@@ -155,7 +157,7 @@ for (const viewport of [
       await expect(longHost.locator('.node-load')).toHaveCSS('opacity', '1');
       const tooltip = longHost.locator('xpath=..').locator('[role="tooltip"]');
       await expect(tooltip).toContainText('40 idle VMs');
-      await expect(tooltip).toContainText('6 console-active VMs');
+      await expect(tooltip).toContainText('6 Proxmox console connections');
       await expect(tooltip).toContainText('Swap 28%');
       await expect(tooltip).toHaveCSS('opacity', '1');
     }
@@ -187,7 +189,7 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await waitForHydration(page);
 
   const plotHost = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 Proxmox console connections, health Warning/,
   });
   await plotHost.focus();
   await expect(plotHost.locator('.node-load')).toHaveCSS('opacity', '1');
@@ -219,7 +221,7 @@ test('plot provides keyboard selection and host detail', async ({ page }) => {
   await expect(page.getByText('Compute-node selection cleared.')).toBeVisible();
 
   const firstHost = page.getByRole('button', {
-    name: /pve-001, 1 idle VM, 1 console-active VM, health Healthy/,
+    name: /pve-001, 1 idle VM, 1 Proxmox console connection, health Healthy/,
   });
   await expect(firstHost.locator('.node-health')).toHaveCount(0);
   await firstHost.focus();
@@ -247,13 +249,13 @@ test('long zero-load node labels retain a usable circular minimum size', async (
   await waitForHydration(page);
 
   const longNameNode = page.getByRole('button', {
-    name: /pve-compute-host-with-a-long-operator-facing-name, 0 idle VMs, 0 console-active VMs, health Critical/,
+    name: /pve-compute-host-with-a-long-operator-facing-name, 0 idle VMs, 0 Proxmox console connections, health Critical/,
   });
   const disc = longNameNode.locator('.node-disc');
   const box = await disc.boundingBox();
   const shortNameBox = await page
     .getByRole('button', {
-      name: /pve-001, 0 idle VMs, 0 console-active VMs, health Healthy/,
+      name: /pve-001, 0 idle VMs, 0 Proxmox console connections, health Healthy/,
     })
     .locator('.node-disc')
     .boundingBox();
@@ -284,9 +286,9 @@ test('idle-VM load alone determines node diameter ordering', async ({
 
   const sizes = await Promise.all(
     [
-      /pve-001, 1 idle VM, 1 console-active VM, health Healthy/,
-      /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
-      /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 console-active VMs, health Critical/,
+      /pve-001, 1 idle VM, 1 Proxmox console connection, health Healthy/,
+      /pve-002, 4 idle VMs, 2 Proxmox console connections, health Warning/,
+      /pve-compute-host-with-a-long-operator-facing-name, 40 idle VMs, 6 Proxmox console connections, health Critical/,
     ].map(async (name) => {
       const box = await page
         .getByRole('button', { name })
@@ -303,7 +305,7 @@ test('idle-VM load alone determines node diameter ordering', async ({
 
 test('switches load distribution to storage main-disk attribution', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/hypervisor');
   await waitForHydration(page);
 
@@ -324,12 +326,38 @@ test('switches load distribution to storage main-disk attribution', async ({
   await expect(storageView).toHaveAttribute('aria-pressed', 'true');
   await expect(computeView).toHaveAttribute('aria-pressed', 'false');
   await expect(
-    page.getByText("Idle VMs by primary drive's NAS in Production Proxmox."),
+    page.getByText("Idle VMs by main drive's NAS in Production Proxmox."),
   ).toBeVisible();
-  await expect(page.locator('.load-radar .radar-active')).toHaveCount(2);
+  await expect(page.locator('.load-radar .radar-active')).toHaveCount(0);
+  await expect(
+    page.locator('.load-radar .radar-active-distribution'),
+  ).toHaveCount(1);
+  await expect(page.locator('.radar-active-distribution')).toHaveCSS(
+    'fill',
+    'rgb(212, 164, 231)',
+  );
+  expect(
+    await page.locator('.radar-active-distribution').getAttribute('points'),
+  ).not.toBe(await page.locator('.radar-idle').getAttribute('points'));
+  const storagePoints = (await page
+    .locator('.radar-active-distribution')
+    .getAttribute('points'))!
+    .split(' ')
+    .map((point) => point.split(',').map(Number));
+  expect(
+    Math.max(...storagePoints.map(([x, y]) => Math.hypot(x - 50, y - 50))),
+  ).toBeCloseTo(34 * (2 / 3));
+  await expect(page.locator('.console-summary')).toHaveText(
+    '3 Proxmox console connections',
+  );
+  await page.screenshot({
+    path: testInfo.outputPath('storage-active-distribution.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
 
   const storage = page.getByRole('button', {
-    name: /shared-vmstore, 8 idle VMs, 2 console-active VMs, health Warning/,
+    name: /shared-vmstore, 8 idle VMs, 2 Proxmox console connections, health Warning/,
   });
   await storage.click();
   await expect(
@@ -339,7 +367,7 @@ test('switches load distribution to storage main-disk attribution', async ({
   await expect(page.locator('.node-detail')).toContainText(/I\/O wait\s+7%/);
 });
 
-test('one console-active VM renders one lavender active spoke', async ({
+test('one console connection renders a filled lavender active distribution', async ({
   page,
   request,
 }) => {
@@ -347,14 +375,94 @@ test('one console-active VM renders one lavender active spoke', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
 
-  await expect(page.locator('.load-radar .radar-active')).toHaveCount(1);
-  await expect(page.locator('.radar-active')).toHaveCSS(
-    'stroke-dasharray',
-    'none',
+  await expect(
+    page.locator('.load-radar .radar-active-distribution'),
+  ).toHaveCount(1);
+  await expect(page.locator('.radar-active-distribution')).toHaveCSS(
+    'fill',
+    'rgb(212, 164, 231)',
   );
   await expect(page.locator('.console-summary')).toHaveText(
-    '1 console-active VM',
+    '1 Proxmox console connection',
   );
+});
+
+test('counts multiple console connections to one VM', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?hypervisor=console-two`);
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  await expect(page.locator('.console-summary')).toHaveText(
+    '2 Proxmox console connections',
+  );
+  await expect(
+    page.getByRole('button', {
+      name: /pve-001, 1 idle VM, 2 Proxmox console connections, health Healthy/,
+    }),
+  ).toBeVisible();
+});
+
+test('scales compute connection distribution against all console connections', async ({
+  page,
+}) => {
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  const points = (await page
+    .locator('.radar-active-distribution')
+    .getAttribute('points'))!
+    .split(' ')
+    .map((point) => point.split(',').map(Number));
+  expect(
+    Math.max(...points.map(([x, y]) => Math.hypot(x - 50, y - 50))),
+  ).toBeCloseTo(34 * (6 / 9));
+});
+
+test('one compute target renders a proportional console-connection ring', async ({
+  page,
+  request,
+}) => {
+  await request.get(`${mockCore}/__test/control?hypervisor=one`);
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+
+  await expect(page.locator('.compact-node-field')).toHaveCount(1);
+  await expect(page.locator('.active-distribution-ring')).toHaveCount(1);
+  await expect(page.locator('.active-distribution-ring')).toHaveCSS(
+    'border-color',
+    'rgb(212, 164, 231)',
+  );
+});
+
+test('one storage target renders a proportional console-connection ring', async ({
+  page,
+  request,
+}, testInfo) => {
+  await request.get(`${mockCore}/__test/control?hypervisor=storage-one`);
+  await page.goto('/hypervisor');
+  await waitForHydration(page);
+  await page
+    .locator('.load-view-toggle')
+    .getByRole('button', { name: 'Storage', exact: true })
+    .click();
+
+  await expect(page.locator('.compact-node-field')).toHaveCount(1);
+  await expect(page.locator('.active-distribution-ring')).toHaveCount(1);
+  await expect(page.locator('.active-distribution-ring')).toHaveCSS(
+    'border-color',
+    'rgb(212, 164, 231)',
+  );
+  await expect(page.locator('.console-summary')).toHaveText(
+    '2 Proxmox console connections',
+  );
+  await page.screenshot({
+    path: testInfo.outputPath('storage-active-ring.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
 });
 
 test('storage attribution remains explicit when guest disk reads are unavailable', async ({
@@ -423,7 +531,7 @@ test('touch selects a host without topology controls', async ({ browser }) => {
   await expect(track).toHaveAttribute('aria-expanded', 'true');
   await expect(track.locator('[role="tooltip"]')).toHaveCSS('opacity', '1');
   const host = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 Proxmox console connections, health Warning/,
   });
   await host.tap();
   await expect(host).toHaveAttribute('aria-pressed', 'true');
@@ -442,7 +550,7 @@ test('selection survives live authoritative data replacement', async ({
   await page.goto('/hypervisor');
   await waitForHydration(page);
   const initial = page.getByRole('button', {
-    name: /pve-002, 4 idle VMs, 2 console-active VMs, health Warning/,
+    name: /pve-002, 4 idle VMs, 2 Proxmox console connections, health Warning/,
   });
   await initial.click();
   await expect(initial).toHaveAttribute('aria-pressed', 'true');
@@ -454,11 +562,11 @@ test('selection survives live authoritative data replacement', async ({
     })
     .toBe(1);
   const updated = page.getByRole('button', {
-    name: /pve-002, 5 idle VMs, 2 console-active VMs, health Warning/,
+    name: /pve-002, 5 idle VMs, 2 Proxmox console connections, health Warning/,
   });
   await expect(updated).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('.node-detail p')).toHaveText(
-    '5 idle VMs · 2 console-active VMs',
+    '5 idle VMs · 2 Proxmox console connections',
   );
 });
 
@@ -483,7 +591,7 @@ for (const scenario of [
       await expect(page.locator('.compact-node-field')).toHaveCount(1);
       await expect(page.locator('.node-count')).toHaveCount(0);
       await expect(page.locator('.console-summary')).toHaveText(
-        '1 console-active VM',
+        '1 Proxmox console connection',
       );
     }
     if (scenario.mode === 'zero') {

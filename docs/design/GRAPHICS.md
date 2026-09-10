@@ -113,11 +113,11 @@ the [W3C SVG accessibility note](https://www.w3.org/TR/SVG/access) and
 ## Hypervisor pilot
 
 The Hypervisor pilot asks: “Which Proxmox host or main-disk storage target currently
-carries the most idle VMs, which has guests with an open Proxmox console, and what
-is that target's current health?” It uses the existing cluster read model: host and
-storage metrics, cluster freshness, running-guest counts, active-console counts,
-and a complete in-memory attribution of each running guest to the storage backing
-its bootable main disk.
+carries the most idle VMs, where open Proxmox console connections are concentrated,
+and what is that target's current health?” It uses the existing cluster read model:
+host and storage metrics, cluster freshness, running-guest counts, distinct
+console-active guest counts, console-connection counts, and a complete in-memory
+attribution of each running guest to the storage backing its bootable main disk.
 
 The summary surface is flat and divided horizontally. On wide screens the compact
 host/storage tracks, vertically stacked utilization gauges, and Load distribution
@@ -149,24 +149,26 @@ running guest configuration, Storage explicitly says attribution is unavailable
 rather than presenting a partial load distribution; Compute remains available.
 
 One- and two-target views use direct proportional controls rather than a radial
-diagram; three through 12 targets use matching radar vertices and a solid idle
-polygon. Each nonzero console-active value renders as one solid restrained-lavender
-spoke from the center along its target axis. It is deliberately not a closed or
-dashed polygon: a single console-active VM must produce one visible active mark,
-not an outbound-and-return pair. The compact footer prints the console-active total
-without a decorative legend rule; the idle legend and duplicate idle counts below
-node circles are omitted. If any per-node active-task read is unavailable, the
-graphic says so rather than presenting a partial or zero count, while the
-running-guest inventory continues to determine idle capacity. The controls remain
-the textual equivalent and source of selection. Each target shows only its name by
-default, then switches its circle to idle and console-active counts on hover or
-focus; its tooltip and selected detail repeat both counts with CPU, RAM, and swap
-context in Compute, or used capacity and I/O wait in Storage. The semantic ring
-conveys the target state without a repeated status word. Selecting a target expands
-it without introducing a cyan selection ring; clicking unoccupied field space or
-pressing `Escape` clears the selection. The interactive controls and selected detail
-are the textual equivalent for this intentionally compact comparison; the former
-duplicate metrics table is omitted.
+diagram; each target adds a restrained-lavender concentric ring whose diameter
+encodes that target's share of all open console connections in the displayed view.
+Three through 12 targets use matching radar vertices and a solid idle polygon. Both
+Compute and Storage render console-connection values as a matching
+restrained-lavender filled polygon. The lavender series uses the displayed-view
+console-connection total as its zero-based domain; the idle polygon and node-disc
+diameters continue to use the idle-VM domain. The compact footer prints the
+console-connection total without a decorative legend rule; the idle legend and
+duplicate idle counts below node circles are omitted. If any per-node active-task
+read is unavailable, the graphic says so rather than presenting a partial or zero
+count, while the running-guest inventory continues to determine idle capacity. The
+controls remain the textual equivalent and source of selection. Each target shows
+only its name by default, then switches its circle to idle-VM and console-connection
+counts on hover or focus; its tooltip and selected detail repeat both counts with
+CPU, RAM, and swap context in Compute, or used capacity and I/O wait in Storage. The
+semantic ring conveys the target state without a repeated status word. Selecting a
+target expands it without introducing a cyan selection ring; clicking unoccupied
+field space or pressing `Escape` clears the selection. The interactive controls and
+selected detail are the textual equivalent for this intentionally compact
+comparison; the former duplicate metrics table is omitted.
 
 Circle diameter follows idle-VM utilization from a shared, bounded baseline derived
 from the longest displayed name segment in the current view. The shared baseline
@@ -177,8 +179,11 @@ remain available through the native title, tooltip, selection detail, and access
 label. Visible names preserve normal word and separator breaks before emergency
 wrapping and remain limited to three lines.
 
-Console-active means that Proxmox reports an open `vncproxy` task for a running
-VM/CT. It is not a general in-guest login or CPU-activity claim. The graphic draws
-no edges because the source contains no relationship data. Individual VM placement,
+Each console connection is one open Proxmox `vncproxy` task for a running VM/CT;
+multiple tasks for the same guest are separate connections. It is not a general
+in-guest login or CPU-activity claim. A task can remain associated with the node
+where it was opened after a guest migration, so Core attributes it to the guest's
+authoritative current host before this graphic consumes it. The graphic draws no
+edges because the source contains no relationship data. Individual VM placement,
 migration paths, traffic, pan/zoom, drag, and layout controls remain out of scope
 until Core exposes authoritative relationships.

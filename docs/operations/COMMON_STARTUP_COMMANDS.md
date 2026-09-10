@@ -22,8 +22,11 @@ open <http://localhost:5173>.
 Rebuild the local images and run the stack in the foreground:
 
 ```sh
-npm run dev
+npm start
 ```
+
+`npm run dev` remains available. If `make` is installed, use `make start`
+instead.
 
 Use `Ctrl+C` to stop following the foreground process. Then run the stop command
 below to remove the containers cleanly if needed.
@@ -40,17 +43,23 @@ Stop and remove the local containers while keeping the PostgreSQL development
 volume:
 
 ```sh
-npm run down
+npm stop
 ```
+
+`npm run down` remains available. If `make` is installed, use `make stop`
+instead.
 
 ## Restart
 
 For a clean local restart that retains development data:
 
 ```sh
-npm run down
-npm run dev
+npm restart
 ```
+
+If `make` is installed, use `make restart` instead. `restart` is equivalent to
+stopping the local containers and starting the rebuilt stack; it retains the
+PostgreSQL development volume.
 
 To restart in the background, replace the second command with:
 

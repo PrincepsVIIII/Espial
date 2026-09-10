@@ -14,7 +14,7 @@ export interface HypervisorHostMetric {
 export interface HypervisorLoadNode {
   id: string;
   idle_vms: number;
-  active_vms: number;
+  console_connections: number;
 }
 
 export interface HypervisorStorageMetric {
@@ -30,13 +30,13 @@ export interface HypervisorStorageMetric {
 export interface HostGraphicRow extends HypervisorHostMetric {
   kind: 'compute';
   idle_vms: number;
-  active_vms: number;
+  console_connections: number;
 }
 
 export interface StorageGraphicRow extends HypervisorStorageMetric {
   kind: 'storage';
   idle_vms: number;
-  active_vms: number;
+  console_connections: number;
 }
 
 export type LoadGraphicRow = HostGraphicRow | StorageGraphicRow;
@@ -121,8 +121,8 @@ export function hostGraphicRows(
     loads.map((load) => [
       load.id,
       {
-        idle_vms: activeVMCount(load.idle_vms),
-        active_vms: activeVMCount(load.active_vms),
+        idle_vms: nonnegativeCount(load.idle_vms),
+        console_connections: nonnegativeCount(load.console_connections),
       },
     ]),
   );
@@ -135,7 +135,7 @@ export function hostGraphicRows(
         kind: 'compute' as const,
         id,
         idle_vms: loadsByID.get(id)?.idle_vms ?? 0,
-        active_vms: loadsByID.get(id)?.active_vms ?? 0,
+        console_connections: loadsByID.get(id)?.console_connections ?? 0,
         cpu_percent: finiteNumber(host?.cpu_percent),
         ram_percent: finiteNumber(host?.ram_percent),
         cpu_cores: finiteNumber(host?.cpu_cores),
@@ -156,8 +156,8 @@ export function storageGraphicRows(
     loads.map((load) => [
       load.id,
       {
-        idle_vms: activeVMCount(load.idle_vms),
-        active_vms: activeVMCount(load.active_vms),
+        idle_vms: nonnegativeCount(load.idle_vms),
+        console_connections: nonnegativeCount(load.console_connections),
       },
     ]),
   );
@@ -170,7 +170,7 @@ export function storageGraphicRows(
         kind: 'storage' as const,
         id,
         idle_vms: loadsByID.get(id)?.idle_vms ?? 0,
-        active_vms: loadsByID.get(id)?.active_vms ?? 0,
+        console_connections: loadsByID.get(id)?.console_connections ?? 0,
         used_bytes: finiteNumber(item?.used_bytes),
         total_bytes: finiteNumber(item?.total_bytes),
         used_percent: finiteNumber(item?.used_percent),
@@ -211,6 +211,6 @@ export function statusLabel(value: string): string {
   return state.charAt(0).toUpperCase() + state.slice(1);
 }
 
-function activeVMCount(value: number): number {
+function nonnegativeCount(value: number): number {
   return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
 }

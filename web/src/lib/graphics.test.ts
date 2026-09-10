@@ -72,23 +72,27 @@ describe('Hypervisor host graphic data', () => {
 
   it('joins metrics and counts with stable ordering and explicit zero load', () => {
     expect(
-      hostGraphicRows(hosts, [{ id: 'pve-a', idle_vms: 3, active_vms: 1 }]).map(
-        ({ id, idle_vms, active_vms }) => ({ id, idle_vms, active_vms }),
-      ),
+      hostGraphicRows(hosts, [
+        { id: 'pve-a', idle_vms: 3, console_connections: 1 },
+      ]).map(({ id, idle_vms, console_connections }) => ({
+        id,
+        idle_vms,
+        console_connections,
+      })),
     ).toEqual([
-      { id: 'pve-a', idle_vms: 3, active_vms: 1 },
-      { id: 'pve-b', idle_vms: 0, active_vms: 0 },
+      { id: 'pve-a', idle_vms: 3, console_connections: 1 },
+      { id: 'pve-b', idle_vms: 0, console_connections: 0 },
     ]);
   });
 
   it('keeps load-only hosts visible with unknown compute metrics', () => {
     const rows = hostGraphicRows(hosts, [
-      { id: 'pve-c', idle_vms: 2, active_vms: 1 },
-      { id: 'pve-a', idle_vms: Number.NaN, active_vms: Number.NaN },
+      { id: 'pve-c', idle_vms: 2, console_connections: 1 },
+      { id: 'pve-a', idle_vms: Number.NaN, console_connections: Number.NaN },
     ]);
     expect(rows.map((row) => row.id)).toEqual(['pve-a', 'pve-b', 'pve-c']);
     expect(rows[0].idle_vms).toBe(0);
-    expect(rows[0].active_vms).toBe(0);
+    expect(rows[0].console_connections).toBe(0);
     expect(rows[2].cpu_percent).toBeNull();
     expect(rows[2].health_state).toBe('unknown');
   });
@@ -127,17 +131,17 @@ describe('Hypervisor host graphic data', () => {
           health_state: 'healthy',
         },
       ],
-      [{ id: 'iscsi-main', idle_vms: 3, active_vms: 1 }],
+      [{ id: 'iscsi-main', idle_vms: 3, console_connections: 1 }],
     );
     expect(
-      rows.map(({ id, idle_vms, active_vms }) => ({
+      rows.map(({ id, idle_vms, console_connections }) => ({
         id,
         idle_vms,
-        active_vms,
+        console_connections,
       })),
     ).toEqual([
-      { id: 'iscsi-main', idle_vms: 3, active_vms: 1 },
-      { id: 'local-zfs', idle_vms: 0, active_vms: 0 },
+      { id: 'iscsi-main', idle_vms: 3, console_connections: 1 },
+      { id: 'local-zfs', idle_vms: 0, console_connections: 0 },
     ]);
   });
 });
